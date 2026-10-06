@@ -192,13 +192,13 @@ fn draw_watermark(ctx: &mut RenderContext, view: Affine, page: &Page, wm: &wordc
         return;
     }
     let diag = if wm.diagonal { ((page.w as f64).powi(2) + (page.h.min(2000.0) as f64).powi(2)).sqrt() } else { page.w as f64 };
-    let size = (diag * 0.7 / raw_w).min(300.0);
+    let size = (diag * 0.5 / raw_w).min(200.0);
     let k = size / upem;
     let angle = if wm.diagonal { -((page.h.min(2000.0) as f64) / page.w.max(1.0) as f64).atan() } else { 0.0 };
     let base = Affine::translate((page.w as f64 / 2.0, page.h.min(2000.0) as f64 / 2.0))
         * Affine::rotate(angle)
         * Affine::translate((-raw_w * size / 2.0, size * 0.35));
-    ctx.set_paint(color(wm.color, if wm.semitransparent { 0.5 } else { 1.0 }));
+    ctx.set_paint(color(wm.color, if wm.semitransparent { 0.35 } else { 0.8 }));
     let db = FontDb::global();
     let mut x = 0.0;
     for g in &glyphs {

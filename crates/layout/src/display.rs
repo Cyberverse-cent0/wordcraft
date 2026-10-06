@@ -173,6 +173,35 @@ fn lines(
         let top = y + (line.top - first.top);
         let base = top + (line.baseline - line.top);
         let bottom = top + line.height;
+        // Commented text gets a soft shade (comment anchors are object markers).
+        if opts.markup
+            && let Some(p) = para
+        {
+            let mut open: Option<usize> = None;
+            let mut ranges = Vec::new();
+            for off in p.object_offsets() {
+                match p.object_at(off) {
+                    Some(InlineObject::CommentStart { .. }) => open = open.or(Some(off)),
+                    Some(InlineObject::CommentEnd { .. }) => {
+                        ranges.push((open.take().unwrap_or(0), off));
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(o) = open {
+                ranges.push((o, p.len()));
+            }
+            for (a, b) in ranges {
+                if b <= line.start || a >= line.stop {
+                    continue;
+                }
+                if let (Some(x0), Some(x1)) = (pl.x_of(li, a.max(line.start)), pl.x_of(li, b.min(line.stop)))
+                    && x1 > x0
+                {
+                    out.push(Draw::Fill { rect: Rect::new(x + x0, top, x1 - x0, line.height), color: Rgb(0xEF, 0xE3, 0xF7), alpha });
+                }
+            }
+        }
         // Backgrounds first: highlight and character shading.
         for k in line.c0..line.c1 {
             let (Some(c), Some(cx), Some(nx)) = (pl.clusters.get(k), line.xs.get(k - line.c0), line.xs.get(k + 1 - line.c0)) else { continue };

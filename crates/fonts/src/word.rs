@@ -98,14 +98,18 @@ pub fn line_metrics(face: &crate::FontFace) -> (f64, f64) {
     }
     let mut v = (face.ascent.max(1.0), face.descent.abs());
     if let Some(f) = face.skrifa() {
-        if let Ok(os2) = f.os2() {
-            let (a, d) = (os2.us_win_ascent() as f64, os2.us_win_descent() as f64);
-            if a > 0.0 && a + d < face.upem * 4.0 {
-                v = (a, d);
-            }
-        } else if let Ok(hhea) = f.hhea() {
-            let gap = hhea.line_gap().to_i16().max(0) as f64;
-            v = (hhea.ascender().to_i16() as f64 + gap, (hhea.descender().to_i16() as f64).abs());
+        // hhea ascender + descender + line gap (Word on macOS); OS/2 win metrics only when the
+        // hhea values are missing, and never more than twice the em.
+        let hhea = f.hhea().ok().map(|h| {
+            let gap = h.line_gap().to_i16().max(0) as f64;
+            (h.ascender().to_i16() as f64 + gap / 2.0, (h.descender().to_i16() as f64).abs() + gap / 2.0)
+        });
+        let win = f.os2().ok().map(|o| (o.us_win_ascent() as f64, o.us_win_descent() as f64));
+        let ok = |m: &(f64, f64)| m.0 > 0.0 && m.0 + m.1 <= face.upem * 2.0;
+        if let Some(m) = hhea.filter(ok) {
+            v = m;
+        } else if let Some(m) = win.filter(ok) {
+            v = m;
         }
     }
     cache.lock().unwrap_or_else(|e| e.into_inner()).insert(face.id(), v);

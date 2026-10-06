@@ -932,7 +932,7 @@ fn proof_issues(p: &Paragraph) -> Vec<(usize, usize, bool)> {
     if p.text.trim().is_empty() || p.text.len() > 100_000 {
         return Vec::new();
     }
-    let text: String = p.text.chars().map(|c| if c == OBJ { ' ' } else { c }).collect();
+    let text = proof_text(p);
     let skip = |a: usize, b: usize| {
         p.run_ranges().any(|(r, c)| r.start < b && a < r.end && (c.no_proof == Some(true) || c.hidden == Some(true) || c.link.is_some()))
     };
@@ -940,4 +940,21 @@ fn proof_issues(p: &Paragraph) -> Vec<(usize, usize, bool)> {
         wordcraft_proof::check_spelling(&text).into_iter().filter(|i| !skip(i.start, i.end)).map(|i| (i.start, i.end, false)).collect();
     v.extend(wordcraft_proof::check_grammar(&text).into_iter().filter(|i| !skip(i.start, i.end)).map(|i| (i.start, i.end, true)));
     v
+}
+
+/// Text for proofing with the same byte offsets: inline objects and tracked deletions become
+/// U+0001 bytes (neither words nor spaces).
+pub fn proof_text(p: &wordcraft_doc::Paragraph) -> String {
+    let mut out = String::with_capacity(p.text.len());
+    for (i, c) in p.text.char_indices() {
+        let deleted = c == wordcraft_doc::para::OBJ || p.props_of_char(i).del.is_some();
+        if deleted {
+            for _ in 0..c.len_utf8() {
+                out.push('\u{1}');
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
