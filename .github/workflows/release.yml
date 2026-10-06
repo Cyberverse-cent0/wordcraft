@@ -275,9 +275,48 @@ jobs:
           path: dist/release/*
           if-no-files-found: error
 
+  freebsd:
+    name: FreeBSD x86_64
+    needs: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      WORDCRAFT_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build in a FreeBSD VM
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1
+        with:
+          release: "14.3"
+          usesh: true
+          cpu: 4
+          mem: 12288
+          envs: WORDCRAFT_VERSION
+          copyback: true
+          prepare: |
+            pkg install -y git curl pkgconf cmake python3 libxkbcommon wayland libX11 libXcursor libXrandr libXi libxcb mesa-libs vulkan-loader gtk3 fontconfig freetype2 alsa-lib
+            curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
+          run: |
+            . "$HOME/.cargo/env"
+            git config --global --add safe.directory "*"
+            cargo run -q -p xtask -- version set "$WORDCRAFT_VERSION"
+            cargo build --release --locked -p wordcraft -p wordcraft-cli
+            name="wordcraft-$WORDCRAFT_VERSION-freebsd-x86_64"
+            mkdir -p "dist/release/$name"
+            cp target/release/wordcraft target/release/wordcraft-cli LICENSE-MIT LICENSE-APACHE NOTICE ATTRIBUTION.md README.md "dist/release/$name/"
+            cp packaging/linux/ai.storyteller.wordcraft.desktop "dist/release/$name/"
+            cp assets/app-icon/hicolor/256x256/apps/ai.storyteller.wordcraft.png "dist/release/$name/"
+            tar -C dist/release -czf "dist/release/$name.tar.gz" "$name"
+            rm -rf "dist/release/$name" target
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-freebsd
+          path: dist/release/*.tar.gz
+          if-no-files-found: error
+
   release:
     name: Draft GitHub Release
-    needs: [version, macos, windows, linux, web]
+    needs: [version, macos, windows, linux, web, freebsd]
     runs-on: ubuntu-latest
     environment: release
     permissions:
