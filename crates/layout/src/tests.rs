@@ -235,3 +235,21 @@ fn empty_center_tab_then_right_tab() {
     let end = l.caret(&Pos::body(0, 11)).unwrap().x;
     assert!((end - (72.0 + 468.0)).abs() < 1.0, "{end}");
 }
+
+#[test]
+fn footnotes_sit_at_page_bottom() {
+    let mut d = Document::from_text(&"Body text line.\n".repeat(30));
+    let mut note = wordcraft_doc::Paragraph::with_text("The note text.", Default::default()).styled("FootnoteText");
+    note.props.space_after = Some(0.0);
+    let id = d.add_part(wordcraft_doc::PartKind::Footnote, vec![wordcraft_doc::para_block(note)]);
+    d.insert_object(&Pos::body(3, 4), InlineObject::NoteRef { kind: wordcraft_doc::para::NoteKind::Footnote, id, custom: String::new() }, &Default::default()).unwrap();
+    let eid = d.add_part(wordcraft_doc::PartKind::Endnote, vec![wordcraft_doc::para_block(wordcraft_doc::Paragraph::with_text("An endnote.", Default::default()))]);
+    d.insert_object(&Pos::body(5, 2), InlineObject::NoteRef { kind: wordcraft_doc::para::NoteKind::Endnote, id: eid, custom: String::new() }, &Default::default()).unwrap();
+    let l = lay(&d);
+    let c = l.caret_on(&Pos { story: StoryRef::Part(id), path: Path::top(0), off: 0 }, 0).unwrap();
+    assert_eq!(c.page, 0);
+    assert!(c.top > 650.0 && c.top < 720.0, "{c:?}");
+    let body_bottom = l.pages[0].items.iter().filter_map(|it| if let Placed::Lines { story: StoryRef::Body, y, para, l0, l1, .. } = it { item_bottom(*y, para, *l0, *l1) } else { None }).fold(0.0f32, f32::max);
+    assert!(body_bottom < c.top, "{body_bottom} {}", c.top);
+    assert!(l.caret_on(&Pos { story: StoryRef::Part(eid), path: Path::top(0), off: 0 }, 0).is_some());
+}

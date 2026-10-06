@@ -179,8 +179,9 @@ fn note(s: &mut Session, v: &Value, kind: NoteKind) -> CmdResult {
     para.insert_text(len, &format!(" {text}"), &CharProps::default())?;
     s.doc.set_story(StoryRef::Part(id), vec![para_block(para)])?;
     let at = delete_selection(s)?;
-    let end = s.doc.insert_object(&at, InlineObject::NoteRef { kind, id, custom: String::new() }, &CharProps { style: Some(refstyle.into()), ..Default::default() })?;
-    s.sel = Selection::caret(end);
+    s.doc.insert_object(&at, InlineObject::NoteRef { kind, id, custom: String::new() }, &CharProps { style: Some(refstyle.into()), ..Default::default() })?;
+    // Like Word, the caret moves into the new note.
+    s.sel = Selection::caret(s.doc.end_of(StoryRef::Part(id)));
     Ok(json!({"id": id}))
 }
 

@@ -69,6 +69,20 @@ impl DocLayout {
         Some(Pos { story: best.story, path: best.path.clone(), off })
     }
 
+    /// The story whose text is under a point (body, footnotes, endnotes; not headers/footers).
+    pub fn story_at(&self, page: usize, x: f32, y: f32) -> Option<StoryRef> {
+        let p = self.pages.get(page)?;
+        p.items.iter().find_map(|it| match it {
+            Placed::Lines { story, para, l0, l1, x: lx, y: ly, .. } => {
+                let first = para.lines.get(*l0)?;
+                let last = para.lines.get(l1.checked_sub(1)?)?;
+                let bottom = ly + last.top + last.height - first.top;
+                (y >= *ly - 2.0 && y <= bottom + 2.0 && x >= *lx - 40.0 && x <= lx + last.right + 40.0).then_some(*story)
+            }
+            _ => None,
+        })
+    }
+
     /// Which header/footer (if any) is at (x, y) on a page — for double-click editing.
     pub fn header_footer_at(&self, page: usize, y: f32) -> Option<(StoryRef, bool)> {
         let p = self.pages.get(page)?;

@@ -330,10 +330,42 @@ struct PageBuilder<'a> {
     bottom: f32,
     number: u32,
     web: bool,
+    /// Footnotes waiting for the bottom of the current page: (part id, items, height).
+    notes: Vec<(u32, Vec<Placed>, f32)>,
+    /// Page bottom before footnotes took space.
+    orig_bottom: f32,
 }
 
+/// Gap above the footnote separator and its length.
+const NOTE_SEP: f32 = 12.0;
+
 impl PageBuilder<'_> {
+    /// Space footnotes take at the bottom of the page.
+    fn notes_h(&self) -> f32 {
+        if self.notes.is_empty() { 0.0 } else { NOTE_SEP + self.notes.iter().map(|n| n.2).sum::<f32>() }
+    }
+    /// Place the collected footnotes at the bottom of the current page.
+    fn flush_notes(&mut self) {
+        if self.notes.is_empty() {
+            return;
+        }
+        let total = self.notes_h();
+        let x = self.sect.margin_left + self.sect.gutter;
+        let mut y = self.orig_bottom - total + NOTE_SEP;
+        let notes = std::mem::take(&mut self.notes);
+        if let Some(pg) = self.pages.last_mut() {
+            pg.items.push(Placed::Rule { x0: x, y0: y - NOTE_SEP / 2.0, x1: x + 144.0, y1: y - NOTE_SEP / 2.0, border: Border { style: wordcraft_doc::props::BorderStyle::Single, width: 0.5, color: None, space: 0.0 } });
+            for (_, items, h) in notes {
+                for mut it in items {
+                    it.translate(x, y);
+                    pg.items.push(it);
+                }
+                y += h;
+            }
+        }
+    }
     fn new_page(&mut self, first_block: usize, body_top: f32) {
+        self.flush_notes();
         let s = self.sect;
         self.number += 1;
         let (w, h) = if self.web { (s.page_w, f32::MAX / 4.0) } else { (s.page_w, s.page_h) };
@@ -343,6 +375,7 @@ impl PageBuilder<'_> {
         self.cols = s.column_boxes();
         self.top = body_top;
         self.bottom = if self.web { f32::MAX / 8.0 } else { s.page_h - s.margin_bottom };
+        self.orig_bottom = self.bottom;
         self.y = self.top;
     }
     fn col_x(&self) -> f32 {
@@ -420,7 +453,7 @@ pub fn layout(doc: &Document, cache: &mut LayoutCache, opts: &LayoutOptions) -> 
     } else {
         first_sect
     };
-    let mut pb = PageBuilder { pages: Vec::new(), sect: sect_ref, sect_idx: 0, col: 0, cols: Vec::new(), y: 0.0, top: 0.0, bottom: 0.0, number: 0, web };
+    let mut pb = PageBuilder { pages: Vec::new(), sect: sect_ref, sect_idx: 0, col: 0, cols: Vec::new(), y: 0.0, top: 0.0, bottom: 0.0, number: 0, web, notes: Vec::new(), orig_bottom: 0.0 };
     let mut block = 0usize;
     for (si, (end, sect)) in sections.iter().enumerate() {
         let sect: &SectionProps = if web { sect_ref } else { sect };
@@ -461,6 +494,37 @@ pub fn layout(doc: &Document, cache: &mut LayoutCache, opts: &LayoutOptions) -> 
     if pb.pages.is_empty() {
         pb.new_page(0, sect_ref.margin_top);
     }
+    // Endnotes after the last paragraph.
+    let endnotes: Vec<u32> = {
+        let mut ids: Vec<(u32, u32)> = ctx.fields.notes.iter().filter(|(id, _)| doc.parts.get(id).is_some_and(|p| p.kind == wordcraft_doc::PartKind::Endnote)).map(|(a, b)| (*b, *a)).collect();
+        ids.sort();
+        ids.into_iter().map(|(_, id)| id).collect()
+    };
+    if !endnotes.is_empty() && !web {
+        pb.y += 12.0;
+        let (x, ry) = (pb.col_x(), pb.y);
+        if let Some(pg) = pb.page() {
+            pg.items.push(Placed::Rule { x0: x, y0: ry, x1: x + 144.0, y1: ry, border: Border { style: wordcraft_doc::props::BorderStyle::Single, width: 0.5, color: None, space: 0.0 } });
+        }
+        pb.y += 8.0;
+        for id in endnotes {
+            let Some(part) = doc.parts.get(&id) else { continue };
+            let blocks = part.blocks.clone();
+            let (items, h) = layout_box(&mut ctx, StoryRef::Part(id), &blocks, &[], pb.col_w(), None, 0);
+            if pb.y + h > pb.bottom && !pb.at_top() {
+                pb.advance(block, pb.top);
+            }
+            let (x, y) = (pb.col_x(), pb.y);
+            if let Some(pg) = pb.page() {
+                for mut it in items {
+                    it.translate(x, y);
+                    pg.items.push(it);
+                }
+            }
+            pb.y += h;
+        }
+    }
+    pb.flush_notes();
     let mut pages = pb.pages;
     if web && let Some(p) = pages.first_mut() {
         let bottom = p.items.iter().filter_map(|it| if let Placed::Lines { y, para, l0, l1, .. } = it { item_bottom(*y, para, *l0, *l1) } else { None }).fold(0.0f32, f32::max);
@@ -524,15 +588,32 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
         let Some(first) = pl.lines.get(l0) else { break };
         let mut l1 = l0;
         let mut forced_break = None;
+        let mut new_notes: Vec<(u32, Vec<Placed>, f32)> = Vec::new();
         while l1 < n {
             let Some(l) = pl.lines.get(l1) else { break };
+            // Footnotes referenced on this line go to the bottom of this page.
+            let mut line_notes = Vec::new();
+            if !pb.web {
+                for (ci, id) in &pl.notes {
+                    if *ci >= l.c0 && *ci < l.c1 && !pb.notes.iter().chain(new_notes.iter()).any(|x| x.0 == *id) {
+                        if let Some(part) = ctx.doc.parts.get(id).filter(|p| p.kind == wordcraft_doc::PartKind::Footnote) {
+                            let blocks = part.blocks.clone();
+                            let (items, h) = layout_box(ctx, StoryRef::Part(*id), &blocks, &[], pb.sect.text_width(), None, 0);
+                            line_notes.push((*id, items, h));
+                        }
+                    }
+                }
+            }
+            let extra: f32 = line_notes.iter().map(|n| n.2).sum::<f32>() + if pb.notes.is_empty() && new_notes.is_empty() && !line_notes.is_empty() { NOTE_SEP } else { 0.0 };
+            let limit = pb.bottom - new_notes.iter().map(|n| n.2).sum::<f32>() - if pb.notes.is_empty() && !new_notes.is_empty() { NOTE_SEP } else { 0.0 } - extra;
             let bottom = pb.y + (l.top + l.height - first.top);
-            if bottom > pb.bottom + 0.01 && l1 > l0 {
+            if bottom > limit + 0.01 && l1 > l0 {
                 break;
             }
-            if bottom > pb.bottom + 0.01 && l1 == l0 && !pb.at_top() {
+            if bottom > limit + 0.01 && l1 == l0 && !pb.at_top() {
                 break;
             }
+            new_notes.extend(line_notes);
             l1 += 1;
             if matches!(l.end, LineEnd::PageBreak | LineEnd::ColumnBreak) && !pb.web {
                 forced_break = Some(l.end);
@@ -555,6 +636,12 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
                 continue;
             }
         }
+        // Keep only the notes of the lines that are placed.
+        let placed_end = pl.lines.get(l1.saturating_sub(1)).map(|l| l.c1).unwrap_or(0);
+        new_notes.retain(|(id, ..)| pl.notes.iter().any(|(ci, nid)| nid == id && *ci < placed_end));
+        let before = pb.notes_h();
+        pb.notes.extend(new_notes);
+        pb.bottom -= pb.notes_h() - before;
         let x = pb.col_x();
         let y = pb.y;
         let mut items = Vec::new();
