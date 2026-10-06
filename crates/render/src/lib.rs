@@ -436,3 +436,12 @@ mod tests {
         }
     }
 }
+
+/// Render the page area (`x`, `y`, `w`×`h` points) at `scale` px/pt — for previews and thumbnails.
+pub fn render_area(doc: &Document, page: &Page, x: f32, y: f32, w: f32, h: f32, scale: f32, opts: &RenderOptions) -> Rendered {
+    let scale = if scale.is_finite() && scale > 0.0 { scale } else { 1.0 };
+    let pw = ((w * scale).ceil() as u32).clamp(1, MAX_SIDE);
+    let ph = ((h * scale).ceil() as u32).clamp(1, MAX_SIDE);
+    let view = Affine::scale(scale as f64) * Affine::translate((-x as f64, -y as f64));
+    render_region(doc, page, pw, ph, view, opts)
+}

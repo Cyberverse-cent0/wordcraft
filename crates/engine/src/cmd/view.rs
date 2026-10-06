@@ -41,13 +41,11 @@ pub fn specs() -> Vec<CommandSpec> {
             let z = ((s.view.zoom * 10.0).round() / 10.0 + 0.1).min(5.0);
             zoom(s, &json!({"value": z * 100.0}))
         })
-        .key("Mod+Shift+=")
         .pure(),
         CommandSpec::new("view.zoomOut", "Zoom Out", "Status Bar", |s, _| {
             let z = ((s.view.zoom * 10.0).round() / 10.0 - 0.1).max(0.1);
             zoom(s, &json!({"value": z * 100.0}))
         })
-        .key("Mod+-")
         .pure(),
         CommandSpec::new("view.onePage", "One Page", "View › Zoom", |s, _| zoom(s, &json!({"value": "onePage"}))).pure(),
         CommandSpec::new("view.multiplePages", "Multiple Pages", "View › Zoom", |s, _| zoom(s, &json!({"value": "multiplePages"}))).pure(),

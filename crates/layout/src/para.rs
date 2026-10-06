@@ -571,7 +571,16 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
                 }
                 _ => {}
             }
-            let fits = x + c.adv <= right_edge + 0.01 || c.kind == ClKind::Space || c.kind == ClKind::Marker;
+            // Text after a right/centre tab grows leftwards into the tab's space first.
+            let absorbs = pending_tab.is_some_and(|(tj, stop, _)| {
+                let room = pl.clusters.get(tj).map(|t| t.adv).unwrap_or(0.0);
+                match stop.align {
+                    TabAlign::Right | TabAlign::Decimal => room >= c.adv,
+                    TabAlign::Center => room >= c.adv / 2.0 && x + c.adv / 2.0 <= right_edge + 0.01,
+                    _ => false,
+                }
+            });
+            let fits = absorbs || x + c.adv <= right_edge + 0.01 || c.kind == ClKind::Space || c.kind == ClKind::Marker;
             if !fits && j > c0 {
                 // Wrap: back up to the last break opportunity on this line.
                 end = LineEnd::Wrap;
@@ -631,6 +640,10 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
                 last_break = Some(j);
             }
             j += 1;
+        }
+        if end == LineEnd::Para || end == LineEnd::Wrap {
+            let xc = x;
+            resolve_tab(pl, &mut pending_tab, &mut xs, c0, xc, &mut x);
         }
         if j >= n && end != LineEnd::Wrap && !matches!(end, LineEnd::LineBreak | LineEnd::PageBreak | LineEnd::ColumnBreak) {
             end = LineEnd::Para;
@@ -795,8 +808,27 @@ fn pl_text_at(c: &Cluster) -> bool {
     c.dot
 }
 
-fn resolve_tab(_pl: &mut ParaLayout, pending: &mut Option<(usize, TabStop, f32)>, _xs: &mut [f32], _c0: usize, _x: f32, _xo: &mut f32) {
-    *pending = None;
+fn resolve_tab(pl: &mut ParaLayout, pending: &mut Option<(usize, TabStop, f32)>, xs: &mut [f32], c0: usize, x: f32, xo: &mut f32) {
+    // Finish a centre/right/decimal tab: its text (possibly empty) ends at `x`.
+    let Some((tj, stop, tx)) = pending.take() else { return };
+    let seg = x - tx - pl.clusters.get(tj).map(|c| c.adv).unwrap_or(0.0);
+    let want = match stop.align {
+        TabAlign::Right | TabAlign::Decimal => stop.pos - tx - seg,
+        TabAlign::Center => stop.pos - tx - seg / 2.0,
+        _ => return,
+    }
+    .max(0.0);
+    let old = pl.clusters.get(tj).map(|c| c.adv).unwrap_or(0.0);
+    let delta = want - old;
+    if delta.abs() > 0.001 {
+        if let Some(c) = pl.clusters.get_mut(tj) {
+            c.adv = want;
+        }
+        for v in xs.iter_mut().skip(tj + 1 - c0) {
+            *v += delta;
+        }
+        *xo += delta;
+    }
 }
 
 impl ParaLayout {

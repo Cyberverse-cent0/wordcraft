@@ -226,3 +226,12 @@ fn layout_is_fast() {
     eprintln!("3000 paragraphs, {} pages: cold {cold:.1} ms, warm {warm:.1} ms", l.pages.len());
     assert!(warm < cold);
 }
+
+#[test]
+fn empty_center_tab_then_right_tab() {
+    let mut d = Document::from_text("left\t\tright");
+    d.format_paragraphs(&Pos::body(0, 0), &Pos::body(0, 0), &|p| p.style = Some("Header".into())).unwrap();
+    let l = lay(&d);
+    let end = l.caret(&Pos::body(0, 11)).unwrap().x;
+    assert!((end - (72.0 + 468.0)).abs() < 1.0, "{end}");
+}
