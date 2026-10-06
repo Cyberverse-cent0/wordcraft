@@ -39,6 +39,49 @@ pub fn specs() -> Vec<CommandSpec> {
         .pure(),
         CommandSpec::new("review.wordCount", "Word Count", "Review › Proofing", word_count).pure(),
         CommandSpec::new("review.changes", "Reviewing Pane", "Review › Tracking", list_changes).pure(),
+        CommandSpec::new("review.spelling", "Spelling & Grammar", "Review › Proofing", next_issue).key("F7").pure(),
+        CommandSpec::new("review.issues", "Proofing Issues", "Review › Proofing", all_issues).pure(),
+        CommandSpec::new("review.suggestions", "Spelling Suggestions", "Review › Proofing", suggestions).params(r#"{"pos"?: Pos}"#).pure(),
+        CommandSpec::new("review.addToDictionary", "Add to Dictionary", "Review › Proofing", |s, v| {
+            let w = match p::str(v, "word") {
+                Some(w) => w.to_string(),
+                None => issue_at(s, &s.sel.focus.clone()).map(|(a, b, _)| s.doc.para_at(&a).and_then(|p| p.text.get(a.off..b.off).map(str::to_string)).unwrap_or_default()).unwrap_or_default(),
+            };
+            if w.is_empty() {
+                return Err(CmdError::Params("no word".into()));
+            }
+            wordcraft_proof::add_word(&w);
+            s.relayout();
+            Ok(json!({"added": w}))
+        })
+        .params(r#"{"word"?: string}"#)
+        .pure(),
+        CommandSpec::new("review.ignoreAll", "Ignore All", "Review › Proofing", |s, v| {
+            let w = match p::str(v, "word") {
+                Some(w) => w.to_string(),
+                None => issue_at(s, &s.sel.focus.clone()).map(|(a, b, _)| s.doc.para_at(&a).and_then(|p| p.text.get(a.off..b.off).map(str::to_string)).unwrap_or_default()).unwrap_or_default(),
+            };
+            wordcraft_proof::add_word(&w);
+            s.relayout();
+            Ok(json!({"ignored": w}))
+        })
+        .pure(),
+        CommandSpec::new("review.applySuggestion", "Change", "Review › Proofing", |s, v| {
+            let text = p::req_str(v, "text")?.to_string();
+            let at = s.sel.focus.clone();
+            if let Some((a, b, _)) = issue_at(s, &at) {
+                s.sel = Selection { anchor: a, focus: b };
+            }
+            super::type_text(s, &text)?;
+            sel_result(s)
+        })
+        .params(r#"{"text": string}"#),
+        CommandSpec::new("review.proofing", "Check Spelling as You Type", "File › Options › Proofing", |s, v| {
+            s.view.proofing = p::bool(v, "value").unwrap_or(!s.view.proofing);
+            Ok(json!({"value": s.view.proofing}))
+        })
+        .pure(),
+        CommandSpec::new("review.thesaurus", "Thesaurus", "Review › Proofing", thesaurus).key("Shift+F7").pure(),
     ]
 }
 
@@ -309,4 +352,116 @@ fn word_count(s: &mut Session, _: &Value) -> CmdResult {
     };
     let pages = s.layout().pages.len();
     Ok(json!({"pages": pages, "words": words, "characters": chars_no_spaces, "charactersWithSpaces": chars, "paragraphs": paragraphs, "lines": lines}))
+}
+
+/// Issues (spelling + grammar) in one paragraph as positions.
+fn para_issues(s: &Session, story: StoryRef, path: &wordcraft_doc::Path) -> Vec<(Pos, Pos, wordcraft_proof::Issue)> {
+    let Some(p) = s.doc.para(story, path) else { return Vec::new() };
+    let text: String = p.text.chars().map(|c| if c == wordcraft_doc::para::OBJ { ' ' } else { c }).collect();
+    let mut v: Vec<wordcraft_proof::Issue> = wordcraft_proof::check_spelling(&text);
+    v.extend(wordcraft_proof::check_grammar(&text));
+    v.sort_by_key(|i| i.start);
+    v.into_iter()
+        .filter(|i| !p.run_ranges().any(|(r, c)| r.start < i.end && i.start < r.end && (c.no_proof == Some(true) || c.link.is_some())))
+        .map(|i| (Pos { story, path: path.clone(), off: i.start }, Pos { story, path: path.clone(), off: i.end }, i))
+        .collect()
+}
+
+/// The issue under a position.
+fn issue_at(s: &Session, at: &Pos) -> Option<(Pos, Pos, wordcraft_proof::Issue)> {
+    para_issues(s, at.story, &at.path).into_iter().find(|(a, b, _)| a.off <= at.off && at.off <= b.off)
+}
+
+fn issue_json(s: &Session, a: &Pos, b: &Pos, i: &wordcraft_proof::Issue) -> Value {
+    let word = s.doc.para_at(a).and_then(|p| p.text.get(a.off..b.off)).unwrap_or("").to_string();
+    let sugg = if i.kind == wordcraft_proof::IssueKind::Spelling { wordcraft_proof::suggest(&word, 6) } else { i.suggestions.clone() };
+    json!({"start": pos_json(a), "end": pos_json(b), "text": word, "kind": if i.kind == wordcraft_proof::IssueKind::Spelling { "spelling" } else { "grammar" }, "message": i.message, "suggestions": sugg})
+}
+
+/// F7: select the next issue after the caret and return it with suggestions.
+fn next_issue(s: &mut Session, _: &Value) -> CmdResult {
+    let caret = s.sel.ordered().1;
+    let story = caret.story;
+    let paths = s.doc.para_paths(story);
+    let start = paths.iter().position(|p| *p == caret.path).unwrap_or(0);
+    for k in 0..paths.len() {
+        let Some(path) = paths.get((start + k) % paths.len().max(1)) else { break };
+        for (a, b, i) in para_issues(s, story, path) {
+            if k == 0 && a.off < caret.off && start + k < paths.len() && paths.len() > 1 {
+                continue;
+            }
+            let r = issue_json(s, &a, &b, &i);
+            s.sel = Selection { anchor: a, focus: b };
+            return Ok(r);
+        }
+    }
+    s.status = "The spelling and grammar check is complete.".into();
+    Ok(json!({"done": true}))
+}
+
+fn all_issues(s: &mut Session, _: &Value) -> CmdResult {
+    let mut out = Vec::new();
+    for path in s.doc.para_paths(StoryRef::Body) {
+        for (a, b, i) in para_issues(s, StoryRef::Body, &path) {
+            out.push(issue_json(s, &a, &b, &i));
+            if out.len() >= 500 {
+                return Ok(Value::Array(out));
+            }
+        }
+    }
+    Ok(Value::Array(out))
+}
+
+fn suggestions(s: &mut Session, v: &Value) -> CmdResult {
+    let at = v.get("pos").and_then(super::parse_pos).unwrap_or_else(|| s.sel.focus.clone());
+    match issue_at(s, &at) {
+        Some((a, b, i)) => Ok(issue_json(s, &a, &b, &i)),
+        None => Ok(Value::Null),
+    }
+}
+
+/// A tiny built-in thesaurus of common words (our own list).
+fn thesaurus(s: &mut Session, v: &Value) -> CmdResult {
+    const T: &[(&str, &[&str])] = &[
+        ("good", &["fine", "excellent", "decent", "solid", "worthy"]),
+        ("bad", &["poor", "inferior", "faulty", "unpleasant"]),
+        ("big", &["large", "huge", "sizable", "vast", "major"]),
+        ("small", &["little", "tiny", "compact", "minor", "modest"]),
+        ("fast", &["quick", "rapid", "swift", "speedy"]),
+        ("slow", &["unhurried", "gradual", "leisurely", "sluggish"]),
+        ("happy", &["glad", "cheerful", "content", "joyful", "pleased"]),
+        ("sad", &["unhappy", "sorrowful", "downcast", "gloomy"]),
+        ("important", &["significant", "key", "vital", "essential", "major"]),
+        ("show", &["display", "reveal", "present", "demonstrate"]),
+        ("make", &["create", "build", "produce", "craft", "form"]),
+        ("use", &["employ", "apply", "utilize", "operate"]),
+        ("help", &["assist", "aid", "support", "serve"]),
+        ("start", &["begin", "launch", "open", "initiate"]),
+        ("end", &["finish", "close", "conclude", "stop"]),
+        ("say", &["state", "tell", "remark", "mention"]),
+        ("think", &["believe", "consider", "reckon", "suppose"]),
+        ("new", &["fresh", "novel", "recent", "modern"]),
+        ("old", &["aged", "former", "ancient", "vintage"]),
+        ("beautiful", &["lovely", "attractive", "gorgeous", "stunning"]),
+        ("easy", &["simple", "effortless", "straightforward"]),
+        ("hard", &["difficult", "tough", "demanding", "firm"]),
+        ("work", &["labor", "effort", "job", "task", "operate"]),
+        ("idea", &["concept", "notion", "thought", "plan"]),
+        ("change", &["alter", "modify", "adjust", "shift"]),
+        ("great", &["excellent", "superb", "terrific", "considerable"]),
+        ("very", &["extremely", "highly", "truly", "really"]),
+        ("shared", &["common", "joint", "communal", "mutual"]),
+        ("community", &["group", "society", "collective", "circle"]),
+    ];
+    let word = match p::str(v, "word") {
+        Some(w) => w.to_lowercase(),
+        None => {
+            let f = s.sel.focus.clone();
+            let p = s.doc.para_at(&f).ok_or_else(|| CmdError::Failed("no word".into()))?;
+            let (a, b) = p.word_at(f.off);
+            p.text.get(a..b).unwrap_or("").trim().to_lowercase()
+        }
+    };
+    let syn = T.iter().find(|(w, _)| *w == word).map(|(_, l)| l.to_vec()).unwrap_or_default();
+    Ok(json!({"word": word, "synonyms": syn}))
 }

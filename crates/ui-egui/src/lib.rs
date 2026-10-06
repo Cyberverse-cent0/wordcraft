@@ -31,7 +31,16 @@ pub struct Services {
     pub pick_open: Option<Box<dyn Fn(&str) -> Option<String>>>,
     /// Pick a path to save to, given a suggested name.
     pub pick_save: Option<Box<dyn Fn(&str) -> Option<String>>>,
+    /// Web: open a file picker; the file arrives later through `inbox`.
+    pub open_async: Option<Box<dyn Fn(&str)>>,
+    /// Web: files (name, bytes) delivered asynchronously (picker, drag and drop).
+    pub inbox: Option<Inbox>,
+    /// Web: hand bytes to the browser as a download.
+    pub download: Option<Box<dyn Fn(&str, &[u8])>>,
 }
+
+/// Files delivered asynchronously.
+pub type Inbox = std::sync::Arc<std::sync::Mutex<Vec<(String, Vec<u8>)>>>;
 
 /// UI state that persists between runs (and that agents can read and set).
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -124,6 +133,17 @@ impl WordApp {
     pub fn run(&mut self, id: &str, params: Value) -> Result<Value, String> {
         if let Some(r) = self.ui_command(id, &params) {
             return r;
+        }
+        // Web: saving and exporting become downloads.
+        if self.services.download.is_some() && matches!(id, "file.save" | "file.saveAs" | "file.exportPdf" | "file.exportPng") {
+            let name = params.get("path").and_then(Value::as_str).map(str::to_string).unwrap_or_else(|| format!("{}.docx", self.title_stem()));
+            let name = if id == "file.exportPdf" && !name.ends_with(".pdf") { format!("{name}.pdf") } else { name };
+            let bytes = wordcraft_engine::io::save_bytes(&name, &self.session.doc)?;
+            if let Some(d) = &self.services.download {
+                d(&name, &bytes);
+            }
+            self.session.dirty = false;
+            return Ok(json!({"downloaded": name, "bytes": bytes.len()}));
         }
         let r = self.session.run(id, &params).map_err(|e| e.to_string());
         self.after_command(id);
@@ -231,6 +251,10 @@ impl WordApp {
     }
 
     fn open_dialog(&mut self) {
+        if let Some(f) = &self.services.open_async {
+            f("document");
+            return;
+        }
         let picked = self.services.pick_open.as_ref().and_then(|f| f("document"));
         if let Some(path) = picked {
             let _ = self.run("file.open", json!({"path": path}));
@@ -247,6 +271,10 @@ impl WordApp {
     }
 
     fn pick_picture(&mut self) {
+        if let Some(f) = &self.services.open_async {
+            f("picture");
+            return;
+        }
         let picked = self.services.pick_open.as_ref().and_then(|f| f("picture"));
         if let Some(path) = picked {
             let _ = self.run("insert.picture", json!({"path": path}));
@@ -279,6 +307,7 @@ impl WordApp {
             self.applied_dark = Some(dark);
         }
         self.drain_control(ctx);
+        self.drain_inbox();
         // AutoSave: write a saved document a couple of seconds after the last change.
         let now = now_ms();
         if self.autosave && self.session.dirty && self.session.path.is_some() && now - self.last_autosave > 2500.0 && now - self.canvas.caret_visible_since > 1500.0 {
@@ -353,6 +382,21 @@ impl WordApp {
         let title = format!("{}{} - WordCraft", self.title_stem(), if self.session.dirty { " •" } else { "" });
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
         self.frame_ms = now_ms() - t0;
+    }
+
+    /// Files that arrived asynchronously (web picker, drops): documents open, pictures insert.
+    fn drain_inbox(&mut self) {
+        let Some(inbox) = self.services.inbox.clone() else { return };
+        let files = std::mem::take(&mut *inbox.lock().unwrap_or_else(|e| e.into_inner()));
+        for (name, bytes) in files {
+            let lower = name.to_ascii_lowercase();
+            let data = wordcraft_engine::cmd::insert::base64_encode(&bytes);
+            let img = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"].iter().any(|e| lower.ends_with(e));
+            let r = if img { self.run("insert.picture", json!({"data": data})) } else { self.run("file.open", json!({"path": name, "data": data})) };
+            if r.is_ok() {
+                self.ui.backstage = false;
+            }
+        }
     }
 
     fn drain_control(&mut self, ctx: &egui::Context) {

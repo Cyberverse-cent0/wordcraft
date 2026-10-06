@@ -193,7 +193,7 @@ fn display_has_glyphs_and_marks() {
 fn web_view_is_one_page() {
     let d = Document::from_text(&"text ".repeat(3000));
     let mut c = LayoutCache::new();
-    let l = layout(&d, &mut c, &LayoutOptions { view: ViewMode::Web, web_width: 800.0, show_hidden: false });
+    let l = layout(&d, &mut c, &LayoutOptions { view: ViewMode::Web, web_width: 800.0, show_hidden: false, proofing: false });
     assert_eq!(l.pages.len(), 1);
     assert!(l.pages[0].h > 800.0);
 }

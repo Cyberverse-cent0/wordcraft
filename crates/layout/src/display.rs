@@ -270,6 +270,19 @@ fn lines(doc: &Document, story: StoryRef, path: &Path, pl: &ParaLayout, l0: usiz
                 out.push(Draw::Line { x0, y0: sy, x1, y1: sy, width: thick, color, stroke, alpha });
             }
         }
+        // Proofing squiggles.
+        for (a, b, grammar) in &pl.issues {
+            if *b <= line.start || *a >= line.stop {
+                continue;
+            }
+            let (Some(x0), Some(x1)) = (pl.x_of(li, (*a).max(line.start)), pl.x_of(li, (*b).min(line.stop))) else { continue };
+            if x1 - x0 < 1.0 {
+                continue;
+            }
+            let y = base + 2.5;
+            let color = if *grammar { Rgb(0x2B, 0x57, 0xC0) } else { Rgb(0xE0, 0x24, 0x24) };
+            out.push(Draw::Line { x0: x + x0, y0: y, x1: x + x1, y1: y, width: 0.8, color, stroke: if *grammar { Stroke::Double } else { Stroke::Wave }, alpha });
+        }
         // Tab leaders.
         for (k, leader) in &line.leaders {
             let (Some(c), Some(a), Some(b)) = (pl.clusters.get(*k), line.xs.get(k - line.c0), line.xs.get(k + 1 - line.c0)) else { continue };

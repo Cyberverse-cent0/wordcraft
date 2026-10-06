@@ -52,6 +52,8 @@ pub struct ViewState {
     pub dark_mode: bool,
     pub show_markup: bool,
     pub track_changes_pane: bool,
+    /// Check spelling and grammar as you type.
+    pub proofing: bool,
 }
 
 impl Default for ViewState {
@@ -73,6 +75,7 @@ impl Default for ViewState {
             dark_mode: false,
             show_markup: true,
             track_changes_pane: false,
+            proofing: true,
         }
     }
 }
@@ -128,7 +131,7 @@ pub struct Session {
     typing_open: bool,
     rev: u64,
     cache: LayoutCache,
-    layout: Option<(u64, f32, ViewMode, Arc<DocLayout>)>,
+    layout: Option<(u64, f32, ViewMode, Arc<DocLayout>, bool)>,
     /// Requests from commands to the UI (open a dialog, scroll…), drained by the front end.
     pub ui_requests: Vec<Value>,
 }
@@ -177,16 +180,17 @@ impl Session {
     /// The current layout (recomputed when the document or view changed).
     pub fn layout(&mut self) -> Arc<DocLayout> {
         let ww = self.view.web_width;
-        if let Some((r, w, m, l)) = &self.layout
+        if let Some((r, w, m, l, pf)) = &self.layout
             && *r == self.rev
             && (*w == ww || self.view.mode == ViewMode::Print)
             && *m == self.view.mode
+            && *pf == self.view.proofing
         {
             return l.clone();
         }
-        let opts = LayoutOptions { view: self.view.mode, web_width: ww, show_hidden: self.view.marks };
+        let opts = LayoutOptions { view: self.view.mode, web_width: ww, show_hidden: self.view.marks, proofing: self.view.proofing };
         let l = Arc::new(wordcraft_layout::layout(&self.doc, &mut self.cache, &opts));
-        self.layout = Some((self.rev, ww, self.view.mode, l.clone()));
+        self.layout = Some((self.rev, ww, self.view.mode, l.clone(), self.view.proofing));
         l
     }
     /// Invalidate the cached layout (fonts changed etc.).

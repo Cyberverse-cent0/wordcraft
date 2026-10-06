@@ -36,6 +36,8 @@ pub struct CanvasState {
     pub render_ms: f64,
     pub ime_preedit: String,
     pub want_focus: bool,
+    pub context_issue: Option<serde_json::Value>,
+    pub context_synonyms: Option<serde_json::Value>,
 }
 
 impl Default for CanvasState {
@@ -56,6 +58,8 @@ impl Default for CanvasState {
             render_ms: 0.0,
             ime_preedit: String::new(),
             want_focus: true,
+            context_issue: None,
+            context_synonyms: None,
         }
     }
 }
@@ -302,6 +306,20 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     }
     app.canvas.focused = resp.has_focus();
     mouse(app, ui, &resp, &rects, &layout, geo.scale);
+    // Right-click: move the caret there (unless inside the selection), then the context menu.
+    if resp.secondary_clicked()
+        && let Some(p) = resp.interact_pointer_pos()
+        && let Some((page, x, y)) = page_at(&rects, geo.scale, p)
+        && let Some(pos) = layout.hit(page, x, y, app.session.sel.focus.story)
+    {
+        let (a, b) = app.session.sel.ordered();
+        if !(a <= pos && pos <= b) || app.session.sel.is_collapsed() {
+            app.session.sel = wordcraft_engine::Selection::caret(pos);
+        }
+        app.canvas.context_issue = app.session.run("review.suggestions", &json!({})).ok().filter(|v| !v.is_null());
+        app.canvas.context_synonyms = app.session.run("review.thesaurus", &json!({})).ok().and_then(|v| v.get("synonyms").cloned());
+    }
+    resp.context_menu(|ui| context_menu(app, ui));
     if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
     }
@@ -555,4 +573,79 @@ pub fn pos_from_screen(app: &mut WordApp, p: Pos2) -> Option<Pos> {
     let (page, x, y) = page_at(&app.canvas.page_rects, app.canvas.scale, p)?;
     let story = app.session.sel.focus.story;
     app.session.layout().hit(page, x, y, story)
+}
+
+fn context_menu(app: &mut WordApp, ui: &mut Ui) {
+    ui.set_min_width(220.0);
+    let item = |ui: &mut Ui, app: &mut WordApp, label: &str, id: &str, params: serde_json::Value| {
+        let sc = crate::widgets::shortcut_text(app, id);
+        let on = crate::widgets::enabled(app, id);
+        if ui.add_enabled(on, egui::Button::new(label).shortcut_text(sc)).clicked() {
+            let _ = app.run(id, params);
+            ui.close();
+        }
+    };
+    if let Some(issue) = app.canvas.context_issue.clone() {
+        let sugg: Vec<String> = issue.get("suggestions").and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+        ui.label(egui::RichText::new(issue.get("message").and_then(|m| m.as_str()).unwrap_or("")).small().weak());
+        if sugg.is_empty() {
+            ui.label(egui::RichText::new("(no suggestions)").italics());
+        }
+        for sgt in sugg {
+            if ui.button(egui::RichText::new(&sgt).strong()).clicked() {
+                let _ = app.run("review.applySuggestion", json!({"text": sgt}));
+                ui.close();
+            }
+        }
+        if issue.get("kind").and_then(|k| k.as_str()) == Some("spelling") {
+            item(ui, app, "Ignore All", "review.ignoreAll", json!({}));
+            item(ui, app, "Add to Dictionary", "review.addToDictionary", json!({}));
+        }
+        ui.separator();
+    }
+    item(ui, app, "Cut", "edit.cut", json!({}));
+    if ui.add(egui::Button::new("Copy").shortcut_text(crate::widgets::shortcut_text(app, "edit.copy"))).clicked() {
+        if let Ok(r) = app.run("edit.copy", json!({}))
+            && let Some(t) = r.get("text").and_then(|t| t.as_str())
+        {
+            ui.ctx().copy_text(t.to_string());
+        }
+        ui.close();
+    }
+    item(ui, app, "Paste", "edit.paste", json!({}));
+    ui.separator();
+    if let Some(syn) = app.canvas.context_synonyms.clone().and_then(|v| v.as_array().cloned()).filter(|a| !a.is_empty()) {
+        ui.menu_button("Synonyms", |ui| {
+            for w in syn.iter().filter_map(|x| x.as_str()) {
+                if ui.button(w).clicked() {
+                    let _ = app.run("select.word", json!({}));
+                    let (a, b) = app.session.sel.ordered();
+                    let trimmed = app.session.doc.para_at(&a).and_then(|p| p.text.get(a.off..b.off)).map(|t| t.trim_end().len()).unwrap_or(0);
+                    let end = wordcraft_doc::Pos { off: a.off + trimmed, ..b };
+                    app.session.sel = wordcraft_engine::Selection { anchor: a, focus: end };
+                    let _ = app.run("text.insert", json!({"text": w, "raw": true}));
+                    ui.close();
+                }
+            }
+        });
+    }
+    item(ui, app, "Font…", "ui.dialog", json!({"name": "font"}));
+    item(ui, app, "Paragraph…", "ui.dialog", json!({"name": "paragraph"}));
+    item(ui, app, "Link…", "ui.dialog", json!({"name": "link"}));
+    item(ui, app, "New Comment", "review.newComment", json!({}));
+    if app.session.sel.focus.path.cell().is_some() {
+        ui.separator();
+        ui.menu_button("Insert", |ui| {
+            item(ui, app, "Insert Rows Above", "table.insertRowAbove", json!({}));
+            item(ui, app, "Insert Rows Below", "table.insertRowBelow", json!({}));
+            item(ui, app, "Insert Columns to the Left", "table.insertColumnLeft", json!({}));
+            item(ui, app, "Insert Columns to the Right", "table.insertColumnRight", json!({}));
+        });
+        ui.menu_button("Delete", |ui| {
+            item(ui, app, "Delete Rows", "table.deleteRow", json!({}));
+            item(ui, app, "Delete Columns", "table.deleteColumn", json!({}));
+            item(ui, app, "Delete Table", "table.deleteTable", json!({}));
+        });
+        item(ui, app, "Merge Cells", "table.merge", json!({}));
+    }
 }

@@ -130,6 +130,8 @@ pub struct ParaLayout {
     pub has_page_fields: bool,
     /// Note references (part id) in this paragraph, by cluster index.
     pub notes: Vec<(usize, u32)>,
+    /// Proofing issues: (byte start, byte end, grammar?).
+    pub issues: Vec<(usize, usize, bool)>,
 }
 
 /// Inputs that change a paragraph's layout beyond its own content.
@@ -142,6 +144,7 @@ pub struct ParaEnv<'a> {
     pub show_hidden: bool,
     /// Extra style applied to every run (table style conditional formatting), under direct formatting.
     pub table_chr: Option<&'a CharProps>,
+    pub proofing: bool,
 }
 
 fn style_key(rc: &ResolvedChar) -> String {
@@ -461,6 +464,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
         text_len: p.text.len(),
         has_page_fields,
         notes,
+        issues: if env.proofing { proof_issues(p) } else { Vec::new() },
     };
     break_lines(&mut pl, env, mark_style, env.label.as_ref().map(|(_, l)| l.suffix));
     pl
@@ -892,4 +896,16 @@ impl ParaLayout {
         let Some(l) = self.lines.get(li) else { return (10.0, 3.0) };
         (l.baseline - l.top, l.top + l.height - l.baseline)
     }
+}
+
+/// Spelling and grammar issues in a paragraph (skipping "do not check" and hidden runs).
+fn proof_issues(p: &Paragraph) -> Vec<(usize, usize, bool)> {
+    if p.text.trim().is_empty() || p.text.len() > 100_000 {
+        return Vec::new();
+    }
+    let text: String = p.text.chars().map(|c| if c == OBJ { ' ' } else { c }).collect();
+    let skip = |a: usize, b: usize| p.run_ranges().any(|(r, c)| r.start < b && a < r.end && (c.no_proof == Some(true) || c.hidden == Some(true) || c.link.is_some()));
+    let mut v: Vec<(usize, usize, bool)> = wordcraft_proof::check_spelling(&text).into_iter().filter(|i| !skip(i.start, i.end)).map(|i| (i.start, i.end, false)).collect();
+    v.extend(wordcraft_proof::check_grammar(&text).into_iter().filter(|i| !skip(i.start, i.end)).map(|i| (i.start, i.end, true)));
+    v
 }

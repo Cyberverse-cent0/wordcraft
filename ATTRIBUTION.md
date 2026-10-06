@@ -8,6 +8,8 @@ Generated-in-code art is original and has no file to list: the UI icon set (`cra
 
 | Asset | Author | Source | Licence | Notes |
 |---|---|---|---|---|
+| `assets/hyphenation/en-us.pat` | DesignCraft contributors (generated) | trained from the Moby list by DesignCraft's patgen | Public Domain (CC0-1.0) | Our own Liang hyphenation patterns (no TeX patterns) |
+| `assets/hyphenation/en-us.dic` | Grady Ward (Moby Hyphenator II word list); converted by DesignCraft contributors | https://www.gutenberg.org/ebooks/3204 (file `mhyph.txt`, SHA-256 `eeb30474c86b8af3469035ec1a0913e35905325ca885290db9dfed9881e230ac`), via DesignCraft | Public Domain | ~165k words with break points; drives spelling and hyphenation |
 | `assets/app-icon/wordcraft-1024.png` | WordCraft contributors | original artwork drawn in SVG (`assets/app-icon/wordcraft.svg`), rendered by `packaging/icons.sh` | MIT OR Apache-2.0 | Placeholder app icon until the WordCraft mascot drawing lands |
 | `assets/app-icon/wordcraft-macos-512.png` | WordCraft contributors | original artwork drawn in SVG (`assets/app-icon/wordcraft.svg`), rendered by `packaging/icons.sh` | MIT OR Apache-2.0 | Placeholder app icon until the WordCraft mascot drawing lands |
 | `assets/app-icon/wordcraft.icns` | WordCraft contributors | original artwork drawn in SVG (`assets/app-icon/wordcraft.svg`), rendered by `packaging/icons.sh` | MIT OR Apache-2.0 | Placeholder app icon until the WordCraft mascot drawing lands |
