@@ -11,7 +11,7 @@ use wordcraft_doc::{Pos, StoryRef};
 use wordcraft_layout::{DocLayout, Page, Placed};
 
 use crate::WordApp;
-use crate::theme::{Tokens, regular};
+use crate::theme::{Tokens, regular, semibold};
 
 /// Points on screen per document point at 100% (96 px per inch, like a word processor).
 pub const PX_PER_PT: f32 = 96.0 / 72.0;
@@ -71,9 +71,18 @@ pub struct Geometry {
     pub scale: f32,
 }
 
+/// Width of the markup area beside each page for comment balloons (points), or 0.
+pub fn markup_width(app: &WordApp) -> f32 {
+    let v = &app.session.view;
+    // Word shows comments either in balloons (contextual) or in the Comments pane (list).
+    let on = v.show_markup && !v.comments_pane && !v.read_mode && !v.multi_page && v.mode == wordcraft_layout::ViewMode::Print;
+    if on && !app.session.doc.comments.is_empty() { 216.0 } else { 0.0 }
+}
+
 pub fn geometry(app: &WordApp, l: &DocLayout, avail: egui::Vec2) -> Geometry {
     let v = &app.session.view;
-    let maxw = l.pages.iter().map(|p| p.w).fold(0.0f32, f32::max).max(72.0);
+    let markup = markup_width(app);
+    let maxw = l.pages.iter().map(|p| p.w).fold(0.0f32, f32::max).max(72.0) + markup;
     let maxh = l.pages.iter().map(|p| p.h.min(20_000.0)).fold(0.0f32, f32::max).max(72.0);
     let web = v.mode != wordcraft_layout::ViewMode::Print;
     let mut scale = v.zoom.clamp(0.1, 5.0) * PX_PER_PT;
@@ -99,7 +108,9 @@ pub fn geometry(app: &WordApp, l: &DocLayout, avail: egui::Vec2) -> Geometry {
         let h = chunk.iter().map(|p| p.h.min(1e6) * scale).fold(0.0f32, f32::max);
         let mut x = (content_w - row_w) / 2.0;
         for p in chunk {
-            rects.push(Rect::from_min_size(pos2(x, y), vec2(p.w * scale, p.h.min(1e6) * scale)));
+            // Pages narrower than the widest keep their markup area beside them.
+            let px = x + (maxw - markup - p.w).max(0.0) * scale / 2.0;
+            rects.push(Rect::from_min_size(pos2(px, y), vec2(p.w * scale, p.h.min(1e6) * scale)));
             x += maxw * scale + GAP;
         }
         y += h + GAP;
@@ -258,6 +269,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         let n = layout.pages.len();
         app.canvas.textures.retain(|k, _| *k < n);
         app.canvas.page_rects = rects.clone();
+        balloons(app, ui, &painter, &rects, &layout, geo.scale);
         // Selection.
         if !app.session.sel.is_collapsed() {
             let (a, b) = app.session.sel.ordered();
@@ -336,6 +348,87 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     let _ = origin;
     if let (Some(h), Some(v)) = (hruler, vruler) {
         rulers(app, ui, h, v, &rects, &layout, geo.scale);
+    }
+}
+
+/// Comment balloons in the markup area right of each page, joined to their anchors.
+fn balloons(app: &mut WordApp, ui: &mut Ui, painter: &egui::Painter, rects: &[Rect], layout: &DocLayout, scale: f32) {
+    let mw = markup_width(app);
+    if mw <= 0.0 {
+        return;
+    }
+    let t = Tokens::get(ui.ctx());
+    let clip = ui.clip_rect();
+    // (page, anchor x, anchor y, id) for each anchored, unresolved-or-not comment.
+    let mut by_page: HashMap<usize, Vec<(f32, f32, u32, Pos)>> = HashMap::new();
+    for (id, pos) in wordcraft_engine::cmd::review::comment_list(&app.session) {
+        let Some(pos) = pos else { continue };
+        let Some(c) = layout.caret_on(&pos, app.session.page_hint) else { continue };
+        by_page.entry(c.page).or_default().push((c.x, c.top + c.height, id, pos));
+    }
+    let palette = [t.blue, Color32::from_rgb(0xB0, 0x3A, 0x2E), Color32::from_rgb(0x2E, 0x7D, 0x32), Color32::from_rgb(0x8E, 0x44, 0xAD), t.orange];
+    let mut authors: Vec<String> = Vec::new();
+    let mut clicked: Option<Pos> = None;
+    // The markup area extends each page.
+    for pr in rects {
+        let area = Rect::from_min_max(pos2(pr.max.x, pr.min.y), pos2(pr.max.x + mw * scale, pr.max.y));
+        if area.intersects(clip) {
+            painter.rect_filled(area, 0.0, Color32::from_rgb(0xF3, 0xF3, 0xF3));
+            painter.line_segment([area.left_top(), area.left_bottom()], Stroke::new(1.0, Color32::from_rgb(0xE0, 0xE0, 0xE0)));
+        }
+    }
+    for (pi, list) in by_page.iter_mut() {
+        let Some(pr) = rects.get(*pi) else { continue };
+        if !pr.expand(400.0).intersects(clip) {
+            continue;
+        }
+        list.sort_by(|a, b| a.1.total_cmp(&b.1).then(a.0.total_cmp(&b.0)));
+        let x0 = pr.max.x + 10.0;
+        let w = (mw * scale - 20.0).max(60.0);
+        let mut next_y = pr.min.y;
+        for (ax, ay, id, pos) in list.iter() {
+            let Some(c) = app.session.doc.comments.get(id) else { continue };
+            let text = app.session.doc.plain_text(StoryRef::Part(c.part));
+            let author = if c.author.is_empty() { "Author".to_string() } else { c.author.clone() };
+            let ai = authors.iter().position(|a| *a == author).unwrap_or_else(|| {
+                authors.push(author.clone());
+                authors.len() - 1
+            });
+            let color = palette.get(ai % palette.len()).copied().unwrap_or(t.blue);
+            let fs = (11.0 * scale / PX_PER_PT).clamp(8.0, 16.0);
+            let head = painter.layout(author.clone(), semibold(fs), t.text, w - 16.0);
+            let body = painter.layout(text.trim().to_string(), regular(fs), if c.resolved { t.text_dim } else { t.text }, w - 16.0);
+            let h = head.size().y + body.size().y + 16.0;
+            let anchor = pos2(pr.min.x + ax * scale, pr.min.y + ay * scale);
+            let top = (anchor.y - 12.0).max(next_y);
+            let card = Rect::from_min_size(pos2(x0, top), vec2(w, h));
+            next_y = card.max.y + 6.0;
+            if !card.intersects(clip) {
+                continue;
+            }
+            let selected = app.session.sel.focus.path == pos.path && app.session.sel.focus.story == pos.story;
+            // Leader: from the anchor along the text to the page edge, then to the card.
+            let lead = Stroke::new(if selected { 1.5 } else { 1.0 }, color.linear_multiply(if selected { 1.0 } else { 0.7 }));
+            dashed(painter, anchor, pos2(pr.max.x, anchor.y), lead);
+            painter.line_segment([pos2(pr.max.x, anchor.y), pos2(x0, top + 10.0)], lead);
+            painter.rect_filled(card.translate(vec2(0.0, 1.0)), 4.0, t.page_shadow);
+            painter.rect_filled(card, 4.0, if selected { t.checked } else { Color32::WHITE });
+            painter.rect_stroke(card, 4.0, Stroke::new(if selected { 1.5 } else { 1.0 }, color), egui::StrokeKind::Inside);
+            painter.rect_filled(Rect::from_min_size(card.min, vec2(4.0, h)), egui::CornerRadius { nw: 4, sw: 4, ne: 0, se: 0 }, color);
+            painter.galley(pos2(card.min.x + 10.0, card.min.y + 6.0), head.clone(), t.text);
+            painter.galley(pos2(card.min.x + 10.0, card.min.y + 10.0 + head.size().y), body, t.text);
+            let r = ui.interact(card, ui.id().with(("balloon", *id)), Sense::click());
+            if r.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+            if r.clicked() {
+                clicked = Some(pos.clone());
+            }
+        }
+    }
+    if let Some(p) = clicked {
+        app.session.sel = wordcraft_engine::Selection::caret(p);
+        app.canvas.want_focus = true;
     }
 }
 

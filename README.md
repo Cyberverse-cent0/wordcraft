@@ -68,12 +68,15 @@ Every screenshot below is WordCraft itself, rendered offscreen by its own UI tes
 
 <table>
 <tr>
-<td width="50%" valign="top"><img src="docs/images/review.png" alt="The Review tab with Track Changes on: the inserted words Cheaper rent is one reason and forty are underlined in magenta, the replaced words are struck through, two commented phrases are shaded and the Comments pane on the right shows both comments with Go to, Resolve and Delete buttons" width="100%"><p align="center"><sub><b>Review.</b> Track changes, comments, accept and reject, spelling and grammar as you type.</sub></p></td>
+<td width="50%" valign="top"><img src="docs/images/review.png" alt="The Review tab with Track Changes on: the word forty is inserted in magenta and thirty struck through; three commented phrases are shaded and joined by dashed leader lines to comment balloons in a grey markup area to the right of the page" width="100%"><p align="center"><sub><b>Review.</b> Track changes, comment balloons in the margin, accept and reject, spelling and grammar as you type.</sub></p></td>
 <td width="50%" valign="top"><img src="docs/images/references.png" alt="The References tab with two pages side by side: a table of contents with dotted leaders and page numbers on page one, and a styled table, numbered list and hyperlink on page two" width="100%"><p align="center"><sub><b>References.</b> Tables of contents, footnotes, citations in APA, MLA, Chicago or IEEE, index and captions.</sub></p></td>
 </tr>
 <tr>
 <td width="50%" valign="top"><img src="docs/images/design.png" alt="The Design tab showing style-set previews; the document is set in a serif theme with plum headings underlined by thin rules and a pale diagonal DRAFT watermark behind the text" width="100%"><p align="center"><sub><b>Design.</b> Themes, style sets, paragraph spacing, watermarks, page colour and borders.</sub></p></td>
 <td width="50%" valign="top"><img src="docs/images/dark.png" alt="WordCraft in dark mode with the Insert tab open and formatting marks shown: pilcrows at paragraph ends and dots for spaces" width="100%"><p align="center"><sub><b>Dark mode</b> with formatting marks, and the Insert tab: tables, pictures, shapes, links, headers, footers, fields and symbols.</sub></p></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/images/layout.png" alt="The Layout tab at 80% zoom: the first paragraph opens with a three-line drop cap E, a dark blue circle sits beside the second section with its paragraph wrapping around it and hyphenating art-ist at the line end, every line is numbered in the left margin and a thin blue border surrounds the page" width="100%"><p align="center"><sub><b>Layout.</b> Drop caps, text wrapping around pictures and shapes, automatic hyphenation, line numbers and page borders.</sub></p></td>
 </tr>
 <tr>
 <td colspan="2"><img src="docs/images/backstage.png" alt="The File tab start page with a Good morning greeting, thumbnails of the Blank document, Studio handbook, Letter, Résumé and Report templates, and a list of recent documents" width="100%"><p align="center"><sub><b>File.</b> Start from a template, open recent documents, edit properties, export to PDF and other formats.</sub></p></td>
@@ -107,11 +110,11 @@ Every screenshot below is WordCraft itself, rendered offscreen by its own UI tes
 | **Paragraphs** | Alignment, indents (draggable on the ruler), spacing, line spacing, tabs with leaders, borders, shading, keep with next, widow/orphan control |
 | **Styles** | Built-in style set, live gallery, Styles pane, create/modify/update styles, style sets, themes |
 | **Lists** | Bullets, numbering, multilevel, restart, set value, custom formats |
-| **Tables** | Insert by grid, merge/split, styles with banded rows, borders, shading, header rows repeated across pages, sort, formulas, text ↔ table |
-| **Pages** | Margins, orientation, size, columns, page/column/section breaks, headers and footers (first page, odd/even), page numbers, watermark |
-| **Objects** | Pictures (resize, crop, recolour, brightness/contrast, transparency, background removal, picture styles, rotate), shapes, text boxes, floating position |
+| **Tables** | Insert by grid, merge/split, styles with banded rows, borders, shading, header rows repeated across pages, rows that split across pages, sort, formulas, text ↔ table |
+| **Pages** | Margins, orientation, size, columns, page/column/section breaks, headers and footers (first page, odd/even), page numbers, watermark, page borders, line numbers, vertical alignment, drop caps, automatic hyphenation |
+| **Objects** | Pictures (resize, crop, recolour, brightness/contrast, transparency, background removal, picture styles, rotate), shapes, text boxes, floating position with text wrapping (square, top and bottom, behind or in front of text) |
 | **References** | Table of contents, footnotes and endnotes, citations and bibliography (APA, MLA, Chicago, IEEE), captions, table of figures, cross-references, index, table of authorities |
-| **Review** | Spelling and grammar with suggestions, thesaurus, word count, comments, track changes, accept/reject, compare documents, restrict editing, accessibility checker, document inspector |
+| **Review** | Spelling and grammar with suggestions, thesaurus, word count, comments in margin balloons or a pane, track changes, accept/reject, compare documents, restrict editing, accessibility checker, document inspector |
 | **Mailings** | Mail merge from CSV, merge fields, address block, greeting line, rules, preview, finish to a document; envelopes and labels |
 | **View** | Print layout, web layout, draft, read mode, focus, zoom, one/multiple pages, page width, Navigation pane, rulers, gridlines, dark mode |
 | **Files** | .docx read/write (opens in Word), PDF export, .odt, .rtf, .html, .md, .txt import/export, page images |
@@ -174,10 +177,11 @@ check and the wasm build. Contributor and agent instructions: [AGENTS.md](AGENTS
 
 ## Roadmap
 
-WordCraft covers 87% of Word's ribbon features with commands today; we estimate about 58% of
-real feature parity once depth is counted. Next: text wrap around floating pictures, margin
-comment balloons, column balancing, charts, an equation editor and signed releases for every
-platform. Details and estimates: [ROADMAP.md](ROADMAP.md).
+WordCraft covers 87% of Word's ribbon features with commands today; counting depth and
+fidelity, we estimate about 62% of real feature parity. An alpha for everyday writing is close:
+the remaining work is mostly testing against real-world .docx files, native printing and the
+first signed builds. Charts, SmartArt, the equation editor and the Draw tab come after.
+Details and estimates: [ROADMAP.md](ROADMAP.md).
 
 ## The Crafting Apps
 
