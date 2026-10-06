@@ -14,6 +14,18 @@ use wordcraft_fonts::FontDb;
 use wordcraft_layout::Page;
 use wordcraft_layout::display::{DisplayOptions, Draw, Stroke, page_display};
 
+/// Worker threads for rasterising (0 on the web, where there are no threads).
+pub fn default_threads() -> u16 {
+    #[cfg(target_arch = "wasm32")]
+    {
+        0
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        std::thread::available_parallelism().map(|n| (n.get().saturating_sub(1)).clamp(1, 8) as u16).unwrap_or(2)
+    }
+}
+
 /// Largest raster side vello_cpu handles comfortably.
 pub const MAX_SIDE: u32 = 16_000;
 
@@ -161,7 +173,7 @@ pub fn render_page(doc: &Document, page: &Page, scale: f32, opts: &RenderOptions
 /// Render a page into a `w`×`h` raster with `view` (page points → pixels).
 pub fn render_region(doc: &Document, page: &Page, w: u32, h: u32, view: Affine, opts: &RenderOptions) -> Rendered {
     let (w16, h16) = (w.clamp(1, MAX_SIDE) as u16, h.clamp(1, MAX_SIDE) as u16);
-    let mut ctx = RenderContext::new(w16, h16);
+    let mut ctx = RenderContext::new_with(w16, h16, vello_cpu::RenderSettings { num_threads: default_threads(), ..Default::default() });
     ctx.set_transform(Affine::IDENTITY);
     ctx.set_paint(color(doc.settings.page_color.unwrap_or(opts.paper), 1.0));
     ctx.fill_rect(&kurbo::Rect::new(0.0, 0.0, w16 as f64, h16 as f64));

@@ -111,7 +111,7 @@ fn main() -> eframe::Result {
             "--control" => control_port = args.next().and_then(|p| p.parse().ok()),
             "--sample" => sample = true,
             "--version" => {
-                println!("wordcraft {}", env!("CARGO_PKG_VERSION"));
+                println!("wordcraft {} ({})", env!("CARGO_PKG_VERSION"), option_env!("WORDCRAFT_BUILD_SHA").map(|s| s.get(..8).unwrap_or(s)).unwrap_or("dev"));
                 return Ok(());
             }
             _ => files.push(a),
