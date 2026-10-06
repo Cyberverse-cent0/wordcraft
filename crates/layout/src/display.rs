@@ -231,6 +231,23 @@ fn lines(
                 link: None,
             });
         }
+        // Hyphen at a hyphenated line end.
+        if let Some((si, gid, adv)) = line.hyphen
+            && let Some(st) = pl.styles.get(si as usize)
+        {
+            let hx = x + line.xs.last().copied().unwrap_or(0.0) - adv;
+            out.push(Draw::Glyphs {
+                face: st.face,
+                size: st.size,
+                glyphs: vec![(gid, hx, base - st.shift)],
+                color: text_color(&st.rc.color, None),
+                alpha,
+                synth_bold: st.synth_bold,
+                synth_italic: st.synth_italic,
+                text: "-".into(),
+                link: None,
+            });
+        }
         // Glyph runs grouped by style.
         let mut k = line.c0;
         while k < line.c1 {

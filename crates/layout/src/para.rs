@@ -102,6 +102,8 @@ pub struct Line {
     /// Left and right edges available to the line.
     pub left: f32,
     pub right: f32,
+    /// The line ends at a hyphenation point: (style, glyph, advance) of the hyphen drawn there.
+    pub hyphen: Option<(u16, u32, f32)>,
 }
 
 /// The list label drawn on the first line.
@@ -134,6 +136,8 @@ pub struct ParaLayout {
     pub issues: Vec<(usize, usize, bool)>,
     /// Drop cap: (clusters at the start that form it, lines it drops, width with its gap).
     pub drop_cap: Option<(usize, u8, f32)>,
+    /// Clusters after which the line may break with a hyphen (soft hyphens, auto hyphenation), sorted.
+    pub hyph_after: Vec<u32>,
 }
 
 /// Inputs that change a paragraph's layout beyond its own content.
@@ -526,7 +530,14 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
         notes,
         issues: if env.proofing { proof_issues(p) } else { Vec::new() },
         drop_cap,
+        hyph_after: Vec::new(),
     };
+    pl.hyph_after = hyphenation_points(p, &pl, env.doc.settings.auto_hyphenation && !pl.rp.suppress_hyphens);
+    for k in pl.hyph_after.clone() {
+        if let Some(c) = pl.clusters.get_mut(k as usize) {
+            c.break_after = true;
+        }
+    }
     break_lines(&mut pl, env, mark_style, env.label.as_ref().map(|(_, l)| l.suffix));
     pl
 }
@@ -556,6 +567,7 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
     let first_left = rp.indent_left + rp.indent_first;
     let hanging_at = if rp.indent_first < 0.0 { Some(rp.indent_left) } else { None };
     let n = pl.clusters.len();
+    let mut hcache: Vec<(u16, u32, f32)> = Vec::new();
     let mut lines: Vec<Line> = Vec::new();
     let mut i = 0usize;
     let mut top = 0.0f32;
@@ -632,6 +644,7 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
         let mut xs: Vec<f32> = Vec::new();
         let mut leaders = Vec::new();
         let mut last_break: Option<usize> = None; // cluster index after which we may break
+        let mut last_plain: Option<(usize, f32)> = None; // last non-hyphen break and the x after it
         let mut end = LineEnd::Para;
         let mut j = i;
         let mut pending_tab: Option<(usize, TabStop, f32)> = None; // tab cluster, stop, x where tab started
@@ -700,6 +713,15 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
             if !fits && j > c0 {
                 // Wrap: back up to the last break opportunity on this line.
                 end = LineEnd::Wrap;
+                // Hyphenate only when the plain break leaves more than the hyphenation zone empty.
+                if let (Some(bk), Some((pj, px))) = (last_break, last_plain)
+                    && pj >= c0
+                    && pj < bk
+                    && pl.hyph_after.binary_search(&(bk as u32)).is_ok()
+                    && right_edge - px <= HYPHENATION_ZONE
+                {
+                    last_break = Some(pj);
+                }
                 if let Some(bk) = last_break.filter(|bk| *bk >= c0) {
                     xs.truncate(bk + 1 - c0);
                     j = bk + 1;
@@ -753,7 +775,13 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
                 }
             }
             if c.break_after {
-                last_break = Some(j);
+                let hyph = pl.hyph_after.binary_search(&(j as u32)).is_ok();
+                if !hyph {
+                    last_break = Some(j);
+                    last_plain = Some((j, x));
+                } else if x + hyphen_glyph(pl, c.style, &mut hcache).2 <= right_edge + 0.01 {
+                    last_break = Some(j);
+                }
             }
             j += 1;
         }
@@ -773,8 +801,12 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
             xs.push(if xs.is_empty() { line_start_x } else { last + adv });
         }
         xs.truncate(c1 - c0);
+        // A line wrapped at a hyphenation point shows a hyphen after its last cluster.
+        let hyphen = (end == LineEnd::Wrap && c1 > c0 && pl.hyph_after.binary_search(&((c1 - 1) as u32)).is_ok())
+            .then(|| pl.clusters.get(c1 - 1).map(|c| hyphen_glyph(pl, c.style, &mut hcache)))
+            .flatten();
         let end_x = match (xs.last(), c1.checked_sub(1).and_then(|k| pl.clusters.get(k))) {
-            (Some(lx), Some(c)) => lx + c.adv,
+            (Some(lx), Some(c)) => lx + c.adv + hyphen.map_or(0.0, |h| h.2),
             _ => line_start_x,
         };
         xs.push(end_x);
@@ -881,7 +913,7 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
         }
         let start = pl.clusters.get(c0).map(|c| c.start).unwrap_or(pl.text_len);
         let stop = if c1 > c0 { pl.clusters.get(c1 - 1).map(|c| c.end).unwrap_or(pl.text_len) } else { start };
-        lines.push(Line { top, height, baseline, c0, c1, xs, leaders, end, start, stop, left, right: right_edge });
+        lines.push(Line { top, height, baseline, c0, c1, xs, leaders, end, start, stop, left, right: right_edge, hyphen });
         top += height;
         first = false;
         i = j;
@@ -909,6 +941,7 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
                     stop: pl.text_len,
                     left: x0,
                     right: base_right,
+                    hyphen: None,
                 });
                 top += h;
             }
@@ -937,6 +970,71 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
     }
     pl.height = top;
     pl.lines = lines;
+}
+
+/// Word's default hyphenation zone (0.25"), points.
+const HYPHENATION_ZONE: f32 = 18.0;
+
+/// The hyphen glyph and advance in a style (cached per paragraph).
+fn hyphen_glyph(pl: &ParaLayout, style: u16, cache: &mut Vec<(u16, u32, f32)>) -> (u16, u32, f32) {
+    if let Some(h) = cache.iter().find(|h| h.0 == style) {
+        return *h;
+    }
+    let h = pl
+        .styles
+        .get(style as usize)
+        .and_then(|st| {
+            let g = wordcraft_fonts::shape(&st.face, "-", &[], |c| c).into_iter().next()?;
+            let k = st.size / st.face.upem.max(1.0) as f32 * st.rc.scale / 100.0;
+            Some((style, g.gid, g.x_advance as f32 * k))
+        })
+        .unwrap_or((style, 0, 0.0));
+    cache.push(h);
+    h
+}
+
+/// Clusters after which a line may end with a hyphen: soft hyphens always, and dictionary or
+/// pattern hyphenation points of each word when automatic hyphenation is on.
+fn hyphenation_points(p: &Paragraph, pl: &ParaLayout, auto: bool) -> Vec<u32> {
+    let mut bytes: Vec<usize> = p.text.char_indices().filter(|(_, c)| *c == SOFT_HYPHEN).map(|(i, c)| i + c.len_utf8()).collect();
+    if auto {
+        let lim = wordcraft_proof::hyphen::Limits::default();
+        let mut start: Option<usize> = None;
+        let text = &p.text;
+        for (i, c) in text.char_indices().chain(std::iter::once((text.len(), ' '))) {
+            let word_char = c.is_alphabetic() || c == '\'' || c == '\u{2019}';
+            match (start, word_char) {
+                (None, true) => start = Some(i),
+                (Some(a), false) => {
+                    if let Some(w) = text.get(a..i)
+                        && w.chars().count() >= lim.min_word
+                    {
+                        let offs: Vec<usize> = w.char_indices().map(|(o, _)| o).collect();
+                        for pt in wordcraft_proof::hyphen::hyphen_points(w, &lim) {
+                            if let Some(o) = offs.get(pt) {
+                                bytes.push(a + o);
+                            }
+                        }
+                    }
+                    start = None;
+                }
+                _ => {}
+            }
+        }
+    }
+    if bytes.is_empty() {
+        return Vec::new();
+    }
+    bytes.sort_unstable();
+    let mut out: Vec<u32> = pl
+        .clusters
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| matches!(c.kind, ClKind::Text | ClKind::Marker) && bytes.binary_search(&c.end).is_ok())
+        .map(|(i, _)| i as u32)
+        .collect();
+    out.dedup();
+    out
 }
 
 fn pl_text_at(c: &Cluster) -> bool {

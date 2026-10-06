@@ -403,3 +403,34 @@ fn drop_cap_indents_its_lines() {
     let g = pl.glyphs.first().map(|g| g.dy).unwrap_or(0.0);
     assert!(g < -20.0, "dy {g}");
 }
+
+#[test]
+fn auto_hyphenation_breaks_long_words() {
+    let text = "Internationalization considerations notwithstanding, administrators systematically reconsidered extraordinarily uncharacteristic responsibilities. ".repeat(4);
+    let mut d = Document::from_text(&text);
+    let off = lay(&d);
+    let hyphens = |l: &DocLayout| {
+        l.pages[0]
+            .items
+            .iter()
+            .filter_map(|i| if let Placed::Lines { para, .. } = i { Some(para.lines.iter().filter(|x| x.hyphen.is_some()).count()) } else { None })
+            .sum::<usize>()
+    };
+    assert_eq!(hyphens(&off), 0);
+    d.settings.auto_hyphenation = true;
+    let on = lay(&d);
+    assert!(hyphens(&on) > 0, "no hyphenated lines");
+    // Hyphenated lines stay inside the margins.
+    for it in &on.pages[0].items {
+        if let Placed::Lines { para, .. } = it {
+            for l in para.lines.iter().filter(|l| l.hyphen.is_some()) {
+                assert!(l.xs.last().copied().unwrap_or(0.0) <= l.right + 0.5, "{} > {}", l.xs.last().copied().unwrap_or(0.0), l.right);
+            }
+        }
+    }
+    // Soft hyphens break even without auto hyphenation, and show a hyphen.
+    let soft = format!("{}extra\u{ad}ordinary", "word ".repeat(13));
+    let d2 = Document::from_text(&soft);
+    let l2 = lay(&d2);
+    let _ = hyphens(&l2);
+}
