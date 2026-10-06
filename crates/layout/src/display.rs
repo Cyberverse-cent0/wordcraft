@@ -89,7 +89,8 @@ impl Default for DisplayOptions {
 
 /// Colour for revisions by author index.
 pub fn revision_color(i: u32) -> Rgb {
-    const C: [Rgb; 6] = [Rgb(0xB0, 0x1E, 0x8F), Rgb(0x1E, 0x6E, 0xB0), Rgb(0x2E, 0x8B, 0x3E), Rgb(0xC0, 0x5A, 0x10), Rgb(0x70, 0x3C, 0xB0), Rgb(0x0E, 0x7C, 0x86)];
+    const C: [Rgb; 6] =
+        [Rgb(0xB0, 0x1E, 0x8F), Rgb(0x1E, 0x6E, 0xB0), Rgb(0x2E, 0x8B, 0x3E), Rgb(0xC0, 0x5A, 0x10), Rgb(0x70, 0x3C, 0xB0), Rgb(0x0E, 0x7C, 0x86)];
     C.get(i as usize % C.len()).copied().unwrap_or(C[0])
 }
 
@@ -152,7 +153,19 @@ fn item(doc: &Document, it: &Placed, opts: &DisplayOptions, alpha: f32, out: &mu
     }
 }
 
-fn lines(doc: &Document, story: StoryRef, path: &Path, pl: &ParaLayout, l0: usize, l1: usize, x: f32, y: f32, opts: &DisplayOptions, alpha: f32, out: &mut Vec<Draw>) {
+fn lines(
+    doc: &Document,
+    story: StoryRef,
+    path: &Path,
+    pl: &ParaLayout,
+    l0: usize,
+    l1: usize,
+    x: f32,
+    y: f32,
+    opts: &DisplayOptions,
+    alpha: f32,
+    out: &mut Vec<Draw>,
+) {
     let Some(first) = pl.lines.get(l0) else { return };
     let para = doc.para(story, path);
     for li in l0..l1 {
@@ -240,7 +253,10 @@ fn lines(doc: &Document, story: StoryRef, path: &Path, pl: &ParaLayout, l0: usiz
             // Decorations across the run (underline skips trailing spaces of the line).
             let x0 = x + line.xs.get(run_start - line.c0).copied().unwrap_or(0.0);
             let mut end_k = run_end;
-            while end_k > run_start && pl.clusters.get(end_k - 1).is_some_and(|c| matches!(c.kind, ClKind::Space | ClKind::Marker | ClKind::LineBreak)) && end_k == line.c1 {
+            while end_k > run_start
+                && pl.clusters.get(end_k - 1).is_some_and(|c| matches!(c.kind, ClKind::Space | ClKind::Marker | ClKind::LineBreak))
+                && end_k == line.c1
+            {
                 end_k -= 1;
             }
             let x1 = x + line.xs.get(end_k - line.c0).copied().unwrap_or(0.0);
@@ -281,7 +297,16 @@ fn lines(doc: &Document, story: StoryRef, path: &Path, pl: &ParaLayout, l0: usiz
             }
             let y = base + 2.5;
             let color = if *grammar { Rgb(0x2B, 0x57, 0xC0) } else { Rgb(0xE0, 0x24, 0x24) };
-            out.push(Draw::Line { x0: x + x0, y0: y, x1: x + x1, y1: y, width: 0.8, color, stroke: if *grammar { Stroke::Double } else { Stroke::Wave }, alpha });
+            out.push(Draw::Line {
+                x0: x + x0,
+                y0: y,
+                x1: x + x1,
+                y1: y,
+                width: 0.8,
+                color,
+                stroke: if *grammar { Stroke::Double } else { Stroke::Wave },
+                alpha,
+            });
         }
         // Tab leaders.
         for (k, leader) in &line.leaders {
@@ -341,7 +366,16 @@ fn lines(doc: &Document, story: StoryRef, path: &Path, pl: &ParaLayout, l0: usiz
                     ClKind::LineBreak => out.push(Draw::Mark { x: cx + 1.0, baseline: base, size, ch: '↵' }),
                     ClKind::PageBreak | ClKind::ColumnBreak => {
                         let label = if c.kind == ClKind::PageBreak { '⤓' } else { '⇥' };
-                        out.push(Draw::Line { x0: cx + 2.0, y0: base - size * 0.3, x1: x + line.right, y1: base - size * 0.3, width: 0.5, color: Rgb(0x60, 0x60, 0x60), stroke: Stroke::Dotted, alpha });
+                        out.push(Draw::Line {
+                            x0: cx + 2.0,
+                            y0: base - size * 0.3,
+                            x1: x + line.right,
+                            y1: base - size * 0.3,
+                            width: 0.5,
+                            color: Rgb(0x60, 0x60, 0x60),
+                            stroke: Stroke::Dotted,
+                            alpha,
+                        });
                         out.push(Draw::Mark { x: cx + 1.0, baseline: base, size, ch: label });
                     }
                     _ => {}

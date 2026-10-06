@@ -28,14 +28,23 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("edit.cut", "Cut", "Home › Clipboard", cut).key("Mod+X").when(has_sel),
         CommandSpec::new("edit.copy", "Copy", "Home › Clipboard", copy).key("Mod+C").pure(),
         CommandSpec::new("edit.paste", "Paste", "Home › Clipboard", paste).key("Mod+V").params(r#"{"text"?: string}"#),
-        CommandSpec::new("edit.pasteText", "Paste: Keep Text Only", "Home › Clipboard › Paste", paste_text).params(r#"{"text"?: string}"#).key("Mod+Shift+Alt+V"),
+        CommandSpec::new("edit.pasteText", "Paste: Keep Text Only", "Home › Clipboard › Paste", paste_text)
+            .params(r#"{"text"?: string}"#)
+            .key("Mod+Shift+Alt+V"),
         CommandSpec::new("edit.pasteMerge", "Paste: Merge Formatting", "Home › Clipboard › Paste", paste_text).params(r#"{"text"?: string}"#),
-        CommandSpec::new("edit.find", "Find", "Home › Editing", find).key("Mod+F").params(r#"{"text": string, "matchCase"?: bool, "wholeWord"?: bool, "regex"?: bool}"#).pure(),
+        CommandSpec::new("edit.find", "Find", "Home › Editing", find)
+            .key("Mod+F")
+            .params(r#"{"text": string, "matchCase"?: bool, "wholeWord"?: bool, "regex"?: bool}"#)
+            .pure(),
         CommandSpec::new("edit.findNext", "Find Next", "Home › Editing › Find", |s, _| step(s, 1)).key("Mod+G / F3").pure(),
         CommandSpec::new("edit.findPrevious", "Find Previous", "Home › Editing › Find", |s, _| step(s, -1)).key("Mod+Shift+G / Shift+F3").pure(),
         CommandSpec::new("edit.replace", "Replace", "Home › Editing", replace).key("Mod+H").params(r#"{"text": string, "with": string}"#),
-        CommandSpec::new("edit.replaceAll", "Replace All", "Home › Editing › Replace", replace_all).params(r#"{"text": string, "with": string, "matchCase"?: bool, "wholeWord"?: bool, "regex"?: bool}"#),
-        CommandSpec::new("edit.goto", "Go To", "Home › Editing › Find", goto).key("Mod+Alt+G / F5").params(r#"{"page"?: n, "bookmark"?: string, "paragraph"?: n}"#).pure(),
+        CommandSpec::new("edit.replaceAll", "Replace All", "Home › Editing › Replace", replace_all)
+            .params(r#"{"text": string, "with": string, "matchCase"?: bool, "wholeWord"?: bool, "regex"?: bool}"#),
+        CommandSpec::new("edit.goto", "Go To", "Home › Editing › Find", goto)
+            .key("Mod+Alt+G / F5")
+            .params(r#"{"page"?: n, "bookmark"?: string, "paragraph"?: n}"#)
+            .pure(),
         CommandSpec::new("edit.formatPainter", "Format Painter", "Home › Clipboard", painter).params(r#"{"sticky"?: bool}"#).pure(),
         CommandSpec::new("edit.copyFormat", "Copy Formatting", "Home › Clipboard", |s, _| {
             painter_pick(s);
@@ -109,7 +118,11 @@ fn search(s: &Session, story: StoryRef) -> Result<Vec<(Pos, Pos)>, CmdError> {
     }
     let pat = if f.regex { f.query.clone() } else { regex::escape(&f.query) };
     let pat = if f.whole_word { format!(r"\b{pat}\b") } else { pat };
-    let re = regex::RegexBuilder::new(&pat).case_insensitive(!f.match_case).size_limit(1 << 20).build().map_err(|e| CmdError::Params(format!("bad pattern: {e}")))?;
+    let re = regex::RegexBuilder::new(&pat)
+        .case_insensitive(!f.match_case)
+        .size_limit(1 << 20)
+        .build()
+        .map_err(|e| CmdError::Params(format!("bad pattern: {e}")))?;
     let mut out = Vec::new();
     for path in s.doc.para_paths(story) {
         let Some(p) = s.doc.para(story, &path) else { continue };

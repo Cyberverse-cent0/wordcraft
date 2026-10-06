@@ -188,9 +188,18 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
             pen.line_c(&[(11.5, 14.5), (14.0, 17.0), (16.5, 14.5)], a);
         }
         "pilcrow" => pen.text(10.0, 10.5, 15.0, "¶", c, false),
-        "alignLeft" => pen.lines(3.0, 17.0, &[4.0, 10.0, 16.0]).then_lines(&pen, 3.0, 12.0, &[7.0, 13.0]),
-        "alignCenter" => pen.lines(3.0, 17.0, &[4.0, 10.0, 16.0]).then_lines(&pen, 6.0, 14.0, &[7.0, 13.0]),
-        "alignRight" => pen.lines(3.0, 17.0, &[4.0, 10.0, 16.0]).then_lines(&pen, 8.0, 17.0, &[7.0, 13.0]),
+        "alignLeft" => {
+            pen.lines(3.0, 17.0, &[4.0, 10.0, 16.0]);
+            ().then_lines(&pen, 3.0, 12.0, &[7.0, 13.0])
+        }
+        "alignCenter" => {
+            pen.lines(3.0, 17.0, &[4.0, 10.0, 16.0]);
+            ().then_lines(&pen, 6.0, 14.0, &[7.0, 13.0])
+        }
+        "alignRight" => {
+            pen.lines(3.0, 17.0, &[4.0, 10.0, 16.0]);
+            ().then_lines(&pen, 8.0, 17.0, &[7.0, 13.0])
+        }
         "justify" => pen.lines(3.0, 17.0, &[4.0, 7.0, 10.0, 13.0, 16.0]),
         "lineSpacing" => {
             pen.lines(9.0, 17.0, &[5.0, 10.0, 15.0]);
@@ -322,9 +331,26 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
             pen.fill(&[(14.0, 10.0), (18.0, 6.5), (18.0, 13.5)], a);
         }
         "link" => {
-            pen.closed(&[(3.0, 10.0), (7.0, 6.0), (9.5, 6.0), (9.5, 8.0), (7.5, 8.0), (5.0, 10.5), (7.5, 13.0), (9.5, 13.0), (9.5, 15.0), (7.0, 15.0)], c);
+            pen.closed(
+                &[(3.0, 10.0), (7.0, 6.0), (9.5, 6.0), (9.5, 8.0), (7.5, 8.0), (5.0, 10.5), (7.5, 13.0), (9.5, 13.0), (9.5, 15.0), (7.0, 15.0)],
+                c,
+            );
             pen.line_c(&[(7.5, 10.5), (12.5, 10.5)], a);
-            pen.closed(&[(17.0, 10.5), (13.0, 14.5), (10.5, 14.5), (10.5, 12.5), (12.5, 12.5), (15.0, 10.0), (12.5, 7.5), (10.5, 7.5), (10.5, 5.5), (13.0, 5.5)], c);
+            pen.closed(
+                &[
+                    (17.0, 10.5),
+                    (13.0, 14.5),
+                    (10.5, 14.5),
+                    (10.5, 12.5),
+                    (12.5, 12.5),
+                    (15.0, 10.0),
+                    (12.5, 7.5),
+                    (10.5, 7.5),
+                    (10.5, 5.5),
+                    (13.0, 5.5),
+                ],
+                c,
+            );
         }
         "bookmark" => {
             pen.closed(&[(5.5, 2.5), (14.5, 2.5), (14.5, 17.5), (10.0, 13.5), (5.5, 17.5)], c);
@@ -625,7 +651,8 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
             pen.rect(2.5, 5.0, 17.5, 15.0, c);
         }
         "next" | "previous" | "first" | "last" => {
-            let pts: &[(f32, f32)] = if name == "next" || name == "last" { &[(7.0, 4.0), (13.0, 10.0), (7.0, 16.0)] } else { &[(13.0, 4.0), (7.0, 10.0), (13.0, 16.0)] };
+            let pts: &[(f32, f32)] =
+                if name == "next" || name == "last" { &[(7.0, 4.0), (13.0, 10.0), (7.0, 16.0)] } else { &[(13.0, 4.0), (7.0, 10.0), (13.0, 16.0)] };
             pen.line_c(pts, a);
         }
         "finish" => {
@@ -664,7 +691,8 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
         }
         "prevComment" | "nextComment" => {
             pen.closed(&[(2.5, 3.5), (17.5, 3.5), (17.5, 13.5), (9.0, 13.5), (5.0, 17.0), (5.0, 13.5), (2.5, 13.5)], c);
-            let pts: &[(f32, f32)] = if name == "nextComment" { &[(8.0, 6.0), (12.0, 8.5), (8.0, 11.0)] } else { &[(12.0, 6.0), (8.0, 8.5), (12.0, 11.0)] };
+            let pts: &[(f32, f32)] =
+                if name == "nextComment" { &[(8.0, 6.0), (12.0, 8.5), (8.0, 11.0)] } else { &[(12.0, 6.0), (8.0, 8.5), (12.0, 11.0)] };
             pen.line_c(pts, a);
         }
         "showComments" => {
@@ -697,7 +725,8 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
         }
         "prevChange" | "nextChange" => {
             pen.page(4.0, 2.0, 16.0, 18.0);
-            let pts: &[(f32, f32)] = if name == "nextChange" { &[(8.5, 7.0), (11.5, 10.0), (8.5, 13.0)] } else { &[(11.5, 7.0), (8.5, 10.0), (11.5, 13.0)] };
+            let pts: &[(f32, f32)] =
+                if name == "nextChange" { &[(8.5, 7.0), (11.5, 10.0), (8.5, 13.0)] } else { &[(11.5, 7.0), (8.5, 10.0), (11.5, 13.0)] };
             pen.line_c(pts, a);
         }
         "compare" | "combine" => {
@@ -896,10 +925,12 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
         "undo" => {
             pen.line(&[(5.0, 8.0), (13.0, 8.0)]);
             pen.p.add(Shape::line(
-                (0..=12).map(|i| {
-                    let t = -std::f32::consts::FRAC_PI_2 + std::f32::consts::PI * i as f32 / 12.0;
-                    pen.pt(13.0 + 4.5 * t.cos(), 12.5 + 4.5 * t.sin())
-                }).collect(),
+                (0..=12)
+                    .map(|i| {
+                        let t = -std::f32::consts::FRAC_PI_2 + std::f32::consts::PI * i as f32 / 12.0;
+                        pen.pt(13.0 + 4.5 * t.cos(), 12.5 + 4.5 * t.sin())
+                    })
+                    .collect(),
                 pen.stroke(c),
             ));
             pen.line(&[(13.0, 17.0), (8.0, 17.0)]);
@@ -908,10 +939,12 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
         "redo" => {
             pen.line(&[(15.0, 8.0), (7.0, 8.0)]);
             pen.p.add(Shape::line(
-                (0..=12).map(|i| {
-                    let t = std::f32::consts::FRAC_PI_2 + std::f32::consts::PI * i as f32 / 12.0;
-                    pen.pt(7.0 + 4.5 * t.cos(), 12.5 - 4.5 * t.sin())
-                }).collect(),
+                (0..=12)
+                    .map(|i| {
+                        let t = std::f32::consts::FRAC_PI_2 + std::f32::consts::PI * i as f32 / 12.0;
+                        pen.pt(7.0 + 4.5 * t.cos(), 12.5 - 4.5 * t.sin())
+                    })
+                    .collect(),
                 pen.stroke(c),
             ));
             pen.line(&[(7.0, 17.0), (12.0, 17.0)]);
@@ -929,10 +962,12 @@ pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32, accent: Color32) {
         "user" => {
             pen.fcircle(10.0, 7.0, 3.5, a);
             pen.p.add(Shape::convex_polygon(
-                (0..=16).map(|i| {
-                    let t = std::f32::consts::PI * i as f32 / 16.0;
-                    pen.pt(10.0 - 6.5 * t.cos(), 18.0 - 6.0 * t.sin())
-                }).collect(),
+                (0..=16)
+                    .map(|i| {
+                        let t = std::f32::consts::PI * i as f32 / 16.0;
+                        pen.pt(10.0 - 6.5 * t.cos(), 18.0 - 6.0 * t.sin())
+                    })
+                    .collect(),
                 a,
                 Stroke::NONE,
             ));

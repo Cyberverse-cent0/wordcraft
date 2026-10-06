@@ -197,7 +197,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
             let scale_px = (geo.scale * ppp).min(max_tex / page.w.max(1.0)).min(max_tex / page.h.clamp(1.0, 1e6)).max(0.05);
             let key = page_key(app, page, scale_px);
             let fresh = app.canvas.textures.get(&i).is_some_and(|(k, _)| *k == key);
-            if !fresh && (rendered < 2 || app.canvas.textures.get(&i).is_none() && rendered < 4) {
+            if !fresh && (rendered < 2 || !app.canvas.textures.contains_key(&i) && rendered < 4) {
                 let mut opts = wordcraft_render::RenderOptions::default();
                 opts.display.marks = app.session.view.marks;
                 opts.display.markup = app.session.view.show_markup;
@@ -242,7 +242,10 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
             if app.session.view.gridlines {
                 for it in &page.items {
                     if let Placed::Cell { rect, .. } = it {
-                        let r = Rect::from_min_size(pos2(sr.min.x + rect.x * geo.scale, sr.min.y + rect.y * geo.scale), vec2(rect.w * geo.scale, rect.h * geo.scale));
+                        let r = Rect::from_min_size(
+                            pos2(sr.min.x + rect.x * geo.scale, sr.min.y + rect.y * geo.scale),
+                            vec2(rect.w * geo.scale, rect.h * geo.scale),
+                        );
                         painter.rect_stroke(r, 0.0, Stroke::new(0.5, t.blue.linear_multiply(0.6)), egui::StrokeKind::Middle);
                     }
                 }
@@ -260,7 +263,8 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
             let (a, b) = app.session.sel.ordered();
             for (pi, r) in layout.selection_rects(&app.session.doc, &a, &b, app.session.page_hint) {
                 if let Some(pr) = rects.get(pi) {
-                    let sr = Rect::from_min_size(pos2(pr.min.x + r.x * geo.scale, pr.min.y + r.y * geo.scale), vec2(r.w * geo.scale, r.h * geo.scale));
+                    let sr =
+                        Rect::from_min_size(pos2(pr.min.x + r.x * geo.scale, pr.min.y + r.y * geo.scale), vec2(r.w * geo.scale, r.h * geo.scale));
                     painter.rect_filled(sr, 0.0, t.selection);
                 }
             }
@@ -274,7 +278,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
             let y0 = pr.min.y + c.top * geo.scale;
             let y1 = y0 + c.height * geo.scale;
             let since = crate::now_ms() - app.canvas.caret_visible_since;
-            let on = (since / 530.0) as u64 % 2 == 0;
+            let on = ((since / 530.0) as u64).is_multiple_of(2);
             if app.session.sel.is_collapsed() && on && focused {
                 painter.line_segment([pos2(x.round() + 0.5, y0), pos2(x.round() + 0.5, y1)], Stroke::new(1.5, t.caret));
             }
@@ -285,7 +289,8 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
             let cr = Rect::from_min_max(pos2(x, y0), pos2(x + 1.0, y1));
             if focused {
                 ui.ctx().output_mut(|o| {
-                    o.ime = Some(egui::output::IMEOutput { rect: cr, cursor_rect: cr, purpose: Default::default(), should_interrupt_composition: false });
+                    o.ime =
+                        Some(egui::output::IMEOutput { rect: cr, cursor_rect: cr, purpose: Default::default(), should_interrupt_composition: false });
                 });
             }
             if !app.canvas.ime_preedit.is_empty() {
@@ -302,7 +307,9 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
         app.canvas.want_focus = false;
     }
     if resp.has_focus() {
-        ui.memory_mut(|m| m.set_focus_lock_filter(resp.id, egui::EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true }));
+        ui.memory_mut(|m| {
+            m.set_focus_lock_filter(resp.id, egui::EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: true })
+        });
     }
     app.canvas.focused = resp.has_focus();
     mouse(app, ui, &resp, &rects, &layout, geo.scale);
@@ -392,14 +399,25 @@ fn mouse(app: &mut WordApp, ui: &Ui, resp: &egui::Response, rects: &[Rect], layo
     if pressed {
         // Clicking into a footnote/endnote edits it; clicking the body from a note goes back.
         let story = match layout.story_at(page, x, y) {
-            Some(StoryRef::Part(id)) if app.session.doc.parts.get(&id).is_some_and(|p| matches!(p.kind, wordcraft_doc::PartKind::Footnote | wordcraft_doc::PartKind::Endnote)) => StoryRef::Part(id),
-            Some(StoryRef::Body) if matches!(story, StoryRef::Part(id) if app.session.doc.parts.get(&id).is_some_and(|p| matches!(p.kind, wordcraft_doc::PartKind::Footnote | wordcraft_doc::PartKind::Endnote))) => StoryRef::Body,
+            Some(StoryRef::Part(id))
+                if app
+                    .session
+                    .doc
+                    .parts
+                    .get(&id)
+                    .is_some_and(|p| matches!(p.kind, wordcraft_doc::PartKind::Footnote | wordcraft_doc::PartKind::Endnote)) =>
+            {
+                StoryRef::Part(id)
+            }
+            Some(StoryRef::Body) if matches!(story, StoryRef::Part(id) if app.session.doc.parts.get(&id).is_some_and(|p| matches!(p.kind, wordcraft_doc::PartKind::Footnote | wordcraft_doc::PartKind::Endnote))) => {
+                StoryRef::Body
+            }
             _ => story,
         };
         let Some(pos) = layout.hit(page, x, y, story) else { return };
         // Ctrl/⌘+click follows a hyperlink.
         if mods.command
-            && let Some(link) = app.session.doc.para_at(&pos).map(|pp| pp.props_of_char(pos.off).link.clone()).flatten()
+            && let Some(link) = app.session.doc.para_at(&pos).and_then(|pp| pp.props_of_char(pos.off).link.clone())
         {
             if let Some(name) = link.strip_prefix('#') {
                 let _ = app.run("edit.goto", json!({"bookmark": name}));
@@ -471,7 +489,15 @@ fn rulers(app: &mut WordApp, ui: &mut Ui, h: Rect, v: Rect, rects: &[Rect], layo
         }
         if xpt >= 0.0 {
             let sx = x0 + xpt * scale;
-            let (len, label) = if k % 8 == 0 { (0.0, Some(k / 8)) } else if k % 4 == 0 { (5.0, None) } else if k % 2 == 0 { (3.0, None) } else { (1.5, None) };
+            let (len, label) = if k % 8 == 0 {
+                (0.0, Some(k / 8))
+            } else if k % 4 == 0 {
+                (5.0, None)
+            } else if k % 2 == 0 {
+                (3.0, None)
+            } else {
+                (1.5, None)
+            };
             match label {
                 Some(n) if n != 0 => {
                     hp.text(pos2(sx, bar.center().y), egui::Align2::CENTER_CENTER, n.abs().to_string(), regular(9.5), t.ruler_tick);
@@ -497,10 +523,28 @@ fn rulers(app: &mut WordApp, ui: &mut Ui, h: Rect, v: Rect, rects: &[Rect], layo
         let left = x0 + (col_x + rp.indent_left) * scale;
         let right = x0 + (col_x + page.body.w - rp.indent_right) * scale;
         let c = t.text_dim;
-        hp.add(egui::Shape::convex_polygon(vec![pos2(first - 4.5, bar.min.y), pos2(first + 4.5, bar.min.y), pos2(first, bar.min.y + 5.0)], t.ruler, Stroke::new(1.0, c)));
-        hp.add(egui::Shape::convex_polygon(vec![pos2(left - 4.5, bar.max.y - 3.0), pos2(left + 4.5, bar.max.y - 3.0), pos2(left, bar.max.y - 8.0)], t.ruler, Stroke::new(1.0, c)));
-        hp.rect(Rect::from_min_max(pos2(left - 4.5, bar.max.y - 3.0), pos2(left + 4.5, bar.max.y + 1.0)), 0.0, t.ruler, Stroke::new(1.0, c), egui::StrokeKind::Inside);
-        hp.add(egui::Shape::convex_polygon(vec![pos2(right - 4.5, bar.max.y - 1.0), pos2(right + 4.5, bar.max.y - 1.0), pos2(right, bar.max.y - 6.0)], t.ruler, Stroke::new(1.0, c)));
+        hp.add(egui::Shape::convex_polygon(
+            vec![pos2(first - 4.5, bar.min.y), pos2(first + 4.5, bar.min.y), pos2(first, bar.min.y + 5.0)],
+            t.ruler,
+            Stroke::new(1.0, c),
+        ));
+        hp.add(egui::Shape::convex_polygon(
+            vec![pos2(left - 4.5, bar.max.y - 3.0), pos2(left + 4.5, bar.max.y - 3.0), pos2(left, bar.max.y - 8.0)],
+            t.ruler,
+            Stroke::new(1.0, c),
+        ));
+        hp.rect(
+            Rect::from_min_max(pos2(left - 4.5, bar.max.y - 3.0), pos2(left + 4.5, bar.max.y + 1.0)),
+            0.0,
+            t.ruler,
+            Stroke::new(1.0, c),
+            egui::StrokeKind::Inside,
+        );
+        hp.add(egui::Shape::convex_polygon(
+            vec![pos2(right - 4.5, bar.max.y - 1.0), pos2(right + 4.5, bar.max.y - 1.0), pos2(right, bar.max.y - 6.0)],
+            t.ruler,
+            Stroke::new(1.0, c),
+        ));
         for tab in &rp.tabs {
             let tx = x0 + (col_x + tab.pos) * scale;
             hp.line_segment([pos2(tx, bar.max.y - 6.0), pos2(tx, bar.max.y - 1.0)], Stroke::new(1.5, t.text));
@@ -592,7 +636,11 @@ fn context_menu(app: &mut WordApp, ui: &mut Ui) {
         }
     };
     if let Some(issue) = app.canvas.context_issue.clone() {
-        let sugg: Vec<String> = issue.get("suggestions").and_then(|v| v.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+        let sugg: Vec<String> = issue
+            .get("suggestions")
+            .and_then(|v| v.as_array())
+            .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+            .unwrap_or_default();
         ui.label(egui::RichText::new(issue.get("message").and_then(|m| m.as_str()).unwrap_or("")).small().weak());
         if sugg.is_empty() {
             ui.label(egui::RichText::new("(no suggestions)").italics());

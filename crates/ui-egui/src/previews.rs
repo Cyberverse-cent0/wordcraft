@@ -63,7 +63,14 @@ impl Previews {
                     return None;
                 }
                 let ppp = ui.ctx().pixels_per_point();
-                let img = snippet(&Document::new(), Paragraph::with_text(name, CharProps { font: Some(name.to_string()), size: Some(13.0), ..Default::default() }), 240.0, 20.0, ppp, 2.0)?;
+                let img = snippet(
+                    &Document::new(),
+                    Paragraph::with_text(name, CharProps { font: Some(name.to_string()), size: Some(13.0), ..Default::default() }),
+                    240.0,
+                    20.0,
+                    ppp,
+                    2.0,
+                )?;
                 let h = ui.ctx().load_texture(&key, img, egui::TextureOptions::LINEAR);
                 ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new(&key), h.clone()));
                 Some(h)
@@ -71,7 +78,12 @@ impl Previews {
             match tex {
                 Some(h) => {
                     let sz = h.size_vec2() / ui.ctx().pixels_per_point();
-                    ui.painter().image(h.id(), Rect::from_min_size(pos2(r.min.x + 6.0, r.center().y - sz.y / 2.0), sz), Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), egui::Color32::WHITE);
+                    ui.painter().image(
+                        h.id(),
+                        Rect::from_min_size(pos2(r.min.x + 6.0, r.center().y - sz.y / 2.0), sz),
+                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                        egui::Color32::WHITE,
+                    );
                 }
                 None => {
                     ui.painter().text(pos2(r.min.x + 8.0, r.center().y), egui::Align2::LEFT_CENTER, name, regular(12.0), t.text);
@@ -122,7 +134,15 @@ pub fn snippet(base: &Document, para: Paragraph, w: f32, h: f32, ppp: f32, margi
     snippet_blocks(base, vec![Block::Para(para)], w, h, ppp, margin, None)
 }
 
-fn snippet_blocks(base: &Document, blocks: Vec<Block>, w: f32, h: f32, ppp: f32, margin: f32, paper: Option<wordcraft_doc::Rgb>) -> Option<egui::ColorImage> {
+fn snippet_blocks(
+    base: &Document,
+    blocks: Vec<Block>,
+    w: f32,
+    h: f32,
+    ppp: f32,
+    margin: f32,
+    paper: Option<wordcraft_doc::Rgb>,
+) -> Option<egui::ColorImage> {
     let mut d = Document::new();
     d.styles = base.styles.clone();
     d.numbering = base.numbering.clone();

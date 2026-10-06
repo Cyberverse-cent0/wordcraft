@@ -146,7 +146,7 @@ pub mod p {
         v.get(k).and_then(Value::as_bool)
     }
     /// The `value` param, or the first positional-ish string.
-    pub fn value<'a>(v: &'a Value) -> Option<&'a Value> {
+    pub fn value(v: &Value) -> Option<&Value> {
         v.get("value")
     }
 }

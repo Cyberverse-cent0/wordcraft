@@ -161,12 +161,12 @@ impl WordApp {
         for req in std::mem::take(&mut self.session.ui_requests) {
             self.handle_request(&req);
         }
-        if let Some(p) = self.session.path.as_ref().map(|p| p.to_string_lossy().to_string()) {
-            if self.ui.recent.first() != Some(&p) {
-                self.ui.recent.retain(|r| *r != p);
-                self.ui.recent.insert(0, p);
-                self.ui.recent.truncate(12);
-            }
+        if let Some(p) = self.session.path.as_ref().map(|p| p.to_string_lossy().to_string())
+            && self.ui.recent.first() != Some(&p)
+        {
+            self.ui.recent.retain(|r| *r != p);
+            self.ui.recent.insert(0, p);
+            self.ui.recent.truncate(12);
         }
         if !self.session.status.is_empty() {
             let s = std::mem::take(&mut self.session.status);
@@ -310,7 +310,12 @@ impl WordApp {
         self.drain_inbox();
         // AutoSave: write a saved document a couple of seconds after the last change.
         let now = now_ms();
-        if self.autosave && self.session.dirty && self.session.path.is_some() && now - self.last_autosave > 2500.0 && now - self.canvas.caret_visible_since > 1500.0 {
+        if self.autosave
+            && self.session.dirty
+            && self.session.path.is_some()
+            && now - self.last_autosave > 2500.0
+            && now - self.canvas.caret_visible_since > 1500.0
+        {
             self.last_autosave = now;
             let ext = self.session.path.as_ref().and_then(|p| p.extension()).map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
             if ext == "docx" || ext == "json" || ext == "odt" || ext == "rtf" {

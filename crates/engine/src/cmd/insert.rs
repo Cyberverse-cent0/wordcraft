@@ -115,9 +115,7 @@ pub fn specs() -> Vec<CommandSpec> {
 fn insert_block_at_caret(s: &mut Session, block: Block) -> Result<Path, CmdError> {
     let at = delete_selection(s)?;
     let len = s.doc.para_at(&at).map(|p| p.len()).unwrap_or(0);
-    let insert_at = if at.off == 0 && len > 0 {
-        at.path.clone()
-    } else if at.off >= len && len == 0 {
+    let insert_at = if at.off == 0 {
         at.path.clone()
     } else {
         let new = s.doc.split_paragraph(&at)?;
@@ -180,7 +178,8 @@ pub fn base64_encode(b: &[u8]) -> String {
     const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity(b.len().div_ceil(3) * 4);
     for ch in b.chunks(3) {
-        let n = (ch.first().copied().unwrap_or(0) as u32) << 16 | (ch.get(1).copied().unwrap_or(0) as u32) << 8 | ch.get(2).copied().unwrap_or(0) as u32;
+        let n =
+            (ch.first().copied().unwrap_or(0) as u32) << 16 | (ch.get(1).copied().unwrap_or(0) as u32) << 8 | ch.get(2).copied().unwrap_or(0) as u32;
         for i in 0..4 {
             if i <= ch.len() {
                 out.push(T[(n >> (18 - 6 * i) & 63) as usize] as char);
@@ -212,7 +211,8 @@ fn picture(s: &mut Session, v: &Value) -> CmdResult {
     if bytes.len() > 200 << 20 {
         return Err(CmdError::Failed("image is larger than 200 MB".into()));
     }
-    let (pw, ph) = wordcraft_render::image_size(&bytes).ok_or_else(|| CmdError::Failed("not a supported image (PNG, JPEG, GIF, WebP, BMP)".into()))?;
+    let (pw, ph) =
+        wordcraft_render::image_size(&bytes).ok_or_else(|| CmdError::Failed("not a supported image (PNG, JPEG, GIF, WebP, BMP)".into()))?;
     let ext = match bytes.get(..4) {
         Some([0x89, b'P', b'N', b'G']) => "png",
         Some([0xFF, 0xD8, ..]) => "jpeg",
@@ -236,14 +236,16 @@ fn picture(s: &mut Session, v: &Value) -> CmdResult {
     }
     let props = s.typing_props();
     let at = delete_selection(s)?;
-    let obj = InlineObject::Image { media: key.clone(), w, h, alt: p::str(v, "alt").unwrap_or("").to_string(), float: Float::default(), crop: [0.0; 4] };
+    let obj =
+        InlineObject::Image { media: key.clone(), w, h, alt: p::str(v, "alt").unwrap_or("").to_string(), float: Float::default(), crop: [0.0; 4] };
     let end = s.doc.insert_object(&at, obj, &props)?;
     s.sel = Selection { anchor: at, focus: end };
     Ok(json!({"media": key, "width": w, "height": h}))
 }
 
 fn shape(s: &mut Session, v: &Value) -> CmdResult {
-    let kind: ShapeKind = serde_json::from_value(v.get("kind").cloned().unwrap_or(json!("rectangle"))).map_err(|e| CmdError::Params(e.to_string()))?;
+    let kind: ShapeKind =
+        serde_json::from_value(v.get("kind").cloned().unwrap_or(json!("rectangle"))).map_err(|e| CmdError::Params(e.to_string()))?;
     let w = p::f32(v, "width").unwrap_or(108.0).clamp(4.0, 2000.0);
     let h = p::f32(v, "height").unwrap_or(if kind == ShapeKind::Line { 1.0 } else { 72.0 }).clamp(1.0, 2000.0);
     let fill = match p::str(v, "fill") {
@@ -254,7 +256,8 @@ fn shape(s: &mut Session, v: &Value) -> CmdResult {
     let stroke = p::str(v, "stroke").and_then(Rgb::parse).or(Some(Rgb(0x0E, 0x40, 0x5A)));
     let props = s.typing_props();
     let at = delete_selection(s)?;
-    let obj = InlineObject::Shape { kind, w, h, fill, stroke, stroke_width: 1.0, float: Float { wrap: Wrap::Inline, ..Default::default() }, story: None };
+    let obj =
+        InlineObject::Shape { kind, w, h, fill, stroke, stroke_width: 1.0, float: Float { wrap: Wrap::Inline, ..Default::default() }, story: None };
     let end = s.doc.insert_object(&at, obj, &props)?;
     s.sel = Selection { anchor: at, focus: end };
     sel_result(s)
@@ -267,7 +270,16 @@ fn text_box(s: &mut Session, v: &Value) -> CmdResult {
     let id = s.doc.add_part(PartKind::TextBox, vec![para_block(Paragraph::with_text(&text, CharProps::default()))]);
     let props = s.typing_props();
     let at = delete_selection(s)?;
-    let obj = InlineObject::Shape { kind: ShapeKind::TextBox, w, h, fill: Some(Rgb::WHITE), stroke: Some(Rgb::BLACK), stroke_width: 0.75, float: Float::default(), story: Some(id) };
+    let obj = InlineObject::Shape {
+        kind: ShapeKind::TextBox,
+        w,
+        h,
+        fill: Some(Rgb::WHITE),
+        stroke: Some(Rgb::BLACK),
+        stroke_width: 0.75,
+        float: Float::default(),
+        story: Some(id),
+    };
     let end = s.doc.insert_object(&at, obj, &props)?;
     s.sel = Selection::caret(end);
     Ok(json!({"story": id}))
@@ -403,7 +415,11 @@ fn page_number(s: &mut Session, v: &Value) -> CmdResult {
         para.insert_text(0, "Page  of ", &CharProps::default())?;
         para.insert_object(5, field, &CharProps { bold: Some(true), ..Default::default() })?;
         let end = para.len();
-        para.insert_object(end, InlineObject::Field { instr: "NUMPAGES".into(), result: "1".into(), locked: false }, &CharProps { bold: Some(true), ..Default::default() })?;
+        para.insert_object(
+            end,
+            InlineObject::Field { instr: "NUMPAGES".into(), result: "1".into(), locked: false },
+            &CharProps { bold: Some(true), ..Default::default() },
+        )?;
     } else {
         para.insert_object(0, field, &CharProps::default())?;
     }
@@ -433,7 +449,8 @@ pub fn format_date(fmt: &str) -> String {
     let d: u32 = iso.get(8..10).and_then(|x| x.parse().ok()).unwrap_or(1);
     let hh: u32 = iso.get(11..13).and_then(|x| x.parse().ok()).unwrap_or(0);
     let mm: u32 = iso.get(14..16).and_then(|x| x.parse().ok()).unwrap_or(0);
-    const MONTHS: [&str; 12] = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const MONTHS: [&str; 12] =
+        ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const DAYS: [&str; 7] = ["Thursday", "Friday", "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday"];
     let days_since = {
         // Days since epoch for weekday.
@@ -473,7 +490,7 @@ pub fn format_date(fmt: &str) -> String {
             ('d', 1) => out.push_str(&d.to_string()),
             ('H', 2..) => out.push_str(&format!("{hh:02}")),
             ('H', _) => out.push_str(&hh.to_string()),
-            ('h', _) => out.push_str(&(if hh % 12 == 0 { 12 } else { hh % 12 }).to_string()),
+            ('h', _) => out.push_str(&(if hh.is_multiple_of(12) { 12 } else { hh % 12 }).to_string()),
             ('m', 2..) => out.push_str(&format!("{mm:02}")),
             ('m', _) => out.push_str(&mm.to_string()),
             ('a' | 'A', _) => out.push_str(if hh < 12 { "AM" } else { "PM" }),
@@ -511,7 +528,8 @@ fn cover_page(s: &mut Session, v: &Value) -> CmdResult {
     for _ in 0..8 {
         blocks.push(Block::Para(Paragraph::new()));
     }
-    let mut t = Paragraph::with_text(&title, CharProps { size: Some(44.0), color: Some(TextColor::Rgb(accent)), ..Default::default() }).styled("Title");
+    let mut t =
+        Paragraph::with_text(&title, CharProps { size: Some(44.0), color: Some(TextColor::Rgb(accent)), ..Default::default() }).styled("Title");
     t.props.borders = Some(wordcraft_doc::props::Borders {
         bottom: Some(wordcraft_doc::props::Border { style: wordcraft_doc::props::BorderStyle::Single, width: 2.0, color: Some(accent), space: 6.0 }),
         ..Default::default()
@@ -521,7 +539,8 @@ fn cover_page(s: &mut Session, v: &Value) -> CmdResult {
     for _ in 0..14 {
         blocks.push(Block::Para(Paragraph::new()));
     }
-    blocks.push(Block::Para(Paragraph::with_text(&author, CharProps { bold: Some(true), color: Some(TextColor::Rgb(accent)), ..Default::default() })));
+    blocks
+        .push(Block::Para(Paragraph::with_text(&author, CharProps { bold: Some(true), color: Some(TextColor::Rgb(accent)), ..Default::default() })));
     let mut date = Paragraph::with_text(&format_date("MMMM d, yyyy"), CharProps::default());
     date.insert_text(date.len(), "\u{000C}", &CharProps::default())?;
     blocks.push(Block::Para(date));

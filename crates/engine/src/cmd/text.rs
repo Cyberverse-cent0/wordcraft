@@ -143,7 +143,7 @@ fn tab(s: &mut Session, _: &Value) -> CmdResult {
         path.extend([nr as u32, nc as u32, 0]);
         let start = Pos { story, path: wordcraft_doc::Path(path), off: 0 };
         // Select the cell's content like Word.
-        let end_path = s.doc.para_paths(story).into_iter().filter(|q| q.0.starts_with(&start.path.0[..start.path.0.len() - 1])).last();
+        let end_path = s.doc.para_paths(story).into_iter().rfind(|q| q.0.starts_with(&start.path.0[..start.path.0.len() - 1]));
         let end = end_path.map(|q| {
             let off = s.doc.para(story, &q).map(|x| x.len()).unwrap_or(0);
             Pos { story, path: q, off }
@@ -240,7 +240,7 @@ fn backspace(s: &mut Session, _: &Value) -> CmdResult {
         }
         Some(Block::Table(_)) => {
             // Move into the table's last cell.
-            let last = s.doc.para_paths(f.story).into_iter().filter(|q| q.0.first() == prev_path.0.first() && q.0.len() > 1).last();
+            let last = s.doc.para_paths(f.story).into_iter().rfind(|q| q.0.first() == prev_path.0.first() && q.0.len() > 1);
             if let Some(q) = last {
                 let off = s.doc.para(f.story, &q).map(|x| x.len()).unwrap_or(0);
                 if s.doc.para_at(&f).is_some_and(|x| x.is_empty()) && s.doc.container(f.story, &f.path).is_some_and(|c| c.len() > i + 1) {

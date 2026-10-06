@@ -50,12 +50,22 @@ pub fn specs() -> Vec<CommandSpec> {
             insert_field(s, &format!("MERGEFIELD {}", quote(&f)), &format!("«{f}»"))
         })
         .params(r#"{"field": string}"#),
-        CommandSpec::new("mailings.addressBlock", "Address Block", "Mailings › Write & Insert Fields", |s, _| insert_field(s, "ADDRESSBLOCK", "«AddressBlock»")),
-        CommandSpec::new("mailings.greetingLine", "Greeting Line", "Mailings › Write & Insert Fields", |s, _| insert_field(s, "GREETINGLINE", "«GreetingLine»")),
+        CommandSpec::new("mailings.addressBlock", "Address Block", "Mailings › Write & Insert Fields", |s, _| {
+            insert_field(s, "ADDRESSBLOCK", "«AddressBlock»")
+        }),
+        CommandSpec::new("mailings.greetingLine", "Greeting Line", "Mailings › Write & Insert Fields", |s, _| {
+            insert_field(s, "GREETINGLINE", "«GreetingLine»")
+        }),
         CommandSpec::new("mailings.rules", "Rules", "Mailings › Write & Insert Fields", |s, v| {
             let rule = p::str(v, "rule").unwrap_or("NEXT").to_ascii_uppercase();
             let instr = match rule.as_str() {
-                "IF" => format!("IF {{ MERGEFIELD {} }} = \"{}\" \"{}\" \"{}\"", p::str(v, "field").unwrap_or("Field"), p::str(v, "value").unwrap_or(""), p::str(v, "then").unwrap_or(""), p::str(v, "else").unwrap_or("")),
+                "IF" => format!(
+                    "IF {{ MERGEFIELD {} }} = \"{}\" \"{}\" \"{}\"",
+                    p::str(v, "field").unwrap_or("Field"),
+                    p::str(v, "value").unwrap_or(""),
+                    p::str(v, "then").unwrap_or(""),
+                    p::str(v, "else").unwrap_or("")
+                ),
                 "SKIPIF" => format!("SKIPIF {{ MERGEFIELD {} }} = \"{}\"", p::str(v, "field").unwrap_or("Field"), p::str(v, "value").unwrap_or("")),
                 "MERGEREC" => "MERGEREC".into(),
                 _ => "NEXT".into(),
@@ -82,7 +92,12 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("mailings.previous", "Previous Record", "Mailings › Preview Results", |s, _| step(s, -1)).when(has_recipients),
         CommandSpec::new("mailings.findRecipient", "Find Recipient", "Mailings › Preview Results", |s, v| {
             let q = p::req_str(v, "text")?.to_lowercase();
-            let idx = s.merge.rows.iter().position(|r| r.iter().any(|c| c.to_lowercase().contains(&q))).ok_or_else(|| CmdError::Failed("no matching recipient".into()))?;
+            let idx = s
+                .merge
+                .rows
+                .iter()
+                .position(|r| r.iter().any(|c| c.to_lowercase().contains(&q)))
+                .ok_or_else(|| CmdError::Failed("no matching recipient".into()))?;
             s.merge.record = idx;
             s.merge.preview = true;
             refresh(s);
@@ -99,9 +114,13 @@ pub fn specs() -> Vec<CommandSpec> {
             Ok(json!({"ok": missing.is_empty(), "unknownFields": missing, "records": s.merge.rows.len()}))
         })
         .pure(),
-        CommandSpec::new("mailings.finish", "Finish & Merge", "Mailings › Finish", finish).params(r#"{"path"?: string (save the merged document), "from"?: n, "to"?: n}"#).when(has_recipients),
-        CommandSpec::new("mailings.envelopes", "Envelopes", "Mailings › Create", envelopes).params(r#"{"delivery": string, "return"?: string, "size"?: "Envelope #10|Envelope DL"}"#),
-        CommandSpec::new("mailings.labels", "Labels", "Mailings › Create", labels).params(r#"{"text"?: string, "rows"?: n, "cols"?: n, "fromRecipients"?: bool}"#),
+        CommandSpec::new("mailings.finish", "Finish & Merge", "Mailings › Finish", finish)
+            .params(r#"{"path"?: string (save the merged document), "from"?: n, "to"?: n}"#)
+            .when(has_recipients),
+        CommandSpec::new("mailings.envelopes", "Envelopes", "Mailings › Create", envelopes)
+            .params(r#"{"delivery": string, "return"?: string, "size"?: "Envelope #10|Envelope DL"}"#),
+        CommandSpec::new("mailings.labels", "Labels", "Mailings › Create", labels)
+            .params(r#"{"text"?: string, "rows"?: n, "cols"?: n, "fromRecipients"?: bool}"#),
     ]
 }
 
@@ -181,7 +200,12 @@ fn recipients(s: &mut Session, v: &Value) -> CmdResult {
         }
         let rows = arr
             .iter()
-            .map(|r| headers.iter().map(|h| r.get(h).map(|x| x.as_str().map(str::to_string).unwrap_or_else(|| x.to_string())).unwrap_or_default()).collect())
+            .map(|r| {
+                headers
+                    .iter()
+                    .map(|h| r.get(h).map(|x| x.as_str().map(str::to_string).unwrap_or_else(|| x.to_string())).unwrap_or_default())
+                    .collect()
+            })
             .collect();
         (headers, rows)
     } else {
@@ -272,7 +296,11 @@ fn address_block(s: &Session, row: usize) -> String {
     let m = address_map(&s.merge.headers);
     let g = |k: &str| m.get(k).and_then(Value::as_str).map(|f| value(s, row, f)).unwrap_or_default();
     let name = [g("title"), g("firstName"), g("lastName")].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join(" ");
-    let city_line = [g("city"), [g("state"), g("postal")].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join(" ")].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join(", ");
+    let city_line = [g("city"), [g("state"), g("postal")].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join(" ")]
+        .into_iter()
+        .filter(|x| !x.is_empty())
+        .collect::<Vec<_>>()
+        .join(", ");
     [name, g("company"), g("address"), city_line, g("country")].into_iter().filter(|x| !x.is_empty()).collect::<Vec<_>>().join("\n")
 }
 
@@ -297,9 +325,11 @@ fn eval(s: &Session, instr: &str, row: usize) -> Option<String> {
         "NEXT" | "SKIPIF" => Some(String::new()),
         "IF" => {
             // IF { MERGEFIELD X } = "v" "then" "else"
-            let field = t.split("MERGEFIELD").nth(1).and_then(|r| r.split('}').next()).map(|x| x.trim().trim_matches('"').to_string()).unwrap_or_default();
+            let field =
+                t.split("MERGEFIELD").nth(1).and_then(|r| r.split('}').next()).map(|x| x.trim().trim_matches('"').to_string()).unwrap_or_default();
             let quoted: Vec<&str> = t.split('"').skip(1).step_by(2).collect();
-            let (cmp, then, els) = (quoted.first().copied().unwrap_or(""), quoted.get(1).copied().unwrap_or(""), quoted.get(2).copied().unwrap_or(""));
+            let (cmp, then, els) =
+                (quoted.first().copied().unwrap_or(""), quoted.get(1).copied().unwrap_or(""), quoted.get(2).copied().unwrap_or(""));
             Some(if value(s, row, &field) == cmp { then.to_string() } else { els.to_string() })
         }
         _ => None,
@@ -417,14 +447,25 @@ fn merge_block(s: &Session, b: &mut Block, row: usize) {
 }
 
 fn envelopes(s: &mut Session, v: &Value) -> CmdResult {
-    let delivery = p::str(v, "delivery").map(str::to_string).unwrap_or_else(|| if s.merge.rows.is_empty() { "Recipient Name\nStreet Address\nCity, ST 00000".into() } else { address_block(s, s.merge.record) });
+    let delivery = p::str(v, "delivery").map(str::to_string).unwrap_or_else(|| {
+        if s.merge.rows.is_empty() { "Recipient Name\nStreet Address\nCity, ST 00000".into() } else { address_block(s, s.merge.record) }
+    });
     let ret = p::str(v, "return").unwrap_or("").to_string();
     let (w, h) = match p::str(v, "size").unwrap_or("Envelope #10") {
         "Envelope DL" => (623.6, 311.8),
         _ => (684.0, 297.0),
     };
     let mut d = Document::new();
-    d.last_section = SectionProps { page_w: w, page_h: h, landscape: true, margin_top: 22.0, margin_left: 22.0, margin_right: 22.0, margin_bottom: 22.0, ..Default::default() };
+    d.last_section = SectionProps {
+        page_w: w,
+        page_h: h,
+        landscape: true,
+        margin_top: 22.0,
+        margin_left: 22.0,
+        margin_right: 22.0,
+        margin_bottom: 22.0,
+        ..Default::default()
+    };
     let mut blocks = Vec::new();
     for l in ret.split('\n') {
         blocks.push(para_block(Paragraph::with_text(l, CharProps { size: Some(10.0), ..Default::default() }).styled("NoSpacing")));

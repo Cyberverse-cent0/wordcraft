@@ -60,13 +60,16 @@ pub fn specs() -> Vec<CommandSpec> {
                 l.banded_columns = set("bandedColumns", l.banded_columns);
             })
         })
-        .params(r#"{"headerRow"?: bool, "totalRow"?: bool, "bandedRows"?: bool, "firstColumn"?: bool, "lastColumn"?: bool, "bandedColumns"?: bool}"#)),
+        .params(
+            r#"{"headerRow"?: bool, "totalRow"?: bool, "bandedRows"?: bool, "firstColumn"?: bool, "lastColumn"?: bool, "bandedColumns"?: bool}"#,
+        )),
         t(CommandSpec::new("table.shading", "Shading", "Table Design › Table Styles", |s, v| {
             let c = p::str(v, "color").and_then(Rgb::parse);
             with_cells(s, |cl| cl.props.shading = c)
         })
         .params(r#"{"color": "RRGGBB" | null}"#)),
-        t(CommandSpec::new("table.borders", "Borders", "Table Design › Borders", borders).params(r#"{"kind": "all|outside|inside|none|top|bottom|left|right", "width"?: pt, "color"?: "RRGGBB"}"#)),
+        t(CommandSpec::new("table.borders", "Borders", "Table Design › Borders", borders)
+            .params(r#"{"kind": "all|outside|inside|none|top|bottom|left|right", "width"?: pt, "color"?: "RRGGBB"}"#)),
         t(CommandSpec::new("table.cellAlign", "Alignment", "Table Layout › Alignment", |s, v| {
             let (h, va) = match p::str(v, "value").unwrap_or("topLeft") {
                 "topLeft" => (Align::Left, VAlign::Top),
@@ -156,7 +159,8 @@ pub fn specs() -> Vec<CommandSpec> {
                 }
             })
         })),
-        t(CommandSpec::new("table.sort", "Sort", "Table Layout › Data", sort_table).params(r#"{"column"?: n, "descending"?: bool, "header"?: bool}"#)),
+        t(CommandSpec::new("table.sort", "Sort", "Table Layout › Data", sort_table)
+            .params(r#"{"column"?: n, "descending"?: bool, "header"?: bool}"#)),
         t(CommandSpec::new("table.toText", "Convert to Text", "Table Layout › Data", to_text).params(r#"{"separator"?: "tab|comma|paragraph"}"#)),
         t(CommandSpec::new("table.formula", "Formula", "Table Layout › Data", formula).params(r#"{"formula"?: "=SUM(ABOVE)"}"#)),
         t(CommandSpec::new("table.selectTable", "Select Table", "Table Layout › Table › Select", |s, _| {
@@ -441,7 +445,10 @@ fn formula(s: &mut Session, v: &Value) -> CmdResult {
     let f = p::str(v, "formula").unwrap_or("=SUM(ABOVE)").to_ascii_uppercase();
     let t = s.doc.table(s.sel.focus.story, &tp).cloned().ok_or_else(|| CmdError::Failed("no table".into()))?;
     let nums: Vec<f64> = if f.contains("LEFT") {
-        t.rows.get(r).map(|row| row.cells.iter().take(c).filter_map(|x| cell_text(x).trim().replace([',', '$'], "").parse().ok()).collect()).unwrap_or_default()
+        t.rows
+            .get(r)
+            .map(|row| row.cells.iter().take(c).filter_map(|x| cell_text(x).trim().replace([',', '$'], "").parse().ok()).collect())
+            .unwrap_or_default()
     } else {
         t.rows.iter().take(r).filter_map(|row| row.cells.get(c)).filter_map(|x| cell_text(x).trim().replace([',', '$'], "").parse().ok()).collect()
     };
@@ -479,7 +486,7 @@ fn select_cells(s: &mut Session, tp: &Path, which: Option<(usize, Option<usize>)
     a.extend([r0 as u32, c0 as u32, 0]);
     let mut b = tp.0.clone();
     b.extend([r1 as u32, last_c as u32]);
-    let end_path = s.doc.para_paths(story).into_iter().filter(|q| q.0.starts_with(&b)).last().unwrap_or_else(|| {
+    let end_path = s.doc.para_paths(story).into_iter().rfind(|q| q.0.starts_with(&b)).unwrap_or_else(|| {
         let mut x = b.clone();
         x.push(0);
         Path(x)
@@ -495,7 +502,8 @@ fn from_text(s: &mut Session, v: &Value) -> CmdResult {
     if a.path.parent() != b.path.parent() || a.story != b.story {
         return Err(CmdError::Failed("select paragraphs to convert".into()));
     }
-    let lines: Vec<String> = (a.path.last()..=b.path.last()).filter_map(|i| s.doc.para(a.story, &a.path.with_last(i)).map(|p| p.plain_text())).collect();
+    let lines: Vec<String> =
+        (a.path.last()..=b.path.last()).filter_map(|i| s.doc.para(a.story, &a.path.with_last(i)).map(|p| p.plain_text())).collect();
     let cols = lines.iter().map(|l| l.split(sep).count()).max().unwrap_or(1).clamp(1, 63);
     let width = super::page::sect(s).text_width();
     let mut t = Table::new(lines.len().max(1), cols, width);
@@ -521,14 +529,30 @@ fn quick_table(s: &mut Session, v: &Value) -> CmdResult {
     let data: Vec<Vec<&str>> = match kind {
         "calendar" => {
             let mut rows = vec![vec!["M", "T", "W", "T", "F", "S", "S"]];
-            let days = ["", "", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "", "", ""];
+            let days = [
+                "", "", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22",
+                "23", "24", "25", "26", "27", "28", "29", "30", "31", "", "", "",
+            ];
             for ch in days.chunks(7) {
                 rows.push(ch.to_vec());
             }
             rows
         }
-        "matrix" => vec![vec!["", "Column A", "Column B", "Column C"], vec!["Row 1", "1", "2", "3"], vec!["Row 2", "4", "5", "6"], vec!["Row 3", "7", "8", "9"]],
-        _ => vec![vec!["Item", "Needed"], vec!["Books", "1"], vec!["Magazines", "3"], vec!["Notebooks", "1"], vec!["Paper pads", "1"], vec!["Pens", "3"], vec!["Pencils", "2"]],
+        "matrix" => vec![
+            vec!["", "Column A", "Column B", "Column C"],
+            vec!["Row 1", "1", "2", "3"],
+            vec!["Row 2", "4", "5", "6"],
+            vec!["Row 3", "7", "8", "9"],
+        ],
+        _ => vec![
+            vec!["Item", "Needed"],
+            vec!["Books", "1"],
+            vec!["Magazines", "3"],
+            vec!["Notebooks", "1"],
+            vec!["Paper pads", "1"],
+            vec!["Pens", "3"],
+            vec!["Pencils", "2"],
+        ],
     };
     let cols = data.iter().map(Vec::len).max().unwrap_or(1);
     let width = super::page::sect(s).text_width();

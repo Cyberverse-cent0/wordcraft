@@ -164,7 +164,11 @@ impl<'a> Builder<'a> {
     fn style(&mut self, rc: &Arc<ResolvedChar>, face_override: Option<FaceRef>, small: bool) -> u16 {
         let r = wordcraft_fonts::word::resolve(&rc.font, rc.bold, rc.italic);
         let face = face_override.unwrap_or(r.face);
-        let key = (format!("{}|{:?}|{}|{}", style_key(rc), rc.color, rc.underline as u8, small), face.id(), rc.strike || rc.double_strike || rc.link.is_some());
+        let key = (
+            format!("{}|{:?}|{}|{}", style_key(rc), rc.color, rc.underline as u8, small),
+            face.id(),
+            rc.strike || rc.double_strike || rc.link.is_some(),
+        );
         let key = (format!("{}|{:?}|{:?}|{:?}|{:?}|{}", key.0, rc.highlight, rc.shading, rc.ins, rc.del, rc.hidden), key.1, key.2);
         if let Some(i) = self.style_index.get(&key) {
             return *i;
@@ -277,7 +281,18 @@ impl<'a> Builder<'a> {
         let Some(first) = added.first() else {
             let si = self.style(rc, None, false);
             let g = self.glyphs.len() as u32;
-            self.clusters.push(Cluster { start, end, adv: 0.0, kind: ClKind::Marker, style: si, g0: g, g1: g, break_after: false, obj_h: 0.0, dot: false });
+            self.clusters.push(Cluster {
+                start,
+                end,
+                adv: 0.0,
+                kind: ClKind::Marker,
+                style: si,
+                g0: g,
+                g1: g,
+                break_after: false,
+                obj_h: 0.0,
+                dot: false,
+            });
             return;
         };
         // Merge into one cluster: rebase glyph dx onto the first cluster.
@@ -362,7 +377,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
             let (start, end) = (range.start + i, range.start + i + c.len_utf8());
             let si = b.style(&rc, None, false);
             let g = b.glyphs.len() as u32;
-            let mut push = |b: &mut Builder, kind: ClKind, adv: f32, h: f32| {
+            let push = |b: &mut Builder, kind: ClKind, adv: f32, h: f32| {
                 b.clusters.push(Cluster { start, end, adv, kind, style: si, g0: g, g1: g, break_after: false, obj_h: h, dot: false })
             };
             match c {
@@ -687,13 +702,14 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
                 any = true;
             }
         }
-        if !any || (asc == 0.0 && desc == 0.0) {
-            if let Some(st) = pl.styles.get(mark_style as usize) {
-                asc = st.ascent;
-                desc = st.descent;
-            }
+        if (!any || (asc == 0.0 && desc == 0.0))
+            && let Some(st) = pl.styles.get(mark_style as usize)
+        {
+            asc = st.ascent;
+            desc = st.descent;
         }
-        if first && let Some(lab) = &pl.label
+        if first
+            && let Some(lab) = &pl.label
             && let Some(st) = pl.styles.get(lab.style as usize)
         {
             asc = asc.max(st.ascent);
@@ -767,7 +783,20 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
         }
         let start = pl.clusters.get(c0).map(|c| c.start).unwrap_or(pl.text_len);
         let stop = if c1 > c0 { pl.clusters.get(c1 - 1).map(|c| c.end).unwrap_or(pl.text_len) } else { start };
-        lines.push(Line { top, height, baseline, c0, c1, xs, leaders, end, start, stop, left: if first { first_left } else { rp.indent_left }, right: right_edge });
+        lines.push(Line {
+            top,
+            height,
+            baseline,
+            c0,
+            c1,
+            xs,
+            leaders,
+            end,
+            start,
+            stop,
+            left: if first { first_left } else { rp.indent_left },
+            right: right_edge,
+        });
         top += height;
         first = false;
         i = j;
@@ -904,8 +933,11 @@ fn proof_issues(p: &Paragraph) -> Vec<(usize, usize, bool)> {
         return Vec::new();
     }
     let text: String = p.text.chars().map(|c| if c == OBJ { ' ' } else { c }).collect();
-    let skip = |a: usize, b: usize| p.run_ranges().any(|(r, c)| r.start < b && a < r.end && (c.no_proof == Some(true) || c.hidden == Some(true) || c.link.is_some()));
-    let mut v: Vec<(usize, usize, bool)> = wordcraft_proof::check_spelling(&text).into_iter().filter(|i| !skip(i.start, i.end)).map(|i| (i.start, i.end, false)).collect();
+    let skip = |a: usize, b: usize| {
+        p.run_ranges().any(|(r, c)| r.start < b && a < r.end && (c.no_proof == Some(true) || c.hidden == Some(true) || c.link.is_some()))
+    };
+    let mut v: Vec<(usize, usize, bool)> =
+        wordcraft_proof::check_spelling(&text).into_iter().filter(|i| !skip(i.start, i.end)).map(|i| (i.start, i.end, false)).collect();
     v.extend(wordcraft_proof::check_grammar(&text).into_iter().filter(|i| !skip(i.start, i.end)).map(|i| (i.start, i.end, true)));
     v
 }

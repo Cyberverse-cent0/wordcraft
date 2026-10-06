@@ -16,69 +16,80 @@ fn in_table(app: &WordApp) -> bool {
 pub fn show(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     // Tab strip.
-    egui::Panel::top("tabs").exact_size(30.0).frame(egui::Frame::NONE.fill(t.tab_strip).inner_margin(egui::Margin { left: 8, right: 10, top: 0, bottom: 0 })).show(ui, |ui| {
-        ui.horizontal_centered(|ui| {
-            ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
-            let mut tabs: Vec<&str> = TABS.to_vec();
-            if in_table(app) {
-                tabs.push("Table Design");
-                tabs.push("Table Layout");
-            }
-            for tab in tabs {
-                let contextual = tab.starts_with("Table ");
-                let w = ui.ctx().fonts_mut(|f| f.layout_no_wrap(tab.to_string(), medium(12.5), t.text).size().x) + 18.0;
-                let (r, resp) = ui.allocate_exact_size(vec2(w, 30.0), Sense::click());
-                let active = app.ui.tab == tab && !app.ui.backstage;
-                if resp.hovered() && !active {
-                    ui.painter().rect_filled(r.shrink2(vec2(0.0, 4.0)), 4.0, t.hover);
+    egui::Panel::top("tabs")
+        .exact_size(30.0)
+        .frame(egui::Frame::NONE.fill(t.tab_strip).inner_margin(egui::Margin { left: 8, right: 10, top: 0, bottom: 0 }))
+        .show(ui, |ui| {
+            ui.horizontal_centered(|ui| {
+                ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
+                let mut tabs: Vec<&str> = TABS.to_vec();
+                if in_table(app) {
+                    tabs.push("Table Design");
+                    tabs.push("Table Layout");
                 }
-                let color = if contextual { t.accent_text } else if active { t.accent_text } else { t.text };
-                ui.painter().text(r.center(), Align2::CENTER_CENTER, tab, if active { semibold(12.5) } else { medium(12.5) }, color);
-                if active {
-                    let u = Rect::from_center_size(pos2(r.center().x, r.max.y - 2.0), vec2(w - 16.0, 3.0));
-                    ui.painter().rect_filled(u, 2.0, t.accent);
-                }
-                if resp.clicked() {
-                    let _ = app.run("ui.tab", json!({"tab": tab}));
-                }
-                if resp.double_clicked() && tab != "File" {
-                    let _ = app.run("ui.collapseRibbon", json!({}));
-                }
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                // Share, Editing mode, Comments.
-                let (r, resp) = ui.allocate_exact_size(vec2(74.0, 24.0), Sense::click());
-                ui.painter().rect_filled(r, 4.0, if resp.hovered() { t.accent_text } else { t.accent });
-                icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 14.0, r.center().y), vec2(14.0, 14.0)), "share", egui::Color32::WHITE, egui::Color32::WHITE);
-                ui.painter().text(pos2(r.min.x + 26.0, r.center().y), Align2::LEFT_CENTER, "Share", medium(12.0), egui::Color32::WHITE);
-                if resp.on_hover_text("Export a copy to share (PDF, Word document)").clicked() {
-                    let _ = app.run("ui.backstage", json!({"value": true, "page": "export"}));
-                }
-                ui.add_space(6.0);
-                let track = app.session.doc.settings.track_changes;
-                ui.menu_button(egui::RichText::new(if track { "✎ Reviewing ▾" } else { "✎ Editing ▾" }).font(regular(12.0)), |ui| {
-                    if ui.selectable_label(!track, "Editing — edit the document directly").clicked() {
-                        let _ = app.run("review.trackChanges", json!({"value": false}));
-                        ui.close();
+                for tab in tabs {
+                    let contextual = tab.starts_with("Table ");
+                    let w = ui.ctx().fonts_mut(|f| f.layout_no_wrap(tab.to_string(), medium(12.5), t.text).size().x) + 18.0;
+                    let (r, resp) = ui.allocate_exact_size(vec2(w, 30.0), Sense::click());
+                    let active = app.ui.tab == tab && !app.ui.backstage;
+                    if resp.hovered() && !active {
+                        ui.painter().rect_filled(r.shrink2(vec2(0.0, 4.0)), 4.0, t.hover);
                     }
-                    if ui.selectable_label(track, "Reviewing — edits become suggestions").clicked() {
-                        let _ = app.run("review.trackChanges", json!({"value": true}));
-                        ui.close();
+                    let color = if contextual || active { t.accent_text } else { t.text };
+                    ui.painter().text(r.center(), Align2::CENTER_CENTER, tab, if active { semibold(12.5) } else { medium(12.5) }, color);
+                    if active {
+                        let u = Rect::from_center_size(pos2(r.center().x, r.max.y - 2.0), vec2(w - 16.0, 3.0));
+                        ui.painter().rect_filled(u, 2.0, t.accent);
+                    }
+                    if resp.clicked() {
+                        let _ = app.run("ui.tab", json!({"tab": tab}));
+                    }
+                    if resp.double_clicked() && tab != "File" {
+                        let _ = app.run("ui.collapseRibbon", json!({}));
+                    }
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // Share, Editing mode, Comments.
+                    let (r, resp) = ui.allocate_exact_size(vec2(74.0, 24.0), Sense::click());
+                    ui.painter().rect_filled(r, 4.0, if resp.hovered() { t.accent_text } else { t.accent });
+                    icons::paint(
+                        ui.painter(),
+                        Rect::from_center_size(pos2(r.min.x + 14.0, r.center().y), vec2(14.0, 14.0)),
+                        "share",
+                        egui::Color32::WHITE,
+                        egui::Color32::WHITE,
+                    );
+                    ui.painter().text(pos2(r.min.x + 26.0, r.center().y), Align2::LEFT_CENTER, "Share", medium(12.0), egui::Color32::WHITE);
+                    if resp.on_hover_text("Export a copy to share (PDF, Word document)").clicked() {
+                        let _ = app.run("ui.backstage", json!({"value": true, "page": "export"}));
+                    }
+                    ui.add_space(6.0);
+                    let track = app.session.doc.settings.track_changes;
+                    ui.menu_button(egui::RichText::new(if track { "✎ Reviewing ▾" } else { "✎ Editing ▾" }).font(regular(12.0)), |ui| {
+                        if ui.selectable_label(!track, "Editing — edit the document directly").clicked() {
+                            let _ = app.run("review.trackChanges", json!({"value": false}));
+                            ui.close();
+                        }
+                        if ui.selectable_label(track, "Reviewing — edits become suggestions").clicked() {
+                            let _ = app.run("review.trackChanges", json!({"value": true}));
+                            ui.close();
+                        }
+                    });
+                    ui.add_space(4.0);
+                    if ui.button(egui::RichText::new("💬 Comments").font(regular(12.0))).clicked() {
+                        let _ = app.run("view.commentsPane", json!({}));
                     }
                 });
-                ui.add_space(4.0);
-                if ui.button(egui::RichText::new("💬 Comments").font(regular(12.0))).clicked() {
-                    let _ = app.run("view.commentsPane", json!({}));
-                }
             });
         });
-    });
     if app.ui.ribbon_collapsed {
         return;
     }
     egui::Panel::top("ribbon")
         .exact_size(CONTENT_H + LABEL_H + 10.0)
-        .frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin { left: 8, right: 8, top: 4, bottom: 4 }).stroke(Stroke::new(1.0, t.border)))
+        .frame(
+            egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin { left: 8, right: 8, top: 4, bottom: 4 }).stroke(Stroke::new(1.0, t.border)),
+        )
         .show(ui, |ui| {
             egui::ScrollArea::horizontal().scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden).show(ui, |ui| {
                 ui.horizontal_top(|ui| {
@@ -148,8 +159,13 @@ fn home(app: &mut WordApp, ui: &mut Ui) {
                 if let Some(f) = combo(ui, "font", 150.0, &font, &fams, Some(&*prev)) {
                     let _ = app.run("format.font", json!({"name": f}));
                 }
-                let size = st.get("size").and_then(Value::as_f64).map(|s| if s.fract() == 0.0 { format!("{s:.0}") } else { format!("{s}") }).unwrap_or_default();
-                let sizes: Vec<String> = wordcraft_engine::cmd::format::SIZES.iter().map(|s| if s.fract() == 0.0 { format!("{s:.0}") } else { s.to_string() }).collect();
+                let size = st
+                    .get("size")
+                    .and_then(Value::as_f64)
+                    .map(|s| if s.fract() == 0.0 { format!("{s:.0}") } else { format!("{s}") })
+                    .unwrap_or_default();
+                let sizes: Vec<String> =
+                    wordcraft_engine::cmd::format::SIZES.iter().map(|s| if s.fract() == 0.0 { format!("{s:.0}") } else { s.to_string() }).collect();
                 if let Some(v) = combo(ui, "size", 52.0, &size, &sizes, None)
                     && let Ok(x) = v.trim().parse::<f64>()
                 {
@@ -172,7 +188,16 @@ fn home(app: &mut WordApp, ui: &mut Ui) {
                 small(ui, app, "bold", None, "Bold", "format.bold", json!({}), flag("bold"));
                 small(ui, app, "italic", None, "Italic", "format.italic", json!({}), flag("italic"));
                 split(ui, app, "underline", "Underline", "format.underline", json!({}), flag("underline"), None, |ui, app| {
-                    for (l, s) in [("Single", "single"), ("Double", "double"), ("Thick", "thick"), ("Dotted", "dotted"), ("Dashed", "dash"), ("Dot-dash", "dotDash"), ("Wave", "wave"), ("Words only", "words")] {
+                    for (l, s) in [
+                        ("Single", "single"),
+                        ("Double", "double"),
+                        ("Thick", "thick"),
+                        ("Dotted", "dotted"),
+                        ("Dashed", "dash"),
+                        ("Dot-dash", "dotDash"),
+                        ("Wave", "wave"),
+                        ("Words only", "words"),
+                    ] {
                         mi(ui, app, l, "format.underline", json!({"style": s}));
                     }
                 });
@@ -239,7 +264,14 @@ fn home(app: &mut WordApp, ui: &mut Ui) {
                     mi(ui, app, "None", "para.bullets", json!({"off": true}));
                 });
                 split(ui, app, "numbering", "Numbering", "para.numbering", json!({}), false, None, |ui, app| {
-                    for (l, k) in [("1. 2. 3.", "numbered"), ("1) 2) 3)", "numberedParen"), ("I. II. III.", "outline"), ("A. B. C.", "upperLetter"), ("a) b) c)", "lowerLetter"), ("i. ii. iii.", "lowerRoman")] {
+                    for (l, k) in [
+                        ("1. 2. 3.", "numbered"),
+                        ("1) 2) 3)", "numberedParen"),
+                        ("I. II. III.", "outline"),
+                        ("A. B. C.", "upperLetter"),
+                        ("a) b) c)", "lowerLetter"),
+                        ("i. ii. iii.", "lowerRoman"),
+                    ] {
                         mi(ui, app, l, "para.numbering", json!({"kind": k}));
                     }
                     ui.separator();
@@ -289,7 +321,16 @@ fn home(app: &mut WordApp, ui: &mut Ui) {
                     }
                 });
                 split(ui, app, "borders", "Borders", "para.borders", json!({"kind": "bottom"}), false, None, |ui, app| {
-                    for (l, k) in [("Bottom Border", "bottom"), ("Top Border", "top"), ("Left Border", "left"), ("Right Border", "right"), ("No Border", "none"), ("All Borders", "all"), ("Outside Borders", "outside"), ("Inside Borders", "inside")] {
+                    for (l, k) in [
+                        ("Bottom Border", "bottom"),
+                        ("Top Border", "top"),
+                        ("Left Border", "left"),
+                        ("Right Border", "right"),
+                        ("No Border", "none"),
+                        ("All Borders", "all"),
+                        ("Outside Borders", "outside"),
+                        ("Inside Borders", "inside"),
+                    ] {
                         mi(ui, app, l, "para.borders", json!({"kind": k}));
                     }
                     ui.separator();
@@ -303,7 +344,7 @@ fn home(app: &mut WordApp, ui: &mut Ui) {
     });
     group(ui, "Editing", None, app, |ui, app| {
         stack(ui, |ui| {
-            if small(ui, app, "find", Some("Find"), "Find", "ui.dialog", json!({"name": "find"}), false).clicked() {}
+            small(ui, app, "find", Some("Find"), "Find", "ui.dialog", json!({"name": "find"}), false).clicked();
             small(ui, app, "replace", Some("Replace"), "Replace", "ui.dialog", json!({"name": "replace"}), false);
             menu_button(ui, app, "select", Some("Select"), "Select", false, |ui, app| {
                 mi(ui, app, "Select All", "select.all", json!({}));
@@ -346,7 +387,17 @@ fn insert(app: &mut WordApp, ui: &mut Ui) {
     group(ui, "Illustrations", None, app, |ui, app| {
         big(ui, app, "picture", "Pictures", "insert.picture", json!({}), false);
         menu_button(ui, app, "shapes", Some("Shapes"), "Shapes", true, |ui, app| {
-            for (l, k) in [("Rectangle", "rectangle"), ("Rounded Rectangle", "roundedRectangle"), ("Oval", "ellipse"), ("Triangle", "triangle"), ("Diamond", "diamond"), ("Line", "line"), ("Arrow", "arrow"), ("Star", "star"), ("Heart", "heart")] {
+            for (l, k) in [
+                ("Rectangle", "rectangle"),
+                ("Rounded Rectangle", "roundedRectangle"),
+                ("Oval", "ellipse"),
+                ("Triangle", "triangle"),
+                ("Diamond", "diamond"),
+                ("Line", "line"),
+                ("Arrow", "arrow"),
+                ("Star", "star"),
+                ("Heart", "heart"),
+            ] {
                 mi(ui, app, l, "insert.shape", json!({"kind": k}));
             }
         });
@@ -408,7 +459,13 @@ fn insert(app: &mut WordApp, ui: &mut Ui) {
         big(ui, app, "equation", "Equation", "insert.equation", json!({}), false);
         menu_button(ui, app, "symbol", Some("Symbol"), "Symbol", true, |ui, app| {
             egui::Grid::new("syms").show(ui, |ui| {
-                for (i, c) in ["©", "®", "™", "§", "¶", "€", "£", "¥", "°", "±", "≠", "≤", "≥", "÷", "×", "∞", "µ", "α", "β", "π", "Ω", "∑", "√", "→", "←", "✓", "★", "♥", "—", "…"].iter().enumerate() {
+                for (i, c) in [
+                    "©", "®", "™", "§", "¶", "€", "£", "¥", "°", "±", "≠", "≤", "≥", "÷", "×", "∞", "µ", "α", "β", "π", "Ω", "∑", "√", "→", "←", "✓",
+                    "★", "♥", "—", "…",
+                ]
+                .iter()
+                .enumerate()
+                {
                     if ui.button(egui::RichText::new(*c).size(16.0)).clicked() {
                         let _ = app.run("insert.symbol", json!({"char": c}));
                         ui.close();
@@ -467,7 +524,15 @@ fn design(app: &mut WordApp, ui: &mut Ui) {
         });
         stack(ui, |ui| {
             menu_button(ui, app, "paraSpacing", Some("Paragraph Spacing"), "Paragraph Spacing", false, |ui, app| {
-                for (l, v) in [("Default", "default"), ("No Paragraph Space", "none"), ("Compact", "compact"), ("Tight", "tight"), ("Open", "open"), ("Relaxed", "relaxed"), ("Double", "double")] {
+                for (l, v) in [
+                    ("Default", "default"),
+                    ("No Paragraph Space", "none"),
+                    ("Compact", "compact"),
+                    ("Tight", "tight"),
+                    ("Open", "open"),
+                    ("Relaxed", "relaxed"),
+                    ("Double", "double"),
+                ] {
                     mi(ui, app, l, "design.paragraphSpacing", json!({"value": v}));
                 }
             });
@@ -502,7 +567,14 @@ fn design(app: &mut WordApp, ui: &mut Ui) {
 fn layout(app: &mut WordApp, ui: &mut Ui) {
     group(ui, "Page Setup", Some("ui.dialog"), app, |ui, app| {
         menu_button(ui, app, "margins", Some("Margins"), "Margins", true, |ui, app| {
-            for (l, k) in [("Normal  1\" all", "normal"), ("Narrow  0.5\" all", "narrow"), ("Moderate", "moderate"), ("Wide", "wide"), ("Mirrored", "mirrored"), ("Office 2003 Default", "office2003")] {
+            for (l, k) in [
+                ("Normal  1\" all", "normal"),
+                ("Narrow  0.5\" all", "narrow"),
+                ("Moderate", "moderate"),
+                ("Wide", "wide"),
+                ("Mirrored", "mirrored"),
+                ("Office 2003 Default", "office2003"),
+            ] {
                 mi(ui, app, l, "layout.margins", json!({"preset": k}));
             }
             mi(ui, app, "Custom Margins…", "ui.dialog", json!({"name": "pageSetup"}));
@@ -536,7 +608,9 @@ fn layout(app: &mut WordApp, ui: &mut Ui) {
                 mi(ui, app, "Odd Page", "layout.break", json!({"kind": "oddPage"}));
             });
             menu_button(ui, app, "lineNumbers", Some("Line Numbers"), "Line Numbers", false, |ui, app| {
-                for (l, v) in [("None", "none"), ("Continuous", "continuous"), ("Restart Each Page", "restartPage"), ("Restart Each Section", "restartSection")] {
+                for (l, v) in
+                    [("None", "none"), ("Continuous", "continuous"), ("Restart Each Page", "restartPage"), ("Restart Each Section", "restartSection")]
+                {
                     mi(ui, app, l, "layout.lineNumbers", json!({"value": v}));
                 }
             });
@@ -644,7 +718,16 @@ fn references(app: &mut WordApp, ui: &mut Ui) {
     group(ui, "Captions", None, app, |ui, app| {
         big(ui, app, "caption", "Insert\nCaption", "references.caption", json!({}), false);
         stack(ui, |ui| {
-            small(ui, app, "tableOfFigures", Some("Insert Table of Figures"), "Insert Table of Figures", "references.tableOfFigures", json!({}), false);
+            small(
+                ui,
+                app,
+                "tableOfFigures",
+                Some("Insert Table of Figures"),
+                "Insert Table of Figures",
+                "references.tableOfFigures",
+                json!({}),
+                false,
+            );
             small(ui, app, "update", Some("Update Table"), "Update Table of Figures", "references.updateFigures", json!({}), false);
             small(ui, app, "crossRef", Some("Cross-reference"), "Cross-reference", "insert.crossReference", json!({}), false);
         });
@@ -731,10 +814,18 @@ fn review(app: &mut WordApp, ui: &mut Ui) {
         let r = big(ui, app, "trackChanges", if on { "Track\nChanges ✓" } else { "Track\nChanges" }, "review.trackChanges", json!({}), false);
         let _ = r;
         stack(ui, |ui| {
-            menu_button(ui, app, "markup", Some(if app.session.view.show_markup { "All Markup" } else { "No Markup" }), "Display for Review", false, |ui, app| {
-                mi(ui, app, "All Markup", "review.markup", json!({"value": "all"}));
-                mi(ui, app, "No Markup", "review.markup", json!({"value": "noMarkup"}));
-            });
+            menu_button(
+                ui,
+                app,
+                "markup",
+                Some(if app.session.view.show_markup { "All Markup" } else { "No Markup" }),
+                "Display for Review",
+                false,
+                |ui, app| {
+                    mi(ui, app, "All Markup", "review.markup", json!({"value": "all"}));
+                    mi(ui, app, "No Markup", "review.markup", json!({"value": "noMarkup"}));
+                },
+            );
             small(ui, app, "reviewingPane", Some("Reviewing Pane"), "Reviewing Pane", "review.changes", json!({}), false);
         });
     });
@@ -833,7 +924,14 @@ fn table_design(app: &mut WordApp, ui: &mut Ui) {
     group(ui, "Table Style Options", None, app, |ui, app| {
         let Some(l) = look else { return };
         egui::Grid::new("look").show(ui, |ui| {
-            for (row, items) in [[("Header Row", "headerRow", l.header_row), ("First Column", "firstColumn", l.first_column)], [("Total Row", "totalRow", l.total_row), ("Last Column", "lastColumn", l.last_column)], [("Banded Rows", "bandedRows", l.banded_rows), ("Banded Columns", "bandedColumns", l.banded_columns)]].iter().enumerate() {
+            for (row, items) in [
+                [("Header Row", "headerRow", l.header_row), ("First Column", "firstColumn", l.first_column)],
+                [("Total Row", "totalRow", l.total_row), ("Last Column", "lastColumn", l.last_column)],
+                [("Banded Rows", "bandedRows", l.banded_rows), ("Banded Columns", "bandedColumns", l.banded_columns)],
+            ]
+            .iter()
+            .enumerate()
+            {
                 let _ = row;
                 for (label, key, val) in items {
                     let mut v = *val;
@@ -846,7 +944,15 @@ fn table_design(app: &mut WordApp, ui: &mut Ui) {
         });
     });
     group(ui, "Table Styles", None, app, |ui, app| {
-        let styles: Vec<(String, String)> = app.session.doc.styles.styles.iter().filter(|s| s.kind == wordcraft_doc::StyleKind::Table && !s.hidden).map(|s| (s.id.clone(), s.name.clone())).collect();
+        let styles: Vec<(String, String)> = app
+            .session
+            .doc
+            .styles
+            .styles
+            .iter()
+            .filter(|s| s.kind == wordcraft_doc::StyleKind::Table && !s.hidden)
+            .map(|s| (s.id.clone(), s.name.clone()))
+            .collect();
         egui::ScrollArea::horizontal().max_width(420.0).show(ui, |ui| {
             ui.horizontal(|ui| {
                 for (id, name) in styles {
@@ -870,7 +976,14 @@ fn table_design(app: &mut WordApp, ui: &mut Ui) {
     });
     group(ui, "Borders", None, app, |ui, app| {
         menu_button(ui, app, "borders", Some("Borders"), "Borders", true, |ui, app| {
-            for (l, k) in [("All Borders", "all"), ("Outside Borders", "outside"), ("Inside Borders", "inside"), ("No Border", "none"), ("Top Border", "top"), ("Bottom Border", "bottom")] {
+            for (l, k) in [
+                ("All Borders", "all"),
+                ("Outside Borders", "outside"),
+                ("Inside Borders", "inside"),
+                ("No Border", "none"),
+                ("Top Border", "top"),
+                ("Bottom Border", "bottom"),
+            ] {
                 mi(ui, app, l, "table.borders", json!({"kind": k}));
             }
         });
@@ -925,7 +1038,8 @@ fn table_layout(app: &mut WordApp, ui: &mut Ui) {
     });
     group(ui, "Alignment", None, app, |ui, app| {
         egui::Grid::new("cellalign").spacing(vec2(1.0, 1.0)).show(ui, |ui| {
-            for row in [["topLeft", "topCenter", "topRight"], ["centerLeft", "center", "centerRight"], ["bottomLeft", "bottomCenter", "bottomRight"]] {
+            for row in [["topLeft", "topCenter", "topRight"], ["centerLeft", "center", "centerRight"], ["bottomLeft", "bottomCenter", "bottomRight"]]
+            {
                 for v in row {
                     small(ui, app, "cellAlign", None, v, "table.cellAlign", json!({"value": v}), false);
                 }

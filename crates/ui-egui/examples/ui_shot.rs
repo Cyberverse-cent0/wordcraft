@@ -17,18 +17,19 @@ fn main() {
     let path = std::env::args().nth(1).expect("usage: ui_shot script.jsonl");
     let script = std::fs::read_to_string(&path).expect("read script");
     let (tx, rx) = std::sync::mpsc::channel::<ControlRequest>();
-    let lines: Vec<serde_json::Value> = script.lines().filter(|l| !l.trim().is_empty()).map(|l| serde_json::from_str(l).expect("json line")).collect();
-    let doc = if lines.first().is_some_and(|l| l.get("empty").is_some()) { wordcraft_doc::Document::new() } else { wordcraft_engine::sample::sample_document() };
+    let lines: Vec<serde_json::Value> =
+        script.lines().filter(|l| !l.trim().is_empty()).map(|l| serde_json::from_str(l).expect("json line")).collect();
+    let doc = if lines.first().is_some_and(|l| l.get("empty").is_some()) {
+        wordcraft_doc::Document::new()
+    } else {
+        wordcraft_engine::sample::sample_document()
+    };
     let mut app = WordApp::new(Session::new(doc), Services::default()).with_control(rx);
     app.integrated_titlebar = true;
     let w = lines.iter().find_map(|l| l.get("width").and_then(|v| v.as_f64())).unwrap_or(1440.0) as f32;
     let h = lines.iter().find_map(|l| l.get("height").and_then(|v| v.as_f64())).unwrap_or(900.0) as f32;
-    let mut harness = egui_kittest::Harness::builder()
-        .with_size(egui::vec2(w, h))
-        .with_pixels_per_point(2.0)
-        .with_max_steps(1_000_000)
-        .wgpu()
-        .build_ui_state(
+    let mut harness =
+        egui_kittest::Harness::builder().with_size(egui::vec2(w, h)).with_pixels_per_point(2.0).with_max_steps(1_000_000).wgpu().build_ui_state(
             |ui, app: &mut WordApp| {
                 if !READY.load(std::sync::atomic::Ordering::Relaxed) {
                     return;

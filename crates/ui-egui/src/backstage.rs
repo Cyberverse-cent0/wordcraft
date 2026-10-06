@@ -20,53 +20,68 @@ const PAGES: [(&str, &str); 9] = [
 
 pub fn show(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
-    egui::Panel::left("backstage_nav").exact_size(200.0).frame(egui::Frame::NONE.fill(APP_COLOR).inner_margin(egui::Margin { left: 0, right: 0, top: 12, bottom: 12 })).show(ui, |ui| {
-        let (r, resp) = ui.allocate_exact_size(vec2(200.0, 40.0), Sense::click());
-        icons::paint(ui.painter(), Rect::from_center_size(pos2(r.min.x + 26.0, r.center().y), vec2(18.0, 18.0)), "chevronLeft", egui::Color32::WHITE, egui::Color32::WHITE);
-        if resp.clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
-            app.ui.backstage = false;
-            app.canvas.want_focus = true;
-        }
-        ui.add_space(6.0);
-        for (id, label) in PAGES {
-            let (r, resp) = ui.allocate_exact_size(vec2(200.0, 38.0), Sense::click());
-            let active = app.ui.backstage_page == id;
-            if active {
-                ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(46));
-            } else if resp.hovered() {
-                ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(26));
+    egui::Panel::left("backstage_nav")
+        .exact_size(200.0)
+        .frame(egui::Frame::NONE.fill(APP_COLOR).inner_margin(egui::Margin { left: 0, right: 0, top: 12, bottom: 12 }))
+        .show(ui, |ui| {
+            let (r, resp) = ui.allocate_exact_size(vec2(200.0, 40.0), Sense::click());
+            icons::paint(
+                ui.painter(),
+                Rect::from_center_size(pos2(r.min.x + 26.0, r.center().y), vec2(18.0, 18.0)),
+                "chevronLeft",
+                egui::Color32::WHITE,
+                egui::Color32::WHITE,
+            );
+            if resp.clicked() || ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                app.ui.backstage = false;
+                app.canvas.want_focus = true;
             }
-            ui.painter().text(pos2(r.min.x + 22.0, r.center().y), Align2::LEFT_CENTER, label, if active { semibold(14.0) } else { medium(14.0) }, egui::Color32::WHITE);
-            if resp.clicked() {
-                match id {
-                    "save" => {
-                        let _ = app.run("file.save", json!({}));
-                    }
-                    "saveAs" => app.save_as_dialog(),
-                    "open" => {
-                        app.ui.backstage_page = id.into();
-                    }
-                    _ => app.ui.backstage_page = id.into(),
-                }
-            }
-        }
-        ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
-            for (label, id) in [("About", "about"), ("Discord community", "discord")] {
-                let (r, resp) = ui.allocate_exact_size(vec2(200.0, 32.0), Sense::click());
-                if resp.hovered() {
+            ui.add_space(6.0);
+            for (id, label) in PAGES {
+                let (r, resp) = ui.allocate_exact_size(vec2(200.0, 38.0), Sense::click());
+                let active = app.ui.backstage_page == id;
+                if active {
+                    ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(46));
+                } else if resp.hovered() {
                     ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(26));
                 }
-                ui.painter().text(pos2(r.min.x + 22.0, r.center().y), Align2::LEFT_CENTER, label, regular(13.0), egui::Color32::WHITE);
+                ui.painter().text(
+                    pos2(r.min.x + 22.0, r.center().y),
+                    Align2::LEFT_CENTER,
+                    label,
+                    if active { semibold(14.0) } else { medium(14.0) },
+                    egui::Color32::WHITE,
+                );
                 if resp.clicked() {
-                    if id == "discord" {
-                        let _ = app.run("ui.discord", json!({}));
-                    } else {
-                        app.dialog = crate::dialogs::Dialog::open("about", app);
+                    match id {
+                        "save" => {
+                            let _ = app.run("file.save", json!({}));
+                        }
+                        "saveAs" => app.save_as_dialog(),
+                        "open" => {
+                            app.ui.backstage_page = id.into();
+                        }
+                        _ => app.ui.backstage_page = id.into(),
                     }
                 }
             }
+            ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                for (label, id) in [("About", "about"), ("Discord community", "discord")] {
+                    let (r, resp) = ui.allocate_exact_size(vec2(200.0, 32.0), Sense::click());
+                    if resp.hovered() {
+                        ui.painter().rect_filled(r, 0.0, egui::Color32::from_white_alpha(26));
+                    }
+                    ui.painter().text(pos2(r.min.x + 22.0, r.center().y), Align2::LEFT_CENTER, label, regular(13.0), egui::Color32::WHITE);
+                    if resp.clicked() {
+                        if id == "discord" {
+                            let _ = app.run("ui.discord", json!({}));
+                        } else {
+                            app.dialog = crate::dialogs::Dialog::open("about", app);
+                        }
+                    }
+                }
+            });
         });
-    });
     egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.ribbon).inner_margin(egui::Margin::symmetric(40, 30))).show(ui, |ui| {
         egui::ScrollArea::vertical().show(ui, |ui| match app.ui.backstage_page.as_str() {
             "new" | "home" => new_page(app, ui),
@@ -88,7 +103,13 @@ fn template_tile(ui: &mut Ui, app: &mut WordApp, label: &str, template: &str) {
     let t = Tokens::get(ui.ctx());
     ui.vertical(|ui| {
         let (r, resp) = ui.allocate_exact_size(vec2(150.0, 194.0), Sense::click());
-        ui.painter().rect(r, 2.0, egui::Color32::WHITE, Stroke::new(if resp.hovered() { 2.0 } else { 1.0 }, if resp.hovered() { t.accent } else { t.border_strong }), egui::StrokeKind::Inside);
+        ui.painter().rect(
+            r,
+            2.0,
+            egui::Color32::WHITE,
+            Stroke::new(if resp.hovered() { 2.0 } else { 1.0 }, if resp.hovered() { t.accent } else { t.border_strong }),
+            egui::StrokeKind::Inside,
+        );
         let ppp = ui.ctx().pixels_per_point();
         let key = format!("tpl:{template}:{ppp}");
         let tex = ui.ctx().data(|d| d.get_temp::<egui::TextureHandle>(egui::Id::new(&key))).or_else(|| {
@@ -98,7 +119,11 @@ fn template_tile(ui: &mut Ui, app: &mut WordApp, label: &str, template: &str) {
             let page = l.pages.first()?;
             let img = wordcraft_render::render_page(&s.doc, page, 150.0 / page.w * ppp, &Default::default());
             let px = img.to_straight();
-            let h = ui.ctx().load_texture(&key, egui::ColorImage::from_rgba_unmultiplied([img.width as usize, img.height as usize], &px), egui::TextureOptions::LINEAR);
+            let h = ui.ctx().load_texture(
+                &key,
+                egui::ColorImage::from_rgba_unmultiplied([img.width as usize, img.height as usize], &px),
+                egui::TextureOptions::LINEAR,
+            );
             ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new(&key), h.clone()));
             Some(h)
         });
@@ -116,7 +141,16 @@ fn template_tile(ui: &mut Ui, app: &mut WordApp, label: &str, template: &str) {
 
 fn new_page(app: &mut WordApp, ui: &mut Ui) {
     let hour = wordcraft_engine::cmd::now_iso().get(11..13).and_then(|h| h.parse::<u32>().ok()).unwrap_or(9);
-    heading(ui, if hour < 12 { "Good morning" } else if hour < 18 { "Good afternoon" } else { "Good evening" });
+    heading(
+        ui,
+        if hour < 12 {
+            "Good morning"
+        } else if hour < 18 {
+            "Good afternoon"
+        } else {
+            "Good evening"
+        },
+    );
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing = vec2(18.0, 0.0);
         template_tile(ui, app, "Blank document", "blank");
@@ -193,7 +227,16 @@ fn export_page(app: &mut WordApp, ui: &mut Ui) {
     heading(ui, if app.ui.backstage_page == "print" { "Print" } else { "Export" });
     ui.label("Save a copy in another format. Printing goes through a PDF you can print from any viewer.");
     ui.add_space(12.0);
-    for (label, ext) in [("PDF document (*.pdf)", "pdf"), ("Word document (*.docx)", "docx"), ("OpenDocument Text (*.odt)", "odt"), ("Rich Text Format (*.rtf)", "rtf"), ("Web page (*.html)", "html"), ("Markdown (*.md)", "md"), ("Plain text (*.txt)", "txt"), ("Page image (*.png)", "png")] {
+    for (label, ext) in [
+        ("PDF document (*.pdf)", "pdf"),
+        ("Word document (*.docx)", "docx"),
+        ("OpenDocument Text (*.odt)", "odt"),
+        ("Rich Text Format (*.rtf)", "rtf"),
+        ("Web page (*.html)", "html"),
+        ("Markdown (*.md)", "md"),
+        ("Plain text (*.txt)", "txt"),
+        ("Page image (*.png)", "png"),
+    ] {
         if ui.add(egui::Button::new(egui::RichText::new(label).font(medium(13.5))).min_size(vec2(320.0, 34.0))).clicked() {
             let name = format!("{}.{ext}", app.title_stem());
             let picked = app.services.pick_save.as_ref().and_then(|f| f(&name));

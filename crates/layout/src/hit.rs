@@ -161,13 +161,25 @@ impl DocLayout {
             .iter()
             .filter(|l| {
                 let mid = (l.top + l.bottom) / 2.0;
-                if dir < 0 { mid < cur_mid - 1.0 && l.bottom <= c.top + c.height * 0.5 } else { mid > cur_mid + 1.0 && l.top >= c.top + c.height * 0.5 }
+                if dir < 0 {
+                    mid < cur_mid - 1.0 && l.bottom <= c.top + c.height * 0.5
+                } else {
+                    mid > cur_mid + 1.0 && l.top >= c.top + c.height * 0.5
+                }
             })
             .collect();
         let target = if dir < 0 {
-            cands.iter().filter(|l| gx >= l.left - 2.0 && gx <= l.right + 2.0).max_by(|a, b| a.top.total_cmp(&b.top)).or_else(|| cands.iter().max_by(|a, b| a.top.total_cmp(&b.top)))
+            cands
+                .iter()
+                .filter(|l| gx >= l.left - 2.0 && gx <= l.right + 2.0)
+                .max_by(|a, b| a.top.total_cmp(&b.top))
+                .or_else(|| cands.iter().max_by(|a, b| a.top.total_cmp(&b.top)))
         } else {
-            cands.iter().filter(|l| gx >= l.left - 2.0 && gx <= l.right + 2.0).min_by(|a, b| a.top.total_cmp(&b.top)).or_else(|| cands.iter().min_by(|a, b| a.top.total_cmp(&b.top)))
+            cands
+                .iter()
+                .filter(|l| gx >= l.left - 2.0 && gx <= l.right + 2.0)
+                .min_by(|a, b| a.top.total_cmp(&b.top))
+                .or_else(|| cands.iter().min_by(|a, b| a.top.total_cmp(&b.top)))
         };
         if let Some(l) = target {
             let off = l.para.off_at_x(l.li, gx - l.x);
@@ -255,7 +267,9 @@ impl DocLayout {
     pub fn cell_at(&self, page: usize, x: f32, y: f32) -> Option<(StoryRef, Path, usize, usize)> {
         let p = self.pages.get(page)?;
         p.items.iter().rev().find_map(|it| match it {
-            Placed::Cell { rect, table, row, cell, story } if rect.contains(wordcraft_geom::Point::new(x, y)) => Some((*story, table.clone(), *row, *cell)),
+            Placed::Cell { rect, table, row, cell, story } if rect.contains(wordcraft_geom::Point::new(x, y)) => {
+                Some((*story, table.clone(), *row, *cell))
+            }
             _ => None,
         })
     }

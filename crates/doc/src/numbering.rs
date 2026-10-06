@@ -132,7 +132,10 @@ fn bullet_level(i: usize, c: char) -> Level {
         text: c.to_string(),
         indent: 36.0 * (i as f32 + 1.0),
         hanging: 18.0,
-        chr: CharProps { font: Some(if c == '•' || c == '▪' || c == '○' { "Arial".into() } else { "Segoe UI Symbol".into() }), ..CharProps::default() },
+        chr: CharProps {
+            font: Some(if c == '•' || c == '▪' || c == '○' { "Arial".into() } else { "Segoe UI Symbol".into() }),
+            ..CharProps::default()
+        },
         ..Level::default()
     }
 }
@@ -204,7 +207,10 @@ impl Numbering {
     pub fn find_kind(&self, kind: ListKind) -> Option<u32> {
         let want = levels_for(kind);
         let first = want.first()?;
-        self.nums.iter().find(|n| self.abstract_of(n.id).and_then(|a| a.levels.first()).is_some_and(|l| l.format == first.format && l.text == first.text)).map(|n| n.id)
+        self.nums
+            .iter()
+            .find(|n| self.abstract_of(n.id).and_then(|a| a.levels.first()).is_some_and(|l| l.format == first.format && l.text == first.text))
+            .map(|n| n.id)
     }
 }
 
@@ -225,8 +231,8 @@ impl Counters {
         let lv = (level as usize).min(8);
         let def = abs.levels.get(lv)?.clone();
         let st = self.state.entry(abs.id).or_insert([0; 9]);
-        if !self.seen.contains_key(&num) {
-            self.seen.insert(num, true);
+        if let std::collections::hash_map::Entry::Vacant(e) = self.seen.entry(num) {
+            e.insert(true);
             for (l, start) in &n.start_overrides {
                 if let Some(s) = st.get_mut(*l as usize) {
                     *s = start.saturating_sub(1);

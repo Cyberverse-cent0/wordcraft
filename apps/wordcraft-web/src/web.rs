@@ -1,8 +1,8 @@
 //! The browser shell: web `Services`, drag-and-drop, and the eframe web runner.
 
-use wordcraft_engine::Session;
-use wordcraft_ui_egui::{WordApp, Inbox, Services};
 use wasm_bindgen::JsCast as _;
+use wordcraft_engine::Session;
+use wordcraft_ui_egui::{Inbox, Services, WordApp};
 
 const DOC_EXTS: &[&str] = &["docx", "docm", "dotx", "odt", "rtf", "txt", "md", "html", "htm", "json"];
 const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp"];

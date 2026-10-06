@@ -54,13 +54,49 @@ pub struct LayoutOptions {
 #[derive(Clone, Debug)]
 pub enum Placed {
     /// Lines `l0..l1` of a paragraph; `y` is the top of line `l0`; `x` the column's left edge.
-    Lines { story: StoryRef, path: Path, para: Arc<ParaLayout>, l0: usize, l1: usize, x: f32, y: f32 },
-    Fill { rect: Rect, color: Rgb },
-    Rule { x0: f32, y0: f32, x1: f32, y1: f32, border: Border },
-    Image { rect: Rect, media: String, crop: [f32; 4], story: StoryRef, path: Path, off: usize },
-    Shape { rect: Rect, kind: wordcraft_doc::para::ShapeKind, fill: Option<Rgb>, stroke: Option<Rgb>, stroke_width: f32 },
+    Lines {
+        story: StoryRef,
+        path: Path,
+        para: Arc<ParaLayout>,
+        l0: usize,
+        l1: usize,
+        x: f32,
+        y: f32,
+    },
+    Fill {
+        rect: Rect,
+        color: Rgb,
+    },
+    Rule {
+        x0: f32,
+        y0: f32,
+        x1: f32,
+        y1: f32,
+        border: Border,
+    },
+    Image {
+        rect: Rect,
+        media: String,
+        crop: [f32; 4],
+        story: StoryRef,
+        path: Path,
+        off: usize,
+    },
+    Shape {
+        rect: Rect,
+        kind: wordcraft_doc::para::ShapeKind,
+        fill: Option<Rgb>,
+        stroke: Option<Rgb>,
+        stroke_width: f32,
+    },
     /// A table cell's area (for hit testing and cell selection).
-    Cell { rect: Rect, table: Path, row: usize, cell: usize, story: StoryRef },
+    Cell {
+        rect: Rect,
+        table: Path,
+        row: usize,
+        cell: usize,
+        story: StoryRef,
+    },
 }
 
 impl Placed {
@@ -201,7 +237,15 @@ impl Ctx<'_> {
             return pl.clone();
         }
         self.cache.misses += 1;
-        let env = para::ParaEnv { doc: self.doc, width, label, fields: &self.fields, show_hidden: self.opts.show_hidden, table_chr, proofing: self.opts.proofing };
+        let env = para::ParaEnv {
+            doc: self.doc,
+            width,
+            label,
+            fields: &self.fields,
+            show_hidden: self.opts.show_hidden,
+            table_chr,
+            proofing: self.opts.proofing,
+        };
         let pl = Arc::new(para::layout_para(p, &env));
         self.cache.paras.insert(key, pl.clone());
         pl
@@ -236,7 +280,15 @@ fn note_numbers(doc: &Document) -> HashMap<u32, u32> {
 
 /// Lay out a block list into a free-standing box of `width` (no page breaks): table cells,
 /// headers, footers, text boxes. Returns items relative to (0, 0) and the height.
-fn layout_box(ctx: &mut Ctx, story: StoryRef, blocks: &Blocks, prefix: &[u32], width: f32, table_chr: Option<&CharProps>, depth: usize) -> (Vec<Placed>, f32) {
+fn layout_box(
+    ctx: &mut Ctx,
+    story: StoryRef,
+    blocks: &Blocks,
+    prefix: &[u32],
+    width: f32,
+    table_chr: Option<&CharProps>,
+    depth: usize,
+) -> (Vec<Placed>, f32) {
     let mut items = Vec::new();
     let mut y = 0.0f32;
     let mut prev_after = 0.0f32;
@@ -356,7 +408,13 @@ impl PageBuilder<'_> {
         let mut y = self.orig_bottom - total + NOTE_SEP;
         let notes = std::mem::take(&mut self.notes);
         if let Some(pg) = self.pages.last_mut() {
-            pg.items.push(Placed::Rule { x0: x, y0: y - NOTE_SEP / 2.0, x1: x + 144.0, y1: y - NOTE_SEP / 2.0, border: Border { style: wordcraft_doc::props::BorderStyle::Single, width: 0.5, color: None, space: 0.0 } });
+            pg.items.push(Placed::Rule {
+                x0: x,
+                y0: y - NOTE_SEP / 2.0,
+                x1: x + 144.0,
+                y1: y - NOTE_SEP / 2.0,
+                border: Border { style: wordcraft_doc::props::BorderStyle::Single, width: 0.5, color: None, space: 0.0 },
+            });
             for (_, items, h) in notes {
                 for mut it in items {
                     it.translate(x, y);
@@ -455,7 +513,21 @@ pub fn layout(doc: &Document, cache: &mut LayoutCache, opts: &LayoutOptions) -> 
     } else {
         first_sect
     };
-    let mut pb = PageBuilder { pages: Vec::new(), sect: sect_ref, sect_idx: 0, col: 0, cols: Vec::new(), y: 0.0, top: 0.0, bottom: 0.0, number: 0, web, notes: Vec::new(), orig_bottom: 0.0, prev: None };
+    let mut pb = PageBuilder {
+        pages: Vec::new(),
+        sect: sect_ref,
+        sect_idx: 0,
+        col: 0,
+        cols: Vec::new(),
+        y: 0.0,
+        top: 0.0,
+        bottom: 0.0,
+        number: 0,
+        web,
+        notes: Vec::new(),
+        orig_bottom: 0.0,
+        prev: None,
+    };
     let mut block = 0usize;
     for (si, (end, sect)) in sections.iter().enumerate() {
         let sect: &SectionProps = if web { sect_ref } else { sect };
@@ -473,7 +545,7 @@ pub fn layout(doc: &Document, cache: &mut LayoutCache, opts: &LayoutOptions) -> 
             pb.new_page(block, body_top);
             if !web && matches!(start, SectionStart::EvenPage | SectionStart::OddPage) {
                 let want_even = start == SectionStart::EvenPage;
-                if (pb.number % 2 == 0) != want_even {
+                if pb.number.is_multiple_of(2) != want_even {
                     pb.new_page(block, body_top);
                 }
             }
@@ -498,7 +570,13 @@ pub fn layout(doc: &Document, cache: &mut LayoutCache, opts: &LayoutOptions) -> 
     }
     // Endnotes after the last paragraph.
     let endnotes: Vec<u32> = {
-        let mut ids: Vec<(u32, u32)> = ctx.fields.notes.iter().filter(|(id, _)| doc.parts.get(id).is_some_and(|p| p.kind == wordcraft_doc::PartKind::Endnote)).map(|(a, b)| (*b, *a)).collect();
+        let mut ids: Vec<(u32, u32)> = ctx
+            .fields
+            .notes
+            .iter()
+            .filter(|(id, _)| doc.parts.get(id).is_some_and(|p| p.kind == wordcraft_doc::PartKind::Endnote))
+            .map(|(a, b)| (*b, *a))
+            .collect();
         ids.sort();
         ids.into_iter().map(|(_, id)| id).collect()
     };
@@ -506,7 +584,13 @@ pub fn layout(doc: &Document, cache: &mut LayoutCache, opts: &LayoutOptions) -> 
         pb.y += 12.0;
         let (x, ry) = (pb.col_x(), pb.y);
         if let Some(pg) = pb.page() {
-            pg.items.push(Placed::Rule { x0: x, y0: ry, x1: x + 144.0, y1: ry, border: Border { style: wordcraft_doc::props::BorderStyle::Single, width: 0.5, color: None, space: 0.0 } });
+            pg.items.push(Placed::Rule {
+                x0: x,
+                y0: ry,
+                x1: x + 144.0,
+                y1: ry,
+                border: Border { style: wordcraft_doc::props::BorderStyle::Single, width: 0.5, color: None, space: 0.0 },
+            });
         }
         pb.y += 8.0;
         for id in endnotes {
@@ -529,7 +613,11 @@ pub fn layout(doc: &Document, cache: &mut LayoutCache, opts: &LayoutOptions) -> 
     pb.flush_notes();
     let mut pages = pb.pages;
     if web && let Some(p) = pages.first_mut() {
-        let bottom = p.items.iter().filter_map(|it| if let Placed::Lines { y, para, l0, l1, .. } = it { item_bottom(*y, para, *l0, *l1) } else { None }).fold(0.0f32, f32::max);
+        let bottom = p
+            .items
+            .iter()
+            .filter_map(|it| if let Placed::Lines { y, para, l0, l1, .. } = it { item_bottom(*y, para, *l0, *l1) } else { None })
+            .fold(0.0f32, f32::max);
         p.h = bottom + 36.0;
     }
     if !web {
@@ -610,17 +698,23 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
             let mut line_notes = Vec::new();
             if !pb.web {
                 for (ci, id) in &pl.notes {
-                    if *ci >= l.c0 && *ci < l.c1 && !pb.notes.iter().chain(new_notes.iter()).any(|x| x.0 == *id) {
-                        if let Some(part) = ctx.doc.parts.get(id).filter(|p| p.kind == wordcraft_doc::PartKind::Footnote) {
-                            let blocks = part.blocks.clone();
-                            let (items, h) = layout_box(ctx, StoryRef::Part(*id), &blocks, &[], pb.sect.text_width(), None, 0);
-                            line_notes.push((*id, items, h));
-                        }
+                    if *ci >= l.c0
+                        && *ci < l.c1
+                        && !pb.notes.iter().chain(new_notes.iter()).any(|x| x.0 == *id)
+                        && let Some(part) = ctx.doc.parts.get(id).filter(|p| p.kind == wordcraft_doc::PartKind::Footnote)
+                    {
+                        let blocks = part.blocks.clone();
+                        let (items, h) = layout_box(ctx, StoryRef::Part(*id), &blocks, &[], pb.sect.text_width(), None, 0);
+                        line_notes.push((*id, items, h));
                     }
                 }
             }
-            let extra: f32 = line_notes.iter().map(|n| n.2).sum::<f32>() + if pb.notes.is_empty() && new_notes.is_empty() && !line_notes.is_empty() { NOTE_SEP } else { 0.0 };
-            let limit = pb.bottom - new_notes.iter().map(|n| n.2).sum::<f32>() - if pb.notes.is_empty() && !new_notes.is_empty() { NOTE_SEP } else { 0.0 } - extra;
+            let extra: f32 = line_notes.iter().map(|n| n.2).sum::<f32>()
+                + if pb.notes.is_empty() && new_notes.is_empty() && !line_notes.is_empty() { NOTE_SEP } else { 0.0 };
+            let limit = pb.bottom
+                - new_notes.iter().map(|n| n.2).sum::<f32>()
+                - if pb.notes.is_empty() && !new_notes.is_empty() { NOTE_SEP } else { 0.0 }
+                - extra;
             let bottom = pb.y + (l.top + l.height - first.top);
             if bottom > limit + 0.01 && l1 > l0 {
                 break;
@@ -669,7 +763,9 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
                 let para::ClKind::Object(oi) = c.kind else { continue };
                 let Some(obj) = p.objects.get(oi) else { continue };
                 let (w, h, float) = match obj {
-                    InlineObject::Image { w, h, float, .. } | InlineObject::Shape { w, h, float, .. } if float.wrap != Wrap::Inline => (*w, *h, *float),
+                    InlineObject::Image { w, h, float, .. } | InlineObject::Shape { w, h, float, .. } if float.wrap != Wrap::Inline => {
+                        (*w, *h, *float)
+                    }
                     _ => continue,
                 };
                 let fx = match float.h_rel {
@@ -684,8 +780,12 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
                 };
                 let rect = Rect::new(fx, fy, w.clamp(1.0, 4000.0), h.clamp(1.0, 4000.0));
                 let it = match obj {
-                    InlineObject::Image { media, crop, .. } => Placed::Image { rect, media: media.clone(), crop: *crop, story: StoryRef::Body, path: Path(vec![block as u32]), off: c.start },
-                    InlineObject::Shape { kind, fill, stroke, stroke_width, .. } => Placed::Shape { rect, kind: *kind, fill: *fill, stroke: *stroke, stroke_width: *stroke_width },
+                    InlineObject::Image { media, crop, .. } => {
+                        Placed::Image { rect, media: media.clone(), crop: *crop, story: StoryRef::Body, path: Path(vec![block as u32]), off: c.start }
+                    }
+                    InlineObject::Shape { kind, fill, stroke, stroke_width, .. } => {
+                        Placed::Shape { rect, kind: *kind, fill: *fill, stroke: *stroke, stroke_width: *stroke_width }
+                    }
                     _ => continue,
                 };
                 if float.wrap == Wrap::BehindText {
@@ -722,7 +822,15 @@ fn next_first_line(ctx: &mut Ctx, block: usize, width: f32) -> f32 {
         Some(Block::Para(p)) => {
             // Don't advance list counters for a lookahead: lay out without the label.
             let rp = ctx.doc.styles.resolve_para(&p.props);
-            let env = para::ParaEnv { doc: ctx.doc, width, label: None, fields: &ctx.fields, show_hidden: ctx.opts.show_hidden, table_chr: None, proofing: false };
+            let env = para::ParaEnv {
+                doc: ctx.doc,
+                width,
+                label: None,
+                fields: &ctx.fields,
+                show_hidden: ctx.opts.show_hidden,
+                table_chr: None,
+                proofing: false,
+            };
             let _ = rp;
             let pl = para::layout_para(p, &env);
             pl.rp.space_before + pl.lines.first().map(|l| l.height).unwrap_or(0.0)

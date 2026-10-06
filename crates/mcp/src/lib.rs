@@ -47,7 +47,9 @@ impl Backend for Headless {
                 let pg = l.pages.get(page).ok_or_else(|| format!("no page {}", page + 1))?;
                 let img = wordcraft_render::render_page(&self.session.doc, pg, scale, &Default::default());
                 let png = img.to_png();
-                Ok(json!({"png": wordcraft_engine::cmd::insert::base64_encode(&png), "width": img.width, "height": img.height, "pages": l.pages.len()}))
+                Ok(
+                    json!({"png": wordcraft_engine::cmd::insert::base64_encode(&png), "width": img.width, "height": img.height, "pages": l.pages.len()}),
+                )
             }
             m if m.starts_with("ui.") => Err(format!("`{m}` {NEEDS_APP}")),
             other => self.session.run(other, &params).map_err(|e| e.to_string()),

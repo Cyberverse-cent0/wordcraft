@@ -45,7 +45,9 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("review.addToDictionary", "Add to Dictionary", "Review › Proofing", |s, v| {
             let w = match p::str(v, "word") {
                 Some(w) => w.to_string(),
-                None => issue_at(s, &s.sel.focus.clone()).map(|(a, b, _)| s.doc.para_at(&a).and_then(|p| p.text.get(a.off..b.off).map(str::to_string)).unwrap_or_default()).unwrap_or_default(),
+                None => issue_at(s, &s.sel.focus.clone())
+                    .map(|(a, b, _)| s.doc.para_at(&a).and_then(|p| p.text.get(a.off..b.off).map(str::to_string)).unwrap_or_default())
+                    .unwrap_or_default(),
             };
             if w.is_empty() {
                 return Err(CmdError::Params("no word".into()));
@@ -59,7 +61,9 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("review.ignoreAll", "Ignore All", "Review › Proofing", |s, v| {
             let w = match p::str(v, "word") {
                 Some(w) => w.to_string(),
-                None => issue_at(s, &s.sel.focus.clone()).map(|(a, b, _)| s.doc.para_at(&a).and_then(|p| p.text.get(a.off..b.off).map(str::to_string)).unwrap_or_default()).unwrap_or_default(),
+                None => issue_at(s, &s.sel.focus.clone())
+                    .map(|(a, b, _)| s.doc.para_at(&a).and_then(|p| p.text.get(a.off..b.off).map(str::to_string)).unwrap_or_default())
+                    .unwrap_or_default(),
             };
             wordcraft_proof::add_word(&w);
             s.relayout();
@@ -241,8 +245,11 @@ fn nav_comment(s: &mut Session, dir: i32) -> CmdResult {
 /// Accept or reject a revision range in one paragraph.
 fn resolve_para(s: &mut Session, story: StoryRef, path: &wordcraft_doc::Path, from: usize, to: usize, accept: bool) -> Result<(), CmdError> {
     let para = s.doc.para_mut(story, path)?;
-    let ranges: Vec<(usize, usize, bool, bool)> =
-        para.run_ranges().filter(|(r, _)| r.end > from && r.start < to).map(|(r, c)| (r.start.max(from), r.end.min(to), c.ins.is_some(), c.del.is_some())).collect();
+    let ranges: Vec<(usize, usize, bool, bool)> = para
+        .run_ranges()
+        .filter(|(r, _)| r.end > from && r.start < to)
+        .map(|(r, c)| (r.start.max(from), r.end.min(to), c.ins.is_some(), c.del.is_some()))
+        .collect();
     for (a, b, ins, del) in ranges.into_iter().rev() {
         if (del && accept) || (ins && !accept) {
             para.delete(a, b)?;
@@ -276,7 +283,10 @@ fn resolve_sel(s: &mut Session, accept: bool) -> CmdResult {
     let (a, b) = s.sel.ordered();
     let (a, b) = if a == b {
         // The change at the caret: the run around it.
-        let found = s.doc.para_at(&a).and_then(|p| p.run_ranges().find(|(r, c)| r.start <= a.off && a.off <= r.end && (c.ins.is_some() || c.del.is_some())).map(|(r, _)| r));
+        let found = s
+            .doc
+            .para_at(&a)
+            .and_then(|p| p.run_ranges().find(|(r, c)| r.start <= a.off && a.off <= r.end && (c.ins.is_some() || c.del.is_some())).map(|(r, _)| r));
         match found {
             Some(r) => (Pos { off: r.start, ..a.clone() }, Pos { off: r.end, ..a }),
             None => return nav_change(s, 1),
@@ -348,10 +358,16 @@ fn word_count(s: &mut Session, _: &Value) -> CmdResult {
     let paragraphs = text.split('\n').filter(|l| !l.trim().is_empty()).count();
     let lines: usize = {
         let l = s.layout();
-        l.pages.iter().flat_map(|p| p.items.iter()).map(|it| if let wordcraft_layout::Placed::Lines { l0, l1, story: StoryRef::Body, .. } = it { l1 - l0 } else { 0 }).sum()
+        l.pages
+            .iter()
+            .flat_map(|p| p.items.iter())
+            .map(|it| if let wordcraft_layout::Placed::Lines { l0, l1, story: StoryRef::Body, .. } = it { l1 - l0 } else { 0 })
+            .sum()
     };
     let pages = s.layout().pages.len();
-    Ok(json!({"pages": pages, "words": words, "characters": chars_no_spaces, "charactersWithSpaces": chars, "paragraphs": paragraphs, "lines": lines}))
+    Ok(
+        json!({"pages": pages, "words": words, "characters": chars_no_spaces, "charactersWithSpaces": chars, "paragraphs": paragraphs, "lines": lines}),
+    )
 }
 
 /// Issues (spelling + grammar) in one paragraph as positions.

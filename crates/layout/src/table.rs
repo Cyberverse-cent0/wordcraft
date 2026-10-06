@@ -18,6 +18,7 @@ pub struct RowLayout {
 pub struct TableLayout {
     /// Table x offset within the column.
     pub x: f32,
+    #[allow(dead_code)]
     pub width: f32,
     pub rows: Vec<RowLayout>,
 }
@@ -33,7 +34,11 @@ pub fn layout_table(ctx: &mut Ctx, story: StoryRef, t: &Table, path: &[u32], ava
     let parts = style_parts(ctx, t);
     let ncols = t.cols().max(1);
     // Column widths.
-    let mut grid: Vec<f32> = if t.grid.len() == ncols { t.grid.iter().map(|w| if w.is_finite() { w.max(4.0) } else { 72.0 }).collect() } else { vec![avail / ncols as f32; ncols] };
+    let mut grid: Vec<f32> = if t.grid.len() == ncols {
+        t.grid.iter().map(|w| if w.is_finite() { w.max(4.0) } else { 72.0 }).collect()
+    } else {
+        vec![avail / ncols as f32; ncols]
+    };
     let mut total: f32 = grid.iter().sum();
     let target = match (t.props.width_pct, t.props.width) {
         (Some(p), _) if p > 0.0 => Some(avail * (p / 100.0).min(1.0)),
@@ -129,7 +134,8 @@ pub fn layout_table(ctx: &mut Ctx, story: StoryRef, t: &Table, path: &[u32], ava
             }
             // Effective borders: cell > table (outer vs inside).
             let tb = tborders.unwrap_or_default();
-            let edge = |own: Option<Border>, outer: bool, outer_b: Option<Border>, inner_b: Option<Border>| own.or(if outer { outer_b } else { inner_b });
+            let edge =
+                |own: Option<Border>, outer: bool, outer_b: Option<Border>, inner_b: Option<Border>| own.or(if outer { outer_b } else { inner_b });
             let cb = cell.props.borders.unwrap_or_default();
             let mut borders = Borders {
                 top: edge(cb.top, ri == 0, tb.top, tb.between),
@@ -142,7 +148,19 @@ pub fn layout_table(ctx: &mut Ctx, story: StoryRef, t: &Table, path: &[u32], ava
             if is_total && let Some(b) = parts.as_ref().and_then(|p| p.total_border_top) {
                 borders.top = Some(b);
             }
-            cells.push(CellBox { items, h, x: x0, w: x1 - x0, valign: cell.props.valign, fill, borders, vmerge: cell.props.vmerge, margins, g, span });
+            cells.push(CellBox {
+                items,
+                h,
+                x: x0,
+                w: x1 - x0,
+                valign: cell.props.valign,
+                fill,
+                borders,
+                vmerge: cell.props.vmerge,
+                margins,
+                g,
+                span,
+            });
             g += span;
         }
         let rh = match (row.props.height, row.props.height_rule) {

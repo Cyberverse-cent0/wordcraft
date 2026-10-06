@@ -189,7 +189,10 @@ impl InlineObject {
     pub fn is_marker(&self) -> bool {
         matches!(
             self,
-            InlineObject::BookmarkStart { .. } | InlineObject::BookmarkEnd { .. } | InlineObject::CommentStart { .. } | InlineObject::CommentEnd { .. }
+            InlineObject::BookmarkStart { .. }
+                | InlineObject::BookmarkEnd { .. }
+                | InlineObject::CommentStart { .. }
+                | InlineObject::CommentEnd { .. }
         )
     }
     pub fn is_floating(&self) -> bool {
@@ -231,7 +234,12 @@ pub struct Paragraph {
 
 impl PartialEq for Paragraph {
     fn eq(&self, o: &Self) -> bool {
-        self.text == o.text && self.runs == o.runs && self.props == o.props && self.mark == o.mark && self.objects == o.objects && self.section == o.section
+        self.text == o.text
+            && self.runs == o.runs
+            && self.props == o.props
+            && self.mark == o.mark
+            && self.objects == o.objects
+            && self.section == o.section
     }
 }
 
@@ -243,7 +251,15 @@ impl Default for Paragraph {
 
 impl Paragraph {
     pub fn new() -> Self {
-        Paragraph { text: String::new(), runs: Vec::new(), props: ParaProps::default(), mark: CharProps::default(), objects: Vec::new(), section: None, rev: next_rev() }
+        Paragraph {
+            text: String::new(),
+            runs: Vec::new(),
+            props: ParaProps::default(),
+            mark: CharProps::default(),
+            objects: Vec::new(),
+            section: None,
+            rev: next_rev(),
+        }
     }
     /// A paragraph of plain text in one run.
     pub fn with_text(text: &str, props: CharProps) -> Self {
@@ -608,11 +624,11 @@ impl Paragraph {
     pub fn word_end(&self, off: usize) -> usize {
         let off = self.clamp(off);
         let Some(after) = self.text.get(off..) else { return self.text.len() };
-        let mut it = after.char_indices().peekable();
+        let it = after.char_indices().peekable();
         let mut end = self.text.len();
         let first_word = after.chars().next().is_some_and(|c| c.is_alphanumeric() || c == '_');
         let mut in_space = false;
-        while let Some((i, c)) = it.next() {
+        for (i, c) in it {
             let w = c.is_alphanumeric() || c == '_' || c == '\'';
             if c == ' ' || c == NBSP {
                 in_space = true;

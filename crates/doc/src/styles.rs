@@ -223,12 +223,7 @@ impl StyleSheet {
             quick: true,
             ..p_style()
         });
-        add(c_style(
-            "SubtleReference",
-            "Subtle Reference",
-            31,
-            CharProps { small_caps: Some(true), color: color(Rgb(0x5A, 0x5A, 0x5A)), ..chr() },
-        ));
+        add(c_style("SubtleReference", "Subtle Reference", 31, CharProps { small_caps: Some(true), color: color(Rgb(0x5A, 0x5A, 0x5A)), ..chr() }));
         add(c_style(
             "IntenseReference",
             "Intense Reference",
@@ -245,7 +240,8 @@ impl StyleSheet {
             quick: true,
             ..p_style()
         });
-        let mut hl = c_style("Hyperlink", "Hyperlink", 99, CharProps { color: color(Rgb(0x46, 0x78, 0x86)), underline: Some(Underline::Single), ..chr() });
+        let mut hl =
+            c_style("Hyperlink", "Hyperlink", 99, CharProps { color: color(Rgb(0x46, 0x78, 0x86)), underline: Some(Underline::Single), ..chr() });
         hl.quick = false;
         add(hl);
         add(Style {
@@ -285,7 +281,8 @@ impl StyleSheet {
             priority: Some(99),
             ..p_style()
         });
-        let mut fr = c_style("FootnoteReference", "Footnote Reference", 99, CharProps { vert_align: Some(crate::props::VertAlign::Superscript), ..chr() });
+        let mut fr =
+            c_style("FootnoteReference", "Footnote Reference", 99, CharProps { vert_align: Some(crate::props::VertAlign::Superscript), ..chr() });
         fr.quick = false;
         add(fr);
         add(Style {
@@ -297,7 +294,8 @@ impl StyleSheet {
             priority: Some(99),
             ..p_style()
         });
-        let mut er = c_style("EndnoteReference", "Endnote Reference", 99, CharProps { vert_align: Some(crate::props::VertAlign::Superscript), ..chr() });
+        let mut er =
+            c_style("EndnoteReference", "Endnote Reference", 99, CharProps { vert_align: Some(crate::props::VertAlign::Superscript), ..chr() });
         er.quick = false;
         add(er);
         add(Style {
@@ -408,36 +406,52 @@ fn table_styles() -> Vec<Style> {
     ];
     let mut v = vec![
         Style { id: "TableNormal".into(), name: "Normal Table".into(), kind: StyleKind::Table, hidden: true, builtin: true, ..Default::default() },
-        mk("PlainTable1", "Plain Table 1", TableStyleParts {
-            borders: Some(Borders::all(thin(Rgb(0xBF, 0xBF, 0xBF)))),
-            header_chr: CharProps { bold: Some(true), ..CharProps::default() },
-            band_fill: Some(Rgb(0xF2, 0xF2, 0xF2)),
-            first_col_chr: CharProps { bold: Some(true), ..CharProps::default() },
-            ..Default::default()
-        }),
-        mk("GridTable1Light", "Grid Table 1 Light", TableStyleParts {
-            borders: Some(Borders::all(thin(Rgb(0x99, 0x99, 0x99)))),
-            header_chr: CharProps { bold: Some(true), ..CharProps::default() },
-            first_col_chr: CharProps { bold: Some(true), ..CharProps::default() },
-            ..Default::default()
-        }),
+        mk(
+            "PlainTable1",
+            "Plain Table 1",
+            TableStyleParts {
+                borders: Some(Borders::all(thin(Rgb(0xBF, 0xBF, 0xBF)))),
+                header_chr: CharProps { bold: Some(true), ..CharProps::default() },
+                band_fill: Some(Rgb(0xF2, 0xF2, 0xF2)),
+                first_col_chr: CharProps { bold: Some(true), ..CharProps::default() },
+                ..Default::default()
+            },
+        ),
+        mk(
+            "GridTable1Light",
+            "Grid Table 1 Light",
+            TableStyleParts {
+                borders: Some(Borders::all(thin(Rgb(0x99, 0x99, 0x99)))),
+                header_chr: CharProps { bold: Some(true), ..CharProps::default() },
+                first_col_chr: CharProps { bold: Some(true), ..CharProps::default() },
+                ..Default::default()
+            },
+        ),
     ];
     for (name, dark, light) in accents {
-        v.push(mk(&format!("GridTable4Accent{name}"), &format!("Grid Table 4 – {name}"), TableStyleParts {
-            borders: Some(Borders::all(thin(light))),
-            header_fill: Some(dark),
-            header_chr: CharProps { bold: Some(true), color: Some(TextColor::Rgb(Rgb::WHITE)), ..CharProps::default() },
-            band_fill: Some(light),
-            first_col_chr: CharProps { bold: Some(true), ..CharProps::default() },
-            ..Default::default()
-        }));
-        v.push(mk(&format!("ListTable3Accent{name}"), &format!("List Table 3 – {name}"), TableStyleParts {
-            borders: Some(Borders::box_(thin(dark))),
-            header_fill: Some(dark),
-            header_chr: CharProps { bold: Some(true), color: Some(TextColor::Rgb(Rgb::WHITE)), ..CharProps::default() },
-            total_border_top: Some(thin(dark)),
-            ..Default::default()
-        }));
+        v.push(mk(
+            &format!("GridTable4Accent{name}"),
+            &format!("Grid Table 4 – {name}"),
+            TableStyleParts {
+                borders: Some(Borders::all(thin(light))),
+                header_fill: Some(dark),
+                header_chr: CharProps { bold: Some(true), color: Some(TextColor::Rgb(Rgb::WHITE)), ..CharProps::default() },
+                band_fill: Some(light),
+                first_col_chr: CharProps { bold: Some(true), ..CharProps::default() },
+                ..Default::default()
+            },
+        ));
+        v.push(mk(
+            &format!("ListTable3Accent{name}"),
+            &format!("List Table 3 – {name}"),
+            TableStyleParts {
+                borders: Some(Borders::box_(thin(dark))),
+                header_fill: Some(dark),
+                header_chr: CharProps { bold: Some(true), color: Some(TextColor::Rgb(Rgb::WHITE)), ..CharProps::default() },
+                total_border_top: Some(thin(dark)),
+                ..Default::default()
+            },
+        ));
     }
     v
 }

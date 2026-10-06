@@ -329,7 +329,8 @@ impl Session {
             }
         }
         // Macro recording and Repeat.
-        let record = !matches!(id, "tools.recordMacro" | "tools.macros" | "edit.undo" | "edit.redo" | "edit.repeat") && (spec.mutates || id.starts_with("caret.") || id.starts_with("select."));
+        let record = !matches!(id, "tools.recordMacro" | "tools.macros" | "edit.undo" | "edit.redo" | "edit.repeat")
+            && (spec.mutates || id.starts_with("caret.") || id.starts_with("select."));
         if record && let Some((_, steps)) = self.recording.as_mut() {
             steps.push((id.to_string(), params.clone()));
         }

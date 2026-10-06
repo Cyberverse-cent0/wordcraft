@@ -274,10 +274,8 @@ fn apply_style(s: &mut Session, v: &Value) -> CmdResult {
     s.doc.format_paragraphs(&a, &b, &|p| {
         p.style = Some(id.clone());
         // Applying a heading or Normal removes direct list numbering (except list styles).
-        if id.starts_with("Heading") || id == "Title" || id == "Normal" {
-            if p.numbering.is_some_and(|n| n.num != 0) && id == "Normal" {
-                p.numbering = None;
-            }
+        if (id.starts_with("Heading") || id == "Title" || id == "Normal") && p.numbering.is_some_and(|n| n.num != 0) && id == "Normal" {
+            p.numbering = None;
         }
     })?;
     // A paragraph style resets direct character formatting that matches nothing (Word keeps
@@ -306,11 +304,15 @@ fn list(s: &mut Session, v: &Value, default: ListKind) -> CmdResult {
     let off = p::bool(v, "off").unwrap_or(false);
     let (a, b) = s.sel.ordered();
     // Toggle: if every selected paragraph already has this kind of list, remove it.
-    let current: Vec<Option<NumRef>> = s.doc.paths_between(&a, &b).iter().map(|p| s.doc.para(a.story, p).and_then(|x| x.props.numbering).filter(|n| n.num != 0)).collect();
+    let current: Vec<Option<NumRef>> =
+        s.doc.paths_between(&a, &b).iter().map(|p| s.doc.para(a.story, p).and_then(|x| x.props.numbering).filter(|n| n.num != 0)).collect();
     let same_kind = |n: &NumRef| {
         s.doc.numbering.level(n.num, 0).is_some_and(|l| {
             let want = wordcraft_doc::numbering::levels_for(kind);
-            want.first().is_some_and(|w| (w.format == wordcraft_doc::section::NumFormat::Bullet) == (l.format == wordcraft_doc::section::NumFormat::Bullet) && (p::str(v, "kind").is_none() || w.text == l.text))
+            want.first().is_some_and(|w| {
+                (w.format == wordcraft_doc::section::NumFormat::Bullet) == (l.format == wordcraft_doc::section::NumFormat::Bullet)
+                    && (p::str(v, "kind").is_none() || w.text == l.text)
+            })
         })
     };
     let remove = off || (!current.is_empty() && current.iter().all(|n| n.as_ref().is_some_and(same_kind)));
@@ -325,7 +327,11 @@ fn list(s: &mut Session, v: &Value, default: ListKind) -> CmdResult {
         });
     }
     // Continue the list of the previous paragraph if it has the same kind; else a new list.
-    let prev_num = s.doc.prev_para(a.story, &a.path).and_then(|q| s.doc.para(a.story, &q).and_then(|x| x.props.numbering)).filter(|n| n.num != 0 && same_kind(n));
+    let prev_num = s
+        .doc
+        .prev_para(a.story, &a.path)
+        .and_then(|q| s.doc.para(a.story, &q).and_then(|x| x.props.numbering))
+        .filter(|n| n.num != 0 && same_kind(n));
     let num = match prev_num {
         Some(n) => n.num,
         None => match kind {
@@ -443,7 +449,16 @@ fn create_style(s: &mut Session, v: &Value) -> CmdResult {
     }
     let id = s.doc.styles.new_id(&name);
     let based = p::str(v, "basedOn").and_then(|b| s.doc.styles.find(b).map(|x| x.id.clone())).or(Some("Normal".into()));
-    let mut st = Style { id: id.clone(), name, kind: StyleKind::Paragraph, based_on: based, next: Some(id.clone()), quick: true, priority: Some(50), ..Default::default() };
+    let mut st = Style {
+        id: id.clone(),
+        name,
+        kind: StyleKind::Paragraph,
+        based_on: based,
+        next: Some(id.clone()),
+        quick: true,
+        priority: Some(50),
+        ..Default::default()
+    };
     if p::bool(v, "fromSelection").unwrap_or(true)
         && let Some(para) = s.doc.para_at(&s.sel.focus)
     {
@@ -463,8 +478,10 @@ fn create_style(s: &mut Session, v: &Value) -> CmdResult {
 
 fn modify_style(s: &mut Session, v: &Value) -> CmdResult {
     let id = style_id(s, p::req_str(v, "style")?)?;
-    let chr: Option<wordcraft_doc::CharProps> = v.get("chr").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| CmdError::Params(e.to_string()))?;
-    let para: Option<ParaProps> = v.get("para").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| CmdError::Params(e.to_string()))?;
+    let chr: Option<wordcraft_doc::CharProps> =
+        v.get("chr").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| CmdError::Params(e.to_string()))?;
+    let para: Option<ParaProps> =
+        v.get("para").map(|c| serde_json::from_value(c.clone())).transpose().map_err(|e| CmdError::Params(e.to_string()))?;
     let next = p::str(v, "next").map(str::to_string);
     let name = p::str(v, "name").map(str::to_string);
     let st = s.doc.styles.get_mut(&id).ok_or_else(|| CmdError::Params("no such style".into()))?;

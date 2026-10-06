@@ -45,7 +45,8 @@ pub enum DocError {
 
 pub type Result<T> = std::result::Result<T, DocError>;
 
-/// A block in a story.
+/// A block in a story. (Blocks are always behind an `Arc`, so the size difference is fine.)
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Block {
@@ -372,7 +373,10 @@ impl Document {
             }
             for b in bl.iter_mut() {
                 if let Block::Table(t) = &**b {
-                    let needs = t.rows.iter().any(|r| r.cells.iter().any(|c| c.blocks.is_empty() || matches!(c.blocks.last().map(|b| &**b), Some(Block::Table(_)))));
+                    let needs = t
+                        .rows
+                        .iter()
+                        .any(|r| r.cells.iter().any(|c| c.blocks.is_empty() || matches!(c.blocks.last().map(|b| &**b), Some(Block::Table(_)))));
                     if needs && let Block::Table(t) = Arc::make_mut(b) {
                         for r in &mut t.rows {
                             for c in &mut r.cells {
@@ -413,7 +417,7 @@ impl Document {
     pub fn container(&self, s: StoryRef, path: &Path) -> Option<&Blocks> {
         let mut bl = self.story(s)?;
         let parent = path.parent();
-        if parent.len() % 3 != 0 {
+        if !parent.len().is_multiple_of(3) {
             return None;
         }
         for ch in parent.chunks(3) {
@@ -427,7 +431,7 @@ impl Document {
     pub fn container_mut(&mut self, s: StoryRef, path: &Path) -> Result<&mut Blocks> {
         let bad = || DocError::BadPath(path.to_string());
         let parent: Vec<u32> = path.parent().to_vec();
-        if parent.len() % 3 != 0 {
+        if !parent.len().is_multiple_of(3) {
             return Err(bad());
         }
         let mut bl = self.story_mut(s)?;

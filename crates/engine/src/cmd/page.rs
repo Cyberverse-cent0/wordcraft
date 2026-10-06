@@ -9,8 +9,9 @@ use crate::{CmdError, CmdResult, CommandSpec, Selection, Session, p};
 
 pub fn specs() -> Vec<CommandSpec> {
     vec![
-        CommandSpec::new("layout.margins", "Margins", "Layout › Page Setup", margins)
-            .params(r#"{"preset"?: "normal|narrow|moderate|wide|mirrored|office2003", "top"?: pt, "bottom"?: pt, "left"?: pt, "right"?: pt, "gutter"?: pt}"#),
+        CommandSpec::new("layout.margins", "Margins", "Layout › Page Setup", margins).params(
+            r#"{"preset"?: "normal|narrow|moderate|wide|mirrored|office2003", "top"?: pt, "bottom"?: pt, "left"?: pt, "right"?: pt, "gutter"?: pt}"#,
+        ),
         CommandSpec::new("layout.orientation", "Orientation", "Layout › Page Setup", |s, v| {
             let land = match p::str(v, "value") {
                 Some("landscape") => true,
@@ -21,8 +22,10 @@ pub fn specs() -> Vec<CommandSpec> {
         })
         .params(r#"{"value": "portrait|landscape"}"#),
         CommandSpec::new("layout.size", "Size", "Layout › Page Setup", size).params(r#"{"name"?: "Letter|Legal|A4|…", "width"?: pt, "height"?: pt}"#),
-        CommandSpec::new("layout.columns", "Columns", "Layout › Page Setup", columns).params(r#"{"count": 1-12, "space"?: pt, "separator"?: bool, "preset"?: "left|right"}"#),
-        CommandSpec::new("layout.break", "Breaks", "Layout › Page Setup", breaks).params(r#"{"kind": "page|column|textWrapping|nextPage|continuous|evenPage|oddPage"}"#),
+        CommandSpec::new("layout.columns", "Columns", "Layout › Page Setup", columns)
+            .params(r#"{"count": 1-12, "space"?: pt, "separator"?: bool, "preset"?: "left|right"}"#),
+        CommandSpec::new("layout.break", "Breaks", "Layout › Page Setup", breaks)
+            .params(r#"{"kind": "page|column|textWrapping|nextPage|continuous|evenPage|oddPage"}"#),
         CommandSpec::new("layout.lineNumbers", "Line Numbers", "Layout › Page Setup", |s, v| {
             let mode = p::str(v, "value").unwrap_or("continuous");
             with_sect(s, |x| {
@@ -76,7 +79,10 @@ pub fn specs() -> Vec<CommandSpec> {
             })
         })
         .params(r#"{"format"?: "decimal|lowerRoman|upperRoman|lowerLetter|upperLetter", "start"?: n}"#),
-        CommandSpec::new("layout.section", "Section Properties", "Layout › Page Setup", |s, _| Ok(serde_json::to_value(sect(s)).unwrap_or(Value::Null))).pure(),
+        CommandSpec::new("layout.section", "Section Properties", "Layout › Page Setup", |s, _| {
+            Ok(serde_json::to_value(sect(s)).unwrap_or(Value::Null))
+        })
+        .pure(),
     ]
 }
 
@@ -142,7 +148,10 @@ fn margins(s: &mut Session, v: &Value) -> CmdResult {
 
 fn size(s: &mut Session, v: &Value) -> CmdResult {
     let (w, h) = if let Some(n) = p::str(v, "name") {
-        let (_, w, h) = wordcraft_geom::PAPER_SIZES.iter().find(|(name, _, _)| name.eq_ignore_ascii_case(n)).ok_or_else(|| CmdError::Params(format!("unknown paper `{n}`")))?;
+        let (_, w, h) = wordcraft_geom::PAPER_SIZES
+            .iter()
+            .find(|(name, _, _)| name.eq_ignore_ascii_case(n))
+            .ok_or_else(|| CmdError::Params(format!("unknown paper `{n}`")))?;
         (*w, *h)
     } else {
         (p::req_f32(v, "width")?, p::req_f32(v, "height")?)
@@ -182,7 +191,9 @@ fn breaks(s: &mut Session, v: &Value) -> CmdResult {
     let start = match kind {
         "page" => return super::text::specs().iter().find(|c| c.id == "text.pageBreak").map(|c| (c.run)(s, v)).unwrap_or_else(|| sel_result(s)),
         "column" => return super::text::specs().iter().find(|c| c.id == "text.columnBreak").map(|c| (c.run)(s, v)).unwrap_or_else(|| sel_result(s)),
-        "textWrapping" => return super::text::specs().iter().find(|c| c.id == "text.lineBreak").map(|c| (c.run)(s, v)).unwrap_or_else(|| sel_result(s)),
+        "textWrapping" => {
+            return super::text::specs().iter().find(|c| c.id == "text.lineBreak").map(|c| (c.run)(s, v)).unwrap_or_else(|| sel_result(s));
+        }
         "nextPage" => SectionStart::NextPage,
         "continuous" => SectionStart::Continuous,
         "evenPage" => SectionStart::EvenPage,

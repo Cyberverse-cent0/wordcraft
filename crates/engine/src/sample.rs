@@ -38,7 +38,11 @@ pub fn sample_document() -> Document {
     add(&mut intro, "Painters", bold());
     add(&mut intro, " set up by the north windows, ", CharProps::default());
     add(&mut intro, "letterpress", italic());
-    add(&mut intro, " regulars claim the back room, and somebody always brings bread. This handbook collects what we have learned about running a shared studio: the routines that keep it pleasant, the tools we pool, and the small agreements that let thirty strangers become a crew.", CharProps::default());
+    add(
+        &mut intro,
+        " regulars claim the back room, and somebody always brings bread. This handbook collects what we have learned about running a shared studio: the routines that keep it pleasant, the tools we pool, and the small agreements that let thirty strangers become a crew.",
+        CharProps::default(),
+    );
     b.push(Block::Para(intro));
     b.push(Block::Para(styled("Why share a studio?", "Heading1")));
     b.push(Block::Para(para("Rent is the obvious reason, but it is not the best one. A shared room puts your work next to work you would never have seen otherwise. A ceramicist explains glaze chemistry to a comic artist; a photographer borrows a weaver's loom for a still life. The cross-talk is the point.")));
@@ -85,7 +89,12 @@ pub fn sample_document() -> Document {
     }
     b.push(Block::Table(t));
     b.push(Block::Para(styled("Opening the studio", "Heading2")));
-    for s in ["Switch on the main breaker by the door.", "Open both skylights unless it is raining.", "Start the kettle. This step is not optional.", "Check the booking sheet for the kiln and press."] {
+    for s in [
+        "Switch on the main breaker by the door.",
+        "Open both skylights unless it is raining.",
+        "Start the kettle. This step is not optional.",
+        "Check the booking sheet for the kiln and press.",
+    ] {
         let mut p = para(s).styled("ListParagraph");
         p.props.numbering = Some(NumRef { num: steps, level: 0 });
         b.push(Block::Para(p));
@@ -93,10 +102,18 @@ pub fn sample_document() -> Document {
     b.push(Block::Para(styled("Membership", "Heading1")));
     let mut m = para("Membership is ");
     add(&mut m, "pay what you can", CharProps { bold: Some(true), color: Some(TextColor::Rgb(Rgb(0x15, 0x60, 0x82))), ..Default::default() });
-    add(&mut m, ", reviewed every season. New members shadow a regular for their first two visits, and everyone takes one cleaning shift a month. If you have never made anything before, you are exactly who we hoped would show up.", CharProps::default());
+    add(
+        &mut m,
+        ", reviewed every season. New members shadow a regular for their first two visits, and everyone takes one cleaning shift a month. If you have never made anything before, you are exactly who we hoped would show up.",
+        CharProps::default(),
+    );
     b.push(Block::Para(m));
     let mut h = para("Questions go to the front desk, or to the notice board by the sink. ");
-    add(&mut h, "Visit the community board", CharProps { style: Some("Hyperlink".into()), link: Some("https://getartcraft.com/".into()), ..Default::default() });
+    add(
+        &mut h,
+        "Visit the community board",
+        CharProps { style: Some("Hyperlink".into()), link: Some("https://getartcraft.com/".into()), ..Default::default() },
+    );
     add(&mut h, " for events.", CharProps::default());
     b.push(Block::Para(h));
     d.body = b.into_iter().map(std::sync::Arc::new).collect();
@@ -107,7 +124,10 @@ pub fn sample_document() -> Document {
     let fid = d.add_part(PartKind::Footer, vec![para_block(f)]);
     d.last_section.footers.default = Some(fid);
     let mut hd = styled("The Open Studio Handbook\t\tSpring edition", "Header");
-    hd.props.borders = Some(Borders { bottom: Some(Border { style: BorderStyle::Single, width: 0.5, color: Some(Rgb(0xBF, 0xBF, 0xBF)), space: 4.0 }), ..Default::default() });
+    hd.props.borders = Some(Borders {
+        bottom: Some(Border { style: BorderStyle::Single, width: 0.5, color: Some(Rgb(0xBF, 0xBF, 0xBF)), space: 4.0 }),
+        ..Default::default()
+    });
     let hid = d.add_part(PartKind::Header, vec![para_block(hd)]);
     d.last_section.headers.default = Some(hid);
     d
@@ -127,7 +147,9 @@ pub fn letter() -> Document {
         para("Street Address"),
         para(""),
         para("Dear Recipient,"),
-        para("Start with a sentence that says why you are writing. Keep paragraphs short and specific, and close with what you would like to happen next."),
+        para(
+            "Start with a sentence that says why you are writing. Keep paragraphs short and specific, and close with what you would like to happen next.",
+        ),
         para("Thank you for your time."),
         para("Sincerely,"),
         para(""),
@@ -140,7 +162,8 @@ pub fn letter() -> Document {
 /// A one-page résumé.
 pub fn resume() -> Document {
     let mut d = Document::new();
-    let mut b: Vec<Block> = vec![Block::Para(styled("Alex Rivera", "Title")), Block::Para(para("Illustrator · alex@example.com · portfolio.example.com"))];
+    let mut b: Vec<Block> =
+        vec![Block::Para(styled("Alex Rivera", "Title")), Block::Para(para("Illustrator · alex@example.com · portfolio.example.com"))];
     for (head, items) in [
         ("Experience", vec![("Lead Illustrator, Harbor Books", "2021 – present"), ("Freelance Illustrator", "2016 – 2021")]),
         ("Education", vec![("BFA Illustration, Coastal College of Art", "2016")]),

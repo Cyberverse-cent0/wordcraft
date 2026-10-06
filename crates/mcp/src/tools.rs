@@ -21,7 +21,10 @@ impl ToolResult {
         Self { content: vec![json!({"type": "text", "text": t.into()})], is_error: true }
     }
     pub fn image(png_base64: String, info: &Value) -> Self {
-        Self { content: vec![json!({"type": "image", "data": png_base64, "mimeType": "image/png"}), json!({"type": "text", "text": info.to_string()})], is_error: false }
+        Self {
+            content: vec![json!({"type": "image", "data": png_base64, "mimeType": "image/png"}), json!({"type": "text", "text": info.to_string()})],
+            is_error: false,
+        }
     }
     pub fn to_value(&self) -> Value {
         json!({"content": self.content, "isError": self.is_error})
@@ -43,22 +46,103 @@ fn tool(name: &str, title: &str, desc: &str, schema: Value, ro: bool) -> Value {
 
 pub fn tool_definitions() -> Value {
     json!([
-        tool("list_commands", "List commands", "Every WordCraft command: id, label, ribbon location, shortcut and params. Filter with `query`.", obj(json!({"query": s("Case-insensitive filter on id/label/location")}), &[]), true),
-        tool("execute", "Run a command", "Run one command by id with params, e.g. {command:\"format.bold\"} or {command:\"insert.table\", params:{rows:3, cols:4}}.", obj(json!({"command": s("Command id"), "params": {"type": "object", "description": "Command parameters"}}), &["command"]), false),
-        tool("batch", "Run several commands", "Run commands in order; stops at the first error unless keepGoing.", obj(json!({"commands": {"type": "array", "items": {"type": "object", "properties": {"command": {"type": "string"}, "params": {"type": "object"}}, "required": ["command"]}}, "keepGoing": {"type": "boolean"}}), &["commands"]), false),
-        tool("new_document", "New document", "Start a document: blank, sample, letter, resume or report.", obj(json!({"template": s("blank|sample|letter|resume|report")}), &[]), false),
-        tool("open_document", "Open", "Open a .docx, .odt, .rtf, .md, .html, .txt or .json file.", obj(json!({"path": s("File path")}), &["path"]), false),
-        tool("save_document", "Save", "Save (format from the extension: docx, pdf, odt, rtf, html, md, txt, png).", obj(json!({"path": s("File path; omit to save in place")}), &[]), false),
-        tool("type_text", "Type text", "Type at the caret (replacing the selection). Use \\n... for line breaks inside text; use execute text.newParagraph for new paragraphs, or `paragraphs: true` to split lines into paragraphs.", obj(json!({"text": s("Text"), "paragraphs": {"type": "boolean"}}), &["text"]), false),
-        tool("select_text", "Select text", "Select the n-th occurrence of some text.", obj(json!({"text": s("Text to find"), "occurrence": n("1-based")}), &["text"]), false),
+        tool(
+            "list_commands",
+            "List commands",
+            "Every WordCraft command: id, label, ribbon location, shortcut and params. Filter with `query`.",
+            obj(json!({"query": s("Case-insensitive filter on id/label/location")}), &[]),
+            true
+        ),
+        tool(
+            "execute",
+            "Run a command",
+            "Run one command by id with params, e.g. {command:\"format.bold\"} or {command:\"insert.table\", params:{rows:3, cols:4}}.",
+            obj(json!({"command": s("Command id"), "params": {"type": "object", "description": "Command parameters"}}), &["command"]),
+            false
+        ),
+        tool(
+            "batch",
+            "Run several commands",
+            "Run commands in order; stops at the first error unless keepGoing.",
+            obj(
+                json!({"commands": {"type": "array", "items": {"type": "object", "properties": {"command": {"type": "string"}, "params": {"type": "object"}}, "required": ["command"]}}, "keepGoing": {"type": "boolean"}}),
+                &["commands"]
+            ),
+            false
+        ),
+        tool(
+            "new_document",
+            "New document",
+            "Start a document: blank, sample, letter, resume or report.",
+            obj(json!({"template": s("blank|sample|letter|resume|report")}), &[]),
+            false
+        ),
+        tool(
+            "open_document",
+            "Open",
+            "Open a .docx, .odt, .rtf, .md, .html, .txt or .json file.",
+            obj(json!({"path": s("File path")}), &["path"]),
+            false
+        ),
+        tool(
+            "save_document",
+            "Save",
+            "Save (format from the extension: docx, pdf, odt, rtf, html, md, txt, png).",
+            obj(json!({"path": s("File path; omit to save in place")}), &[]),
+            false
+        ),
+        tool(
+            "type_text",
+            "Type text",
+            "Type at the caret (replacing the selection). Use \\n... for line breaks inside text; use execute text.newParagraph for new paragraphs, or `paragraphs: true` to split lines into paragraphs.",
+            obj(json!({"text": s("Text"), "paragraphs": {"type": "boolean"}}), &["text"]),
+            false
+        ),
+        tool(
+            "select_text",
+            "Select text",
+            "Select the n-th occurrence of some text.",
+            obj(json!({"text": s("Text to find"), "occurrence": n("1-based")}), &["text"]),
+            false
+        ),
         tool("get_text", "Document text", "Plain text of the document body.", obj(json!({}), &[]), true),
-        tool("inspect_document", "Inspect document", "Structure: blocks with text, styles, formatting runs, lists, tables, sections, parts, selection, pages.", obj(json!({}), &[]), true),
-        tool("render_page", "Render page", "Render a page to PNG to look at the result.", obj(json!({"page": n("1-based page"), "scale": n("Pixels per point (default 1)")}), &[]), true),
+        tool(
+            "inspect_document",
+            "Inspect document",
+            "Structure: blocks with text, styles, formatting runs, lists, tables, sections, parts, selection, pages.",
+            obj(json!({}), &[]),
+            true
+        ),
+        tool(
+            "render_page",
+            "Render page",
+            "Render a page to PNG to look at the result.",
+            obj(json!({"page": n("1-based page"), "scale": n("Pixels per point (default 1)")}), &[]),
+            true
+        ),
         tool("parity", "Feature parity", "WordCraft's command coverage of the word-processor feature catalog.", obj(json!({}), &[]), true),
         tool("screenshot", "Screenshot app", "Screenshot of the whole WordCraft window (desktop app only).", obj(json!({}), &[]), true),
-        tool("click", "Click", "Click at window coordinates (desktop app only).", obj(json!({"x": n("x"), "y": n("y"), "count": n("1-3 clicks"), "shift": {"type": "boolean"}, "cmd": {"type": "boolean"}}), &["x", "y"]), false),
-        tool("key", "Press key", "Press a key with modifiers (desktop app only), e.g. {key:\"B\", cmd:true}.", obj(json!({"key": s("Key name"), "shift": {"type": "boolean"}, "alt": {"type": "boolean"}, "cmd": {"type": "boolean"}}), &["key"]), false),
-        tool("ui_inspect", "Inspect UI", "UI state: tab, panes, dialog, page rectangles on screen, caret (desktop app only).", obj(json!({}), &[]), true),
+        tool(
+            "click",
+            "Click",
+            "Click at window coordinates (desktop app only).",
+            obj(json!({"x": n("x"), "y": n("y"), "count": n("1-3 clicks"), "shift": {"type": "boolean"}, "cmd": {"type": "boolean"}}), &["x", "y"]),
+            false
+        ),
+        tool(
+            "key",
+            "Press key",
+            "Press a key with modifiers (desktop app only), e.g. {key:\"B\", cmd:true}.",
+            obj(json!({"key": s("Key name"), "shift": {"type": "boolean"}, "alt": {"type": "boolean"}, "cmd": {"type": "boolean"}}), &["key"]),
+            false
+        ),
+        tool(
+            "ui_inspect",
+            "Inspect UI",
+            "UI state: tab, panes, dialog, page rectangles on screen, caret (desktop app only).",
+            obj(json!({}), &[]),
+            true
+        ),
     ])
 }
 
@@ -82,7 +166,12 @@ pub fn call_tool(b: &mut dyn Backend, name: &str, a: &Value) -> ToolResult {
                 Ok(Value::Array(v)) => {
                     let f: Vec<Value> = v
                         .into_iter()
-                        .filter(|c| q.is_empty() || ["id", "label", "location"].iter().any(|k| c.get(*k).and_then(Value::as_str).is_some_and(|x| x.to_lowercase().contains(&q))))
+                        .filter(|c| {
+                            q.is_empty()
+                                || ["id", "label", "location"]
+                                    .iter()
+                                    .any(|k| c.get(*k).and_then(Value::as_str).is_some_and(|x| x.to_lowercase().contains(&q)))
+                        })
                         .collect();
                     ToolResult::json(&Value::Array(f))
                 }
@@ -119,10 +208,14 @@ pub fn call_tool(b: &mut dyn Backend, name: &str, a: &Value) -> ToolResult {
             if ext == "png" {
                 wrap(exec(b, "file.exportPng", json!({"path": p})))
             } else {
-                wrap(exec(b, "file.save", match p {
-                    Some(p) => json!({"path": p}),
-                    None => json!({}),
-                }))
+                wrap(exec(
+                    b,
+                    "file.save",
+                    match p {
+                        Some(p) => json!({"path": p}),
+                        None => json!({}),
+                    },
+                ))
             }
         }
         "type_text" => {
@@ -145,7 +238,9 @@ pub fn call_tool(b: &mut dyn Backend, name: &str, a: &Value) -> ToolResult {
                 wrap(exec(b, "text.insert", json!({"text": t, "raw": true})))
             }
         }
-        "select_text" => wrap(exec(b, "select.text", json!({"text": st("text").unwrap_or(""), "occurrence": a.get("occurrence").cloned().unwrap_or(json!(1))}))),
+        "select_text" => {
+            wrap(exec(b, "select.text", json!({"text": st("text").unwrap_or(""), "occurrence": a.get("occurrence").cloned().unwrap_or(json!(1))})))
+        }
         "get_text" => wrap(exec(b, "document.text", json!({}))),
         "inspect_document" => wrap(b.call("document.inspect", json!({}))),
         "parity" => wrap(b.call("ui.parity", json!({}))),

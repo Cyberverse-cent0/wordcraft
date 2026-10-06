@@ -124,10 +124,28 @@ pub fn cite(src: &Source, style: &str, n: usize, pages: &str) -> String {
         _ => format!("{} et al.", lasts.first().copied().unwrap_or("")),
     };
     match style {
-        "MLA" => if pages.is_empty() { format!("({who})") } else { format!("({who} {pages})") },
-        "Chicago" => if pages.is_empty() { format!("({who} {})", src.year) } else { format!("({who} {}, {pages})", src.year) },
+        "MLA" => {
+            if pages.is_empty() {
+                format!("({who})")
+            } else {
+                format!("({who} {pages})")
+            }
+        }
+        "Chicago" => {
+            if pages.is_empty() {
+                format!("({who} {})", src.year)
+            } else {
+                format!("({who} {}, {pages})", src.year)
+            }
+        }
         "IEEE" => format!("[{n}]"),
-        _ => if pages.is_empty() { format!("({who}, {})", src.year) } else { format!("({who}, {}, p. {pages})", src.year) },
+        _ => {
+            if pages.is_empty() {
+                format!("({who}, {})", src.year)
+            } else {
+                format!("({who}, {}, p. {pages})", src.year)
+            }
+        }
     }
 }
 
@@ -136,7 +154,16 @@ pub fn entry(src: &Source, style: &str, n: usize) -> String {
     let au = authors(&src.author);
     let year = if src.year.is_empty() { "n.d.".to_string() } else { src.year.clone() };
     let pubinfo = [src.city.as_str(), src.publisher.as_str()].iter().filter(|x| !x.is_empty()).copied().collect::<Vec<_>>().join(": ");
-    let journal = if src.journal.is_empty() { String::new() } else { format!("{}{}{}", src.journal, if src.volume.is_empty() { String::new() } else { format!(", {}", src.volume) }, if src.pages.is_empty() { String::new() } else { format!(", {}", src.pages) }) };
+    let journal = if src.journal.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "{}{}{}",
+            src.journal,
+            if src.volume.is_empty() { String::new() } else { format!(", {}", src.volume) },
+            if src.pages.is_empty() { String::new() } else { format!(", {}", src.pages) }
+        )
+    };
     let url = if src.url.is_empty() { String::new() } else { format!(" {}", src.url) };
     match style {
         "MLA" => {
@@ -146,10 +173,15 @@ pub fn entry(src: &Source, style: &str, n: usize) -> String {
                 _ => au.first().map(|(l, f)| format!("{l}, {f}, et al. ")).unwrap_or_default(),
             };
             let container = if journal.is_empty() { src.publisher.clone() } else { journal };
-            format!("{names}\u{201C}{}.\u{201D} {}{}, {year}.{url}", src.title, container, if container.is_empty() { "" } else { "" })
+            format!("{names}\u{201C}{}.\u{201D} {container}, {year}.{url}", src.title)
         }
         "Chicago" => {
-            let names = au.iter().enumerate().map(|(i, (l, f))| if i == 0 { format!("{l}, {f}") } else { format!("{f} {l}") }).collect::<Vec<_>>().join(", and ");
+            let names = au
+                .iter()
+                .enumerate()
+                .map(|(i, (l, f))| if i == 0 { format!("{l}, {f}") } else { format!("{f} {l}") })
+                .collect::<Vec<_>>()
+                .join(", and ");
             let rest = if journal.is_empty() { pubinfo } else { journal };
             format!("{names}. {year}. {}. {rest}.{url}", src.title)
         }
@@ -163,7 +195,11 @@ pub fn entry(src: &Source, style: &str, n: usize) -> String {
             let names = match names.len() {
                 0 => String::new(),
                 1 => names.first().cloned().unwrap_or_default(),
-                _ => format!("{}, & {}", names.get(..names.len() - 1).map(|x| x.join(", ")).unwrap_or_default(), names.last().cloned().unwrap_or_default()),
+                _ => format!(
+                    "{}, & {}",
+                    names.get(..names.len() - 1).map(|x| x.join(", ")).unwrap_or_default(),
+                    names.last().cloned().unwrap_or_default()
+                ),
             };
             let rest = if journal.is_empty() { src.publisher.clone() } else { journal };
             format!("{names} ({year}). {}. {rest}.{url}", src.title)
@@ -175,7 +211,13 @@ fn sources(s: &mut Session, v: &Value) -> CmdResult {
     if let Some(a) = v.get("add") {
         let mut src: Source = serde_json::from_value(a.clone()).map_err(|e| CmdError::Params(e.to_string()))?;
         if src.tag.is_empty() {
-            let base: String = authors(&src.author).first().map(|x| x.0.clone()).unwrap_or_else(|| "Source".into()).chars().filter(|c| c.is_alphanumeric()).collect();
+            let base: String = authors(&src.author)
+                .first()
+                .map(|x| x.0.clone())
+                .unwrap_or_else(|| "Source".into())
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect();
             src.tag = format!("{base}{}", src.year);
         }
         s.doc.sources.retain(|x| x.tag != src.tag);
@@ -331,11 +373,14 @@ fn entries_for(s: &mut Session, kind: &str) -> Vec<(String, bool)> {
             .filter_map(|p| s.doc.para(StoryRef::Body, p))
             .flat_map(|p| p.objects.iter())
             .filter_map(|o| match o {
-                InlineObject::Field { instr, .. } if instr.trim_start().starts_with("CITATION") => instr.split_whitespace().nth(1).map(str::to_string),
+                InlineObject::Field { instr, .. } if instr.trim_start().starts_with("CITATION") => {
+                    instr.split_whitespace().nth(1).map(str::to_string)
+                }
                 _ => None,
             })
             .collect();
-        let mut srcs: Vec<(usize, Source)> = s.doc.sources.iter().cloned().enumerate().filter(|(_, x)| cited.is_empty() || cited.contains(&x.tag)).collect();
+        let mut srcs: Vec<(usize, Source)> =
+            s.doc.sources.iter().cloned().enumerate().filter(|(_, x)| cited.is_empty() || cited.contains(&x.tag)).collect();
         if style != "IEEE" {
             srcs.sort_by_key(|(_, x)| authors(&x.author).first().map(|a| a.0.to_lowercase()).unwrap_or_else(|| x.title.to_lowercase()));
         }
@@ -454,14 +499,19 @@ fn cross_ref(s: &mut Session, v: &Value) -> CmdResult {
     let Some(target) = p::str(v, "target") else {
         return Ok(Value::Array(targets.iter().map(|(t, _)| json!(t)).collect()));
     };
-    let (text, pos) = targets.into_iter().find(|(t, _)| t == target || t.starts_with(target)).ok_or_else(|| CmdError::Params(format!("no {to} `{target}`")))?;
+    let (text, pos) =
+        targets.into_iter().find(|(t, _)| t == target || t.starts_with(target)).ok_or_else(|| CmdError::Params(format!("no {to} `{target}`")))?;
     let show = p::str(v, "show").unwrap_or("text");
     let page = page_of(s, &pos);
     let result = match show {
         "page" => page.to_string(),
         "number" => text.split(':').next().unwrap_or(&text).trim().to_string(),
         "aboveBelow" => {
-            if pos < s.sel.focus { "above".into() } else { "below".into() }
+            if pos < s.sel.focus {
+                "above".into()
+            } else {
+                "below".into()
+            }
         }
         _ => text.clone(),
     };

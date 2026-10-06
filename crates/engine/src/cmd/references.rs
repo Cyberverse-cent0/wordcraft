@@ -10,7 +10,8 @@ use crate::{CmdError, CmdResult, CommandSpec, Selection, Session, p};
 
 pub fn specs() -> Vec<CommandSpec> {
     vec![
-        CommandSpec::new("references.toc", "Table of Contents", "References › Table of Contents", insert_toc).params(r#"{"levels"?: 1-9, "title"?: string}"#),
+        CommandSpec::new("references.toc", "Table of Contents", "References › Table of Contents", insert_toc)
+            .params(r#"{"levels"?: 1-9, "title"?: string}"#),
         CommandSpec::new("references.updateToc", "Update Table", "References › Table of Contents", |s, _| {
             update_toc(s)?;
             sel_result(s)
@@ -29,8 +30,12 @@ pub fn specs() -> Vec<CommandSpec> {
             super::para::fmt(s, &|pp| pp.outline_level = if level == 0 { Some(9) } else { Some(level - 1) })
         })
         .params(r#"{"level": 0 (do not show) | 1-9}"#),
-        CommandSpec::new("references.footnote", "Insert Footnote", "References › Footnotes", |s, v| note(s, v, NoteKind::Footnote)).key("Mod+Alt+F").params(r#"{"text"?: string}"#),
-        CommandSpec::new("references.endnote", "Insert Endnote", "References › Footnotes", |s, v| note(s, v, NoteKind::Endnote)).key("Mod+Alt+D").params(r#"{"text"?: string}"#),
+        CommandSpec::new("references.footnote", "Insert Footnote", "References › Footnotes", |s, v| note(s, v, NoteKind::Footnote))
+            .key("Mod+Alt+F")
+            .params(r#"{"text"?: string}"#),
+        CommandSpec::new("references.endnote", "Insert Endnote", "References › Footnotes", |s, v| note(s, v, NoteKind::Endnote))
+            .key("Mod+Alt+D")
+            .params(r#"{"text"?: string}"#),
         CommandSpec::new("references.nextFootnote", "Next Footnote", "References › Footnotes", |s, _| {
             let caret = s.sel.focus.clone();
             let refs = note_refs(s);
@@ -50,7 +55,8 @@ pub fn specs() -> Vec<CommandSpec> {
             Ok(Value::Array(out))
         })
         .pure(),
-        CommandSpec::new("references.caption", "Insert Caption", "References › Captions", caption).params(r#"{"label"?: "Figure|Table|Equation", "text"?: string}"#),
+        CommandSpec::new("references.caption", "Insert Caption", "References › Captions", caption)
+            .params(r#"{"label"?: "Figure|Table|Equation", "text"?: string}"#),
         CommandSpec::new("references.updateFields", "Update Field", "References", |s, _| {
             update_fields(s)?;
             sel_result(s)
@@ -87,7 +93,9 @@ fn headings(s: &Session, levels: u8) -> Vec<(Path, u8, String)> {
 /// The TOC block range in the body: the paragraph holding the TOC field and the TOC entries after it.
 fn toc_range(s: &Session) -> Option<(usize, usize)> {
     let start = s.doc.body.iter().position(|b| {
-        b.as_para().is_some_and(|p| p.objects.iter().any(|o| matches!(o, InlineObject::Field { instr, .. } if instr.trim_start().to_ascii_uppercase().starts_with("TOC"))))
+        b.as_para().is_some_and(|p| {
+            p.objects.iter().any(|o| matches!(o, InlineObject::Field { instr, .. } if instr.trim_start().to_ascii_uppercase().starts_with("TOC")))
+        })
     })?;
     let mut end = start;
     while let Some(Block::Para(p)) = s.doc.body.get(end + 1).map(|b| &**b) {
@@ -107,7 +115,11 @@ fn toc_levels(s: &Session, start: usize) -> u8 {
         .and_then(|b| b.as_para())
         .and_then(|p| {
             p.objects.iter().find_map(|o| match o {
-                InlineObject::Field { instr, .. } => instr.split("\\o").nth(1).and_then(|r| r.trim().trim_matches('"').split('-').nth(1)).and_then(|n| n.trim_matches('"').parse::<u8>().ok()),
+                InlineObject::Field { instr, .. } => instr
+                    .split("\\o")
+                    .nth(1)
+                    .and_then(|r| r.trim().trim_matches('"').split('-').nth(1))
+                    .and_then(|n| n.trim_matches('"').parse::<u8>().ok()),
                 _ => None,
             })
         })
@@ -128,7 +140,11 @@ fn insert_toc(s: &mut Session, v: &Value) -> CmdResult {
     }
     // Title paragraph carrying the TOC field marker.
     let mut head = Paragraph::with_text(&title, CharProps::default()).styled("TOCHeading");
-    head.insert_object(head.len(), InlineObject::Field { instr: format!("TOC \\o \"1-{levels}\" \\h \\z \\u"), result: String::new(), locked: false }, &CharProps::default())?;
+    head.insert_object(
+        head.len(),
+        InlineObject::Field { instr: format!("TOC \\o \"1-{levels}\" \\h \\z \\u"), result: String::new(), locked: false },
+        &CharProps::default(),
+    )?;
     let i = if s.doc.para_at(&at).is_some_and(|p| p.is_empty()) { at.path.last() } else { s.doc.split_paragraph(&at)?.path.last() };
     s.doc.insert_block(StoryRef::Body, &Path::top(i), Block::Para(head))?;
     update_toc(s)?;
@@ -156,7 +172,8 @@ pub fn update_toc(s: &mut Session) -> Result<(), CmdError> {
         let shift = if pass == 0 { 0 } else { entries.len() };
         for (k, (path, level, text)) in entries.iter().enumerate() {
             let target = Path::top(path.last() + shift);
-            let page = l.caret(&Pos { story: StoryRef::Body, path: target, off: 0 }).and_then(|c| l.pages.get(c.page)).map(|pg| pg.number).unwrap_or(1);
+            let page =
+                l.caret(&Pos { story: StoryRef::Body, path: target, off: 0 }).and_then(|c| l.pages.get(c.page)).map(|pg| pg.number).unwrap_or(1);
             let mut para = Paragraph::with_text(&format!("{text}\t{page}"), CharProps::default()).styled(&format!("TOC{}", level + 1));
             para.props.tabs = Some(vec![TabStop { pos: width - 0.5, align: TabAlign::Right, leader: TabLeader::Dot }]);
             s.doc.insert_block(StoryRef::Body, &Path::top(start + 1 + k), Block::Para(para))?;
@@ -174,12 +191,20 @@ fn note(s: &mut Session, v: &Value, kind: NoteKind) -> CmdResult {
     };
     let mut para = Paragraph::new().styled(style);
     let id = s.doc.add_part(pk, Vec::new());
-    para.insert_object(0, InlineObject::NoteRef { kind, id, custom: String::new() }, &CharProps { style: Some(refstyle.into()), ..Default::default() })?;
+    para.insert_object(
+        0,
+        InlineObject::NoteRef { kind, id, custom: String::new() },
+        &CharProps { style: Some(refstyle.into()), ..Default::default() },
+    )?;
     let len = para.len();
     para.insert_text(len, &format!(" {text}"), &CharProps::default())?;
     s.doc.set_story(StoryRef::Part(id), vec![para_block(para)])?;
     let at = delete_selection(s)?;
-    s.doc.insert_object(&at, InlineObject::NoteRef { kind, id, custom: String::new() }, &CharProps { style: Some(refstyle.into()), ..Default::default() })?;
+    s.doc.insert_object(
+        &at,
+        InlineObject::NoteRef { kind, id, custom: String::new() },
+        &CharProps { style: Some(refstyle.into()), ..Default::default() },
+    )?;
     // Like Word, the caret moves into the new note.
     s.sel = Selection::caret(s.doc.end_of(StoryRef::Part(id)));
     Ok(json!({"id": id}))
@@ -220,7 +245,11 @@ fn caption(s: &mut Session, v: &Value) -> CmdResult {
     para.mark = CharProps::default();
     let base = format!("{label} ");
     para.insert_text(0, &base, &CharProps::default())?;
-    para.insert_object(base.len(), InlineObject::Field { instr: format!("SEQ {label} \\* ARABIC"), result: n.to_string(), locked: false }, &CharProps::default())?;
+    para.insert_object(
+        base.len(),
+        InlineObject::Field { instr: format!("SEQ {label} \\* ARABIC"), result: n.to_string(), locked: false },
+        &CharProps::default(),
+    )?;
     let end = para.len();
     if !text.is_empty() {
         para.insert_text(end, &format!(": {text}"), &CharProps::default())?;
@@ -244,7 +273,11 @@ pub fn update_fields(s: &mut Session) -> Result<(), CmdError> {
             let name = wordcraft_layout::fields::field_name(instr);
             match name.as_str() {
                 "DATE" | "TIME" | "CREATEDATE" | "SAVEDATE" | "PRINTDATE" => {
-                    let pic = instr.split("\\@").nth(1).map(|x| x.trim().trim_matches('"').to_string()).unwrap_or_else(|| if name == "TIME" { "h:mm am/pm".into() } else { "M/d/yyyy".into() });
+                    let pic = instr
+                        .split("\\@")
+                        .nth(1)
+                        .map(|x| x.trim().trim_matches('"').to_string())
+                        .unwrap_or_else(|| if name == "TIME" { "h:mm am/pm".into() } else { "M/d/yyyy".into() });
                     updates.push((k, super::insert::format_date(&pic)));
                 }
                 "SEQ" => {

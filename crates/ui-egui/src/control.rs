@@ -82,7 +82,13 @@ fn key_from(name: &str) -> Option<egui::Key> {
 fn mods(p: &Value) -> egui::Modifiers {
     let b = |k: &str| p.get(k).and_then(Value::as_bool).unwrap_or(false);
     let cmd = b("cmd") || b("command") || b("ctrl");
-    egui::Modifiers { alt: b("alt"), ctrl: cmd && !cfg!(target_os = "macos"), shift: b("shift"), mac_cmd: cmd && cfg!(target_os = "macos"), command: cmd }
+    egui::Modifiers {
+        alt: b("alt"),
+        ctrl: cmd && !cfg!(target_os = "macos"),
+        shift: b("shift"),
+        mac_cmd: cmd && cfg!(target_os = "macos"),
+        command: cmd,
+    }
 }
 
 fn click_events(app: &mut WordApp, pos: egui::Pos2, button: egui::PointerButton, count: u64, m: egui::Modifiers) {
@@ -149,12 +155,22 @@ pub fn handle(app: &mut WordApp, ctx: &egui::Context, req: &ControlRequest) -> O
             let m = mods(p);
             let steps = p.get("steps").and_then(Value::as_u64).unwrap_or(8).clamp(1, 100);
             app.synthetic.push(egui::Event::PointerMoved(egui::pos2(x, y)));
-            app.synthetic.push(egui::Event::PointerButton { pos: egui::pos2(x, y), button: egui::PointerButton::Primary, pressed: true, modifiers: m });
+            app.synthetic.push(egui::Event::PointerButton {
+                pos: egui::pos2(x, y),
+                button: egui::PointerButton::Primary,
+                pressed: true,
+                modifiers: m,
+            });
             for i in 1..=steps {
                 let k = i as f32 / steps as f32;
                 app.synthetic.push(egui::Event::PointerMoved(egui::pos2(x + (tx - x) * k, y + (ty - y) * k)));
             }
-            app.synthetic.push(egui::Event::PointerButton { pos: egui::pos2(tx, ty), button: egui::PointerButton::Primary, pressed: false, modifiers: m });
+            app.synthetic.push(egui::Event::PointerButton {
+                pos: egui::pos2(tx, ty),
+                button: egui::PointerButton::Primary,
+                pressed: false,
+                modifiers: m,
+            });
             ok(json!({"queued": true}))
         }
         "ui.key" => {

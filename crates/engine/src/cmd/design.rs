@@ -9,12 +9,42 @@ use crate::{CmdError, CmdResult, CommandSpec, Session, p};
 
 /// Our own themes: (name, heading font, body font, accent colours).
 pub const THEMES: &[(&str, &str, &str, [Rgb; 6])] = &[
-    ("Craft", styles::HEADING_FONT, styles::BODY_FONT, [Rgb(0x15, 0x60, 0x82), Rgb(0xE9, 0x71, 0x32), Rgb(0x19, 0x6B, 0x24), Rgb(0x0F, 0x9E, 0xD5), Rgb(0xA0, 0x2B, 0x93), Rgb(0x4E, 0xA7, 0x2E)]),
-    ("Studio", "Georgia", "Georgia", [Rgb(0x8C, 0x2F, 0x39), Rgb(0xC9, 0x8B, 0x2E), Rgb(0x3E, 0x5C, 0x76), Rgb(0x6B, 0x8F, 0x71), Rgb(0x9A, 0x6F, 0xB0), Rgb(0x4A, 0x4A, 0x4A)]),
-    ("Gallery", "Helvetica Neue", "Helvetica Neue", [Rgb(0x22, 0x22, 0x22), Rgb(0xE6, 0x39, 0x46), Rgb(0x45, 0x7B, 0x9D), Rgb(0x1D, 0x35, 0x57), Rgb(0xA8, 0xDA, 0xDC), Rgb(0xF4, 0xA2, 0x61)]),
-    ("Atelier", "Palatino", "Palatino", [Rgb(0x6D, 0x59, 0x7A), Rgb(0xB5, 0x65, 0x76), Rgb(0xE5, 0x6B, 0x6F), Rgb(0xEA, 0xAC, 0x8B), Rgb(0x35, 0x50, 0x70), Rgb(0x8E, 0x9A, 0xAF)]),
-    ("Darkroom", "Futura", "Avenir Next", [Rgb(0x26, 0x46, 0x53), Rgb(0x2A, 0x9D, 0x8F), Rgb(0xE9, 0xC4, 0x6A), Rgb(0xF4, 0xA2, 0x61), Rgb(0xE7, 0x6F, 0x51), Rgb(0x5E, 0x54, 0x8E)]),
-    ("Sketchbook", "Gill Sans", "Gill Sans", [Rgb(0x58, 0x81, 0x57), Rgb(0x3A, 0x5A, 0x40), Rgb(0xA3, 0xB1, 0x8A), Rgb(0xDA, 0xD7, 0xCD), Rgb(0x34, 0x4E, 0x41), Rgb(0xBC, 0x6C, 0x25)]),
+    (
+        "Craft",
+        styles::HEADING_FONT,
+        styles::BODY_FONT,
+        [Rgb(0x15, 0x60, 0x82), Rgb(0xE9, 0x71, 0x32), Rgb(0x19, 0x6B, 0x24), Rgb(0x0F, 0x9E, 0xD5), Rgb(0xA0, 0x2B, 0x93), Rgb(0x4E, 0xA7, 0x2E)],
+    ),
+    (
+        "Studio",
+        "Georgia",
+        "Georgia",
+        [Rgb(0x8C, 0x2F, 0x39), Rgb(0xC9, 0x8B, 0x2E), Rgb(0x3E, 0x5C, 0x76), Rgb(0x6B, 0x8F, 0x71), Rgb(0x9A, 0x6F, 0xB0), Rgb(0x4A, 0x4A, 0x4A)],
+    ),
+    (
+        "Gallery",
+        "Helvetica Neue",
+        "Helvetica Neue",
+        [Rgb(0x22, 0x22, 0x22), Rgb(0xE6, 0x39, 0x46), Rgb(0x45, 0x7B, 0x9D), Rgb(0x1D, 0x35, 0x57), Rgb(0xA8, 0xDA, 0xDC), Rgb(0xF4, 0xA2, 0x61)],
+    ),
+    (
+        "Atelier",
+        "Palatino",
+        "Palatino",
+        [Rgb(0x6D, 0x59, 0x7A), Rgb(0xB5, 0x65, 0x76), Rgb(0xE5, 0x6B, 0x6F), Rgb(0xEA, 0xAC, 0x8B), Rgb(0x35, 0x50, 0x70), Rgb(0x8E, 0x9A, 0xAF)],
+    ),
+    (
+        "Darkroom",
+        "Futura",
+        "Avenir Next",
+        [Rgb(0x26, 0x46, 0x53), Rgb(0x2A, 0x9D, 0x8F), Rgb(0xE9, 0xC4, 0x6A), Rgb(0xF4, 0xA2, 0x61), Rgb(0xE7, 0x6F, 0x51), Rgb(0x5E, 0x54, 0x8E)],
+    ),
+    (
+        "Sketchbook",
+        "Gill Sans",
+        "Gill Sans",
+        [Rgb(0x58, 0x81, 0x57), Rgb(0x3A, 0x5A, 0x40), Rgb(0xA3, 0xB1, 0x8A), Rgb(0xDA, 0xD7, 0xCD), Rgb(0x34, 0x4E, 0x41), Rgb(0xBC, 0x6C, 0x25)],
+    ),
 ];
 
 pub fn specs() -> Vec<CommandSpec> {
@@ -33,10 +63,12 @@ pub fn specs() -> Vec<CommandSpec> {
             set_accent(s, t.3[0]);
             sel_result(s)
         }),
-        CommandSpec::new("design.styleSet", "Style Set", "Design › Document Formatting", style_set).params(r#"{"name": "default|basic|lines|shaded|casual|centered|minimalist|title"}"#),
+        CommandSpec::new("design.styleSet", "Style Set", "Design › Document Formatting", style_set)
+            .params(r#"{"name": "default|basic|lines|shaded|casual|centered|minimalist|title"}"#),
         CommandSpec::new("design.paragraphSpacing", "Paragraph Spacing", "Design › Document Formatting", para_spacing)
             .params(r#"{"value": "default|none|compact|tight|open|relaxed|double"}"#),
-        CommandSpec::new("design.watermark", "Watermark", "Design › Page Background", watermark).params(r#"{"text"?: string, "remove"?: bool, "diagonal"?: bool, "color"?: "RRGGBB"}"#),
+        CommandSpec::new("design.watermark", "Watermark", "Design › Page Background", watermark)
+            .params(r#"{"text"?: string, "remove"?: bool, "diagonal"?: bool, "color"?: "RRGGBB"}"#),
         CommandSpec::new("design.pageColor", "Page Color", "Design › Page Background", |s, v| {
             s.doc.settings.page_color = p::str(v, "color").and_then(Rgb::parse);
             sel_result(s)
@@ -57,7 +89,10 @@ pub fn specs() -> Vec<CommandSpec> {
             sel_result(s)
         })
         .pure(),
-        CommandSpec::new("design.themes", "Theme List", "Design › Document Formatting", |_, _| Ok(json!(THEMES.iter().map(|t| t.0).collect::<Vec<_>>()))).pure(),
+        CommandSpec::new("design.themes", "Theme List", "Design › Document Formatting", |_, _| {
+            Ok(json!(THEMES.iter().map(|t| t.0).collect::<Vec<_>>()))
+        })
+        .pure(),
     ]
 }
 
@@ -78,7 +113,11 @@ fn set_fonts(s: &mut Session, heading: &str, body: &str) {
 
 fn set_accent(s: &mut Session, accent: Rgb) {
     for st in &mut s.doc.styles.styles {
-        if st.id.starts_with("Heading") && st.id.len() == 8 && st.id.as_bytes().get(7).is_some_and(|d| *d <= b'5') || st.id == "IntenseQuote" || st.id == "IntenseEmphasis" || st.id == "IntenseReference" {
+        if st.id.starts_with("Heading") && st.id.len() == 8 && st.id.as_bytes().get(7).is_some_and(|d| *d <= b'5')
+            || st.id == "IntenseQuote"
+            || st.id == "IntenseEmphasis"
+            || st.id == "IntenseReference"
+        {
             st.chr.color = Some(TextColor::Rgb(accent));
             if let Some(b) = st.para.borders.as_mut() {
                 for e in [&mut b.top, &mut b.bottom].into_iter().flatten() {

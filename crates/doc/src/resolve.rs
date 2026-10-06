@@ -118,7 +118,8 @@ const MAX_INDENT: f32 = 1584.0; // 22"
 impl ResolvedPara {
     fn from(p: &ParaProps, style: &str) -> ResolvedPara {
         let clampi = |v: Option<f32>| v.unwrap_or(0.0).clamp(-MAX_INDENT, MAX_INDENT);
-        let mut tabs: Vec<TabStop> = p.tabs.clone().unwrap_or_default().into_iter().filter(|t| t.align != TabAlign::Clear && t.pos.is_finite()).collect();
+        let mut tabs: Vec<TabStop> =
+            p.tabs.clone().unwrap_or_default().into_iter().filter(|t| t.align != TabAlign::Clear && t.pos.is_finite()).collect();
         tabs.sort_by(|a, b| a.pos.total_cmp(&b.pos));
         ResolvedPara {
             style: style.to_string(),
@@ -234,7 +235,11 @@ mod tests {
     #[test]
     fn hostile_values_clamped() {
         let s = StyleSheet::builtin();
-        let p = s.resolve_para(&ParaProps { indent_left: Some(f32::INFINITY), line_spacing: Some(LineSpacing::Multiple(f32::NAN)), ..Default::default() });
+        let p = s.resolve_para(&ParaProps {
+            indent_left: Some(f32::INFINITY),
+            line_spacing: Some(LineSpacing::Multiple(f32::NAN)),
+            ..Default::default()
+        });
         assert_eq!(p.indent_left, MAX_INDENT);
         assert_eq!(p.line_spacing, LineSpacing::Multiple(1.0));
         let c = s.resolve_char(None, &CharProps { size: Some(-4.0), ..Default::default() });

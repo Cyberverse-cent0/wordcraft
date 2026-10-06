@@ -6,8 +6,8 @@ use std::net::{TcpListener, TcpStream};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::Duration;
 
-use wordcraft_ui_egui::ControlRequest;
 use serde_json::{Value, json};
+use wordcraft_ui_egui::ControlRequest;
 
 pub fn start(port: u16, ctx: egui::Context) -> Receiver<ControlRequest> {
     let (tx, rx) = channel::<ControlRequest>();

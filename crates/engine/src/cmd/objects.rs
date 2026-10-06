@@ -293,7 +293,11 @@ pub fn selected(s: &Session) -> Option<(Pos, InlineObject)> {
     for path in paths {
         let Some(p) = s.doc.para(story, &path) else { continue };
         for off in p.object_offsets() {
-            let inside = if a == b { off + wordcraft_doc::para::OBJ.len_utf8() == a.off || off == a.off } else { (path != a.path || off >= a.off) && (path != b.path || off < b.off) };
+            let inside = if a == b {
+                off + wordcraft_doc::para::OBJ.len_utf8() == a.off || off == a.off
+            } else {
+                (path != a.path || off >= a.off) && (path != b.path || off < b.off)
+            };
             if !inside {
                 continue;
             }
@@ -408,7 +412,11 @@ fn recolor(img: image::DynamicImage, mode: &str, sat: f32) -> image::DynamicImag
         let l = 0.299 * rf + 0.587 * gf + 0.114 * bf;
         let out = match mode {
             "grayscale" => [l, l, l],
-            "sepia" => [(0.393 * rf + 0.769 * gf + 0.189 * bf).min(255.0), (0.349 * rf + 0.686 * gf + 0.168 * bf).min(255.0), (0.272 * rf + 0.534 * gf + 0.131 * bf).min(255.0)],
+            "sepia" => [
+                (0.393 * rf + 0.769 * gf + 0.189 * bf).min(255.0),
+                (0.349 * rf + 0.686 * gf + 0.168 * bf).min(255.0),
+                (0.272 * rf + 0.534 * gf + 0.131 * bf).min(255.0),
+            ],
             "washout" => [rf * 0.35 + 255.0 * 0.65, gf * 0.35 + 255.0 * 0.65, bf * 0.35 + 255.0 * 0.65],
             "blackAndWhite" => {
                 let v = if l > 127.0 { 255.0 } else { 0.0 };
@@ -555,7 +563,9 @@ mod tests {
     use super::*;
 
     fn png(w: u32, h: u32) -> Vec<u8> {
-        let img = image::RgbaImage::from_fn(w, h, |x, y| if x > 2 && x < w - 3 && y > 2 && y < h - 3 { image::Rgba([200, 30, 30, 255]) } else { image::Rgba([255, 255, 255, 255]) });
+        let img = image::RgbaImage::from_fn(w, h, |x, y| {
+            if x > 2 && x < w - 3 && y > 2 && y < h - 3 { image::Rgba([200, 30, 30, 255]) } else { image::Rgba([255, 255, 255, 255]) }
+        });
         let mut b = Vec::new();
         image::DynamicImage::ImageRgba8(img).write_to(&mut std::io::Cursor::new(&mut b), image::ImageFormat::Png).unwrap();
         b

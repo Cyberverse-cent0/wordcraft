@@ -20,7 +20,9 @@ pub fn specs() -> Vec<CommandSpec> {
         })
         .params(r#"{"path": string}"#)
         .pure(),
-        CommandSpec::new("file.exportPng", "Export Page as PNG", "File › Export", export_png).params(r#"{"path": string, "page"?: n (1-based), "scale"?: px per pt}"#).pure(),
+        CommandSpec::new("file.exportPng", "Export Page as PNG", "File › Export", export_png)
+            .params(r#"{"path": string, "page"?: n (1-based), "scale"?: px per pt}"#)
+            .pure(),
         CommandSpec::new("file.print", "Print", "File", |s, _| {
             s.ui_requests.push(json!({"open": "print"}));
             sel_result(s)
@@ -33,7 +35,8 @@ pub fn specs() -> Vec<CommandSpec> {
         })
         .key("Mod+W")
         .pure(),
-        CommandSpec::new("file.properties", "Properties", "File › Info", properties).params(r#"{"title"?, "subject"?, "author"?, "keywords"?, "comments"?, "category"?}"#),
+        CommandSpec::new("file.properties", "Properties", "File › Info", properties)
+            .params(r#"{"title"?, "subject"?, "author"?, "keywords"?, "comments"?, "category"?}"#),
         CommandSpec::new("file.info", "Info", "File", info).pure(),
         CommandSpec::new("file.options", "Options", "File", |s, _| {
             s.ui_requests.push(json!({"open": "options"}));
@@ -196,7 +199,12 @@ fn inspect(s: &mut Session, v: &Value) -> CmdResult {
                 if !p.props.is_empty() {
                     o["props"] = serde_json::to_value(&p.props).unwrap_or(Value::Null);
                 }
-                let runs: Vec<Value> = p.run_ranges().filter(|(_, c)| !c.is_empty()).map(|(r, c)| json!({"start": r.start, "end": r.end, "props": c})).take(50).collect();
+                let runs: Vec<Value> = p
+                    .run_ranges()
+                    .filter(|(_, c)| !c.is_empty())
+                    .map(|(r, c)| json!({"start": r.start, "end": r.end, "props": c}))
+                    .take(50)
+                    .collect();
                 if !runs.is_empty() {
                     o["runs"] = json!(runs);
                 }
@@ -209,13 +217,23 @@ fn inspect(s: &mut Session, v: &Value) -> CmdResult {
                 blocks.push(o);
             }
             Block::Table(t) => {
-                let cells: Vec<Vec<String>> = t.rows.iter().map(|r| r.cells.iter().map(|c| c.blocks.iter().filter_map(|b| b.as_para().map(|p| p.plain_text())).collect::<Vec<_>>().join("\n")).collect()).collect();
+                let cells: Vec<Vec<String>> = t
+                    .rows
+                    .iter()
+                    .map(|r| {
+                        r.cells
+                            .iter()
+                            .map(|c| c.blocks.iter().filter_map(|b| b.as_para().map(|p| p.plain_text())).collect::<Vec<_>>().join("\n"))
+                            .collect()
+                    })
+                    .collect();
                 blocks.push(json!({"index": i, "type": "table", "rows": t.rows.len(), "cols": t.cols(), "style": t.props.style, "cells": cells}));
             }
         }
     }
     let l = s.layout();
-    let parts: Vec<Value> = s.doc.parts.iter().map(|(id, p)| json!({"id": id, "kind": p.kind, "text": s.doc.plain_text(StoryRef::Part(*id))})).collect();
+    let parts: Vec<Value> =
+        s.doc.parts.iter().map(|(id, p)| json!({"id": id, "kind": p.kind, "text": s.doc.plain_text(StoryRef::Part(*id))})).collect();
     Ok(json!({
         "blocks": blocks,
         "parts": parts,

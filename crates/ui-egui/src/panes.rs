@@ -10,13 +10,25 @@ use crate::theme::{Tokens, regular, semibold};
 pub fn show(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
     if app.session.view.nav_pane {
-        egui::Panel::left("nav_pane").default_size(260.0).resizable(true).frame(egui::Frame::NONE.fill(t.panel).inner_margin(10).stroke(Stroke::new(1.0, t.border))).show(ui, |ui| nav(app, ui));
+        egui::Panel::left("nav_pane")
+            .default_size(260.0)
+            .resizable(true)
+            .frame(egui::Frame::NONE.fill(t.panel).inner_margin(10).stroke(Stroke::new(1.0, t.border)))
+            .show(ui, |ui| nav(app, ui));
     }
     if app.session.view.styles_pane {
-        egui::Panel::right("styles_pane").default_size(250.0).resizable(true).frame(egui::Frame::NONE.fill(t.panel).inner_margin(10).stroke(Stroke::new(1.0, t.border))).show(ui, |ui| styles(app, ui));
+        egui::Panel::right("styles_pane")
+            .default_size(250.0)
+            .resizable(true)
+            .frame(egui::Frame::NONE.fill(t.panel).inner_margin(10).stroke(Stroke::new(1.0, t.border)))
+            .show(ui, |ui| styles(app, ui));
     }
     if app.session.view.comments_pane {
-        egui::Panel::right("comments_pane").default_size(290.0).resizable(true).frame(egui::Frame::NONE.fill(t.panel).inner_margin(10).stroke(Stroke::new(1.0, t.border))).show(ui, |ui| comments(app, ui));
+        egui::Panel::right("comments_pane")
+            .default_size(290.0)
+            .resizable(true)
+            .frame(egui::Frame::NONE.fill(t.panel).inner_margin(10).stroke(Stroke::new(1.0, t.border)))
+            .show(ui, |ui| comments(app, ui));
     }
 }
 
@@ -146,7 +158,15 @@ fn styles(app: &mut WordApp, ui: &mut Ui) {
         }
     });
     ui.separator();
-    let mut list: Vec<(String, String, bool)> = app.session.doc.styles.styles.iter().filter(|s| !s.hidden && s.kind != wordcraft_doc::StyleKind::Table).map(|s| (s.id.clone(), s.name.clone(), s.kind == wordcraft_doc::StyleKind::Character)).collect();
+    let mut list: Vec<(String, String, bool)> = app
+        .session
+        .doc
+        .styles
+        .styles
+        .iter()
+        .filter(|s| !s.hidden && s.kind != wordcraft_doc::StyleKind::Table)
+        .map(|s| (s.id.clone(), s.name.clone(), s.kind == wordcraft_doc::StyleKind::Character))
+        .collect();
     list.sort_by_key(|s| s.1.to_lowercase());
     egui::ScrollArea::vertical().show(ui, |ui| {
         for (id, name, is_char) in list {
@@ -215,7 +235,8 @@ fn comments(app: &mut WordApp, ui: &mut Ui) {
                         ui.data_mut(|d| d.insert_temp(key, text.clone()));
                     }
                     if r.lost_focus() {
-                        let blocks = text.split('\n').map(|l| wordcraft_doc::para_block(wordcraft_doc::Paragraph::with_text(l, Default::default()))).collect();
+                        let blocks =
+                            text.split('\n').map(|l| wordcraft_doc::para_block(wordcraft_doc::Paragraph::with_text(l, Default::default()))).collect();
                         let _ = app.session.doc.set_story(StoryRef::Part(part), blocks);
                         app.session.touch();
                         ui.data_mut(|d| d.remove::<String>(key));

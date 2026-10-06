@@ -13,30 +13,57 @@ pub const SIZES: [f32; 17] = [8.0, 9.0, 10.0, 10.5, 11.0, 12.0, 14.0, 16.0, 18.0
 
 pub fn specs() -> Vec<CommandSpec> {
     vec![
-        CommandSpec::new("format.bold", "Bold", "Home › Font", |s, v| toggle(s, v, |r| r.bold, |c, on| c.bold = Some(on))).key("Mod+B").params(r#"{"value"?: bool}"#),
-        CommandSpec::new("format.italic", "Italic", "Home › Font", |s, v| toggle(s, v, |r| r.italic, |c, on| c.italic = Some(on))).key("Mod+I").params(r#"{"value"?: bool}"#),
-        CommandSpec::new("format.underline", "Underline", "Home › Font", underline).key("Mod+U").params(r#"{"value"?: bool, "style"?: "single|double|thick|dotted|dash|dotDash|dotDotDash|wave|words"}"#),
+        CommandSpec::new("format.bold", "Bold", "Home › Font", |s, v| toggle(s, v, |r| r.bold, |c, on| c.bold = Some(on)))
+            .key("Mod+B")
+            .params(r#"{"value"?: bool}"#),
+        CommandSpec::new("format.italic", "Italic", "Home › Font", |s, v| toggle(s, v, |r| r.italic, |c, on| c.italic = Some(on)))
+            .key("Mod+I")
+            .params(r#"{"value"?: bool}"#),
+        CommandSpec::new("format.underline", "Underline", "Home › Font", underline)
+            .key("Mod+U")
+            .params(r#"{"value"?: bool, "style"?: "single|double|thick|dotted|dash|dotDash|dotDotDash|wave|words"}"#),
         CommandSpec::new("format.doubleUnderline", "Double Underline", "Home › Font › Underline", |s, _| {
             underline(s, &json!({"style": "double"}))
         })
         .key("Mod+Shift+D"),
-        CommandSpec::new("format.wordUnderline", "Underline Words Only", "Home › Font › Underline", |s, _| underline(s, &json!({"style": "words"}))).key("Mod+Shift+W"),
-        CommandSpec::new("format.strikethrough", "Strikethrough", "Home › Font", |s, v| toggle(s, v, |r| r.strike, |c, on| c.strike = Some(on))).params(r#"{"value"?: bool}"#),
+        CommandSpec::new("format.wordUnderline", "Underline Words Only", "Home › Font › Underline", |s, _| {
+            underline(s, &json!({"style": "words"}))
+        })
+        .key("Mod+Shift+W"),
+        CommandSpec::new("format.strikethrough", "Strikethrough", "Home › Font", |s, v| toggle(s, v, |r| r.strike, |c, on| c.strike = Some(on)))
+            .params(r#"{"value"?: bool}"#),
         CommandSpec::new("format.doubleStrikethrough", "Double Strikethrough", "Home › Font › Font", |s, v| {
             toggle(s, v, |r| r.double_strike, |c, on| c.double_strike = Some(on))
         }),
         CommandSpec::new("format.subscript", "Subscript", "Home › Font", |s, v| {
-            toggle(s, v, |r| r.vert_align == VertAlign::Subscript, |c, on| c.vert_align = Some(if on { VertAlign::Subscript } else { VertAlign::Baseline }))
+            toggle(
+                s,
+                v,
+                |r| r.vert_align == VertAlign::Subscript,
+                |c, on| c.vert_align = Some(if on { VertAlign::Subscript } else { VertAlign::Baseline }),
+            )
         })
         .key("Mod+="),
         CommandSpec::new("format.superscript", "Superscript", "Home › Font", |s, v| {
-            toggle(s, v, |r| r.vert_align == VertAlign::Superscript, |c, on| c.vert_align = Some(if on { VertAlign::Superscript } else { VertAlign::Baseline }))
+            toggle(
+                s,
+                v,
+                |r| r.vert_align == VertAlign::Superscript,
+                |c, on| c.vert_align = Some(if on { VertAlign::Superscript } else { VertAlign::Baseline }),
+            )
         })
         .key("Mod+Shift+="),
-        CommandSpec::new("format.allCaps", "All Caps", "Home › Font › Font", |s, v| toggle(s, v, |r| r.caps, |c, on| c.caps = Some(on))).key("Mod+Shift+A"),
-        CommandSpec::new("format.smallCaps", "Small Caps", "Home › Font › Font", |s, v| toggle(s, v, |r| r.small_caps, |c, on| c.small_caps = Some(on))).key("Mod+Shift+K"),
-        CommandSpec::new("format.hidden", "Hidden", "Home › Font › Font", |s, v| toggle(s, v, |r| r.hidden, |c, on| c.hidden = Some(on))).key("Mod+Shift+H"),
-        CommandSpec::new("format.outline", "Outline", "Home › Font › Text Effects", |s, v| toggle(s, v, |r| r.outline, |c, on| c.outline = Some(on))),
+        CommandSpec::new("format.allCaps", "All Caps", "Home › Font › Font", |s, v| toggle(s, v, |r| r.caps, |c, on| c.caps = Some(on)))
+            .key("Mod+Shift+A"),
+        CommandSpec::new("format.smallCaps", "Small Caps", "Home › Font › Font", |s, v| {
+            toggle(s, v, |r| r.small_caps, |c, on| c.small_caps = Some(on))
+        })
+        .key("Mod+Shift+K"),
+        CommandSpec::new("format.hidden", "Hidden", "Home › Font › Font", |s, v| toggle(s, v, |r| r.hidden, |c, on| c.hidden = Some(on)))
+            .key("Mod+Shift+H"),
+        CommandSpec::new("format.outline", "Outline", "Home › Font › Text Effects", |s, v| {
+            toggle(s, v, |r| r.outline, |c, on| c.outline = Some(on))
+        }),
         CommandSpec::new("format.shadow", "Shadow", "Home › Font › Text Effects", |s, v| toggle(s, v, |r| r.shadow, |c, on| c.shadow = Some(on))),
         CommandSpec::new("format.emboss", "Emboss", "Home › Font › Font", |s, v| toggle(s, v, |r| r.emboss, |c, on| c.emboss = Some(on))),
         CommandSpec::new("format.engrave", "Engrave", "Home › Font › Font", |s, v| toggle(s, v, |r| r.engrave, |c, on| c.engrave = Some(on))),
@@ -47,13 +74,17 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("format.growFont1", "Grow Font 1 Point", "Home › Font", |s, _| nudge_size(s, 1.0)).key("Mod+]"),
         CommandSpec::new("format.shrinkFont1", "Shrink Font 1 Point", "Home › Font", |s, _| nudge_size(s, -1.0)).key("Mod+["),
         CommandSpec::new("format.color", "Font Color", "Home › Font", color).params(r#"{"color": "RRGGBB" | "auto"}"#),
-        CommandSpec::new("format.highlight", "Text Highlight Color", "Home › Font", highlight).params(r#"{"color": "yellow|brightGreen|turquoise|pink|blue|red|darkBlue|teal|green|violet|darkRed|darkYellow|gray50|gray25|black|none"}"#),
+        CommandSpec::new("format.highlight", "Text Highlight Color", "Home › Font", highlight).params(
+            r#"{"color": "yellow|brightGreen|turquoise|pink|blue|red|darkBlue|teal|green|violet|darkRed|darkYellow|gray50|gray25|black|none"}"#,
+        ),
         CommandSpec::new("format.shading", "Character Shading", "Home › Font", |s, v| {
             let c = p::str(v, "color").and_then(Rgb::parse);
             apply(s, &|x| x.shading = c)
         })
         .params(r#"{"color": "RRGGBB" | null}"#),
-        CommandSpec::new("format.changeCase", "Change Case", "Home › Font", change_case).key("Shift+F3").params(r#"{"mode"?: "sentence|lower|upper|title|toggle"}"#),
+        CommandSpec::new("format.changeCase", "Change Case", "Home › Font", change_case)
+            .key("Shift+F3")
+            .params(r#"{"mode"?: "sentence|lower|upper|title|toggle"}"#),
         CommandSpec::new("format.clear", "Clear All Formatting", "Home › Font", clear).key("Mod+Space"),
         CommandSpec::new("format.spacing", "Character Spacing", "Home › Font › Font › Advanced", |s, v| {
             let x = p::req_f32(v, "points")?.clamp(-100.0, 100.0);
@@ -227,7 +258,11 @@ fn highlight(s: &mut Session, v: &Value) -> CmdResult {
     let h = Highlight::ALL
         .iter()
         .copied()
-        .find(|h| h.ooxml().eq_ignore_ascii_case(c) || h.name().replace(['-', ' ', '%'], "").eq_ignore_ascii_case(&c.replace(['-', ' ', '%'], "")) || format!("{h:?}").eq_ignore_ascii_case(c))
+        .find(|h| {
+            h.ooxml().eq_ignore_ascii_case(c)
+                || h.name().replace(['-', ' ', '%'], "").eq_ignore_ascii_case(&c.replace(['-', ' ', '%'], ""))
+                || format!("{h:?}").eq_ignore_ascii_case(c)
+        })
         .ok_or_else(|| CmdError::Params(format!("unknown highlight colour `{c}`")))?;
     apply(s, &|x| x.highlight = Some(h))
 }

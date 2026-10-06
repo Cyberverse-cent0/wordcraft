@@ -35,7 +35,9 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("view.ruler", "Ruler", "View › Show", |s, v| toggle(s, v, |x| &mut x.ruler)).pure(),
         CommandSpec::new("view.gridlines", "Gridlines", "View › Show", |s, v| toggle(s, v, |x| &mut x.gridlines)).pure(),
         CommandSpec::new("view.navigationPane", "Navigation Pane", "View › Show", |s, v| toggle(s, v, |x| &mut x.nav_pane)).pure(),
-        CommandSpec::new("view.zoom", "Zoom", "View › Zoom", zoom).params(r#"{"value": percent (10-500) | "pageWidth" | "onePage" | "multiplePages"}"#).pure(),
+        CommandSpec::new("view.zoom", "Zoom", "View › Zoom", zoom)
+            .params(r#"{"value": percent (10-500) | "pageWidth" | "onePage" | "multiplePages"}"#)
+            .pure(),
         CommandSpec::new("view.zoom100", "100%", "View › Zoom", |s, _| zoom(s, &json!({"value": 100}))).pure(),
         CommandSpec::new("view.zoomIn", "Zoom In", "Status Bar", |s, _| {
             let z = ((s.view.zoom * 10.0).round() / 10.0 + 0.1).min(5.0);
@@ -63,7 +65,8 @@ pub fn specs() -> Vec<CommandSpec> {
             sel_result(s)
         })
         .pure(),
-        CommandSpec::new("view.state", "View State", "View", |s, _| serde_json::to_value(&s.view).map_err(|e| CmdError::Failed(e.to_string()))).pure(),
+        CommandSpec::new("view.state", "View State", "View", |s, _| serde_json::to_value(&s.view).map_err(|e| CmdError::Failed(e.to_string())))
+            .pure(),
     ]
 }
 

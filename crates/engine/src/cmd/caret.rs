@@ -15,16 +15,30 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("caret.up", "Up", "Navigation", |s, v| vert(s, v, -1)).key("Up").params(EXTEND).pure(),
         CommandSpec::new("caret.down", "Down", "Navigation", |s, v| vert(s, v, 1)).key("Down").params(EXTEND).pure(),
         CommandSpec::new("caret.wordLeft", "Word Left", "Navigation", |s, v| mv(s, v, word_left)).key("Mod+Left / Alt+Left").params(EXTEND).pure(),
-        CommandSpec::new("caret.wordRight", "Word Right", "Navigation", |s, v| mv(s, v, word_right)).key("Mod+Right / Alt+Right").params(EXTEND).pure(),
+        CommandSpec::new("caret.wordRight", "Word Right", "Navigation", |s, v| mv(s, v, word_right))
+            .key("Mod+Right / Alt+Right")
+            .params(EXTEND)
+            .pure(),
         CommandSpec::new("caret.home", "Line Start", "Navigation", |s, v| line(s, v, true)).key("Home").params(EXTEND).pure(),
         CommandSpec::new("caret.end", "Line End", "Navigation", |s, v| line(s, v, false)).key("End").params(EXTEND).pure(),
         CommandSpec::new("caret.paraUp", "Paragraph Up", "Navigation", |s, v| mv(s, v, para_up)).key("Mod+Up / Alt+Up").params(EXTEND).pure(),
-        CommandSpec::new("caret.paraDown", "Paragraph Down", "Navigation", |s, v| mv(s, v, para_down)).key("Mod+Down / Alt+Down").params(EXTEND).pure(),
-        CommandSpec::new("caret.docStart", "Document Start", "Navigation", |s, v| mv(s, v, |s, _| s.doc.start_of(s.sel.focus.story))).key("Mod+Home").params(EXTEND).pure(),
-        CommandSpec::new("caret.docEnd", "Document End", "Navigation", |s, v| mv(s, v, |s, _| s.doc.end_of(s.sel.focus.story))).key("Mod+End").params(EXTEND).pure(),
+        CommandSpec::new("caret.paraDown", "Paragraph Down", "Navigation", |s, v| mv(s, v, para_down))
+            .key("Mod+Down / Alt+Down")
+            .params(EXTEND)
+            .pure(),
+        CommandSpec::new("caret.docStart", "Document Start", "Navigation", |s, v| mv(s, v, |s, _| s.doc.start_of(s.sel.focus.story)))
+            .key("Mod+Home")
+            .params(EXTEND)
+            .pure(),
+        CommandSpec::new("caret.docEnd", "Document End", "Navigation", |s, v| mv(s, v, |s, _| s.doc.end_of(s.sel.focus.story)))
+            .key("Mod+End")
+            .params(EXTEND)
+            .pure(),
         CommandSpec::new("caret.pageUp", "Page Up", "Navigation", |s, v| page(s, v, -1)).key("PageUp").params(EXTEND).pure(),
         CommandSpec::new("caret.pageDown", "Page Down", "Navigation", |s, v| page(s, v, 1)).key("PageDown").params(EXTEND).pure(),
-        CommandSpec::new("caret.set", "Set Caret", "Navigation", set).params(r#"{"pos": Pos, "extend"?: bool} | {"page": n, "x": pt, "y": pt}"#).pure(),
+        CommandSpec::new("caret.set", "Set Caret", "Navigation", set)
+            .params(r#"{"pos": Pos, "extend"?: bool} | {"page": n, "x": pt, "y": pt}"#)
+            .pure(),
         CommandSpec::new("select.all", "Select All", "Home › Editing › Select", select_all).key("Mod+A").pure(),
         CommandSpec::new("select.range", "Select Range", "Navigation", select_range).params(r#"{"anchor": Pos, "focus": Pos}"#).pure(),
         CommandSpec::new("select.word", "Select Word", "Navigation", select_word).pure(),
@@ -274,7 +288,8 @@ fn select_text(s: &mut Session, v: &Value) -> CmdResult {
         for (i, _) in p.text.match_indices(needle) {
             count += 1;
             if count == n {
-                s.sel = Selection { anchor: Pos { story, path: path.clone(), off: i }, focus: Pos { story, path: path.clone(), off: i + needle.len() } };
+                s.sel =
+                    Selection { anchor: Pos { story, path: path.clone(), off: i }, focus: Pos { story, path: path.clone(), off: i + needle.len() } };
                 return sel_result(s);
             }
         }

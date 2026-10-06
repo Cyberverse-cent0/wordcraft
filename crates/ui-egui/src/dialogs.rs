@@ -12,20 +12,92 @@ use crate::theme::{Tokens, semibold};
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "dialog", rename_all = "camelCase")]
 pub enum Dialog {
-    Font { font: String, size: String, bold: bool, italic: bool, underline: bool, strike: bool, sup: bool, sub: bool, small_caps: bool, caps: bool, hidden: bool, color: String, spacing: f32 },
-    Paragraph { align: String, left: f32, right: f32, first: f32, before: f32, after: f32, line: f32, keep_next: bool, keep_lines: bool, page_break: bool, widow: bool },
-    Find { query: String, replace: String, match_case: bool, whole_word: bool, regex: bool, replace_mode: bool, message: String },
-    Goto { page: String },
-    InsertTable { rows: u32, cols: u32 },
-    PageSetup { top: f32, bottom: f32, left: f32, right: f32, landscape: bool },
-    Link { url: String, text: String },
-    Bookmark { name: String },
-    WordCount { stats: Value },
-    Zoom { percent: f32 },
-    Watermark { text: String, diagonal: bool },
-    NewStyle { name: String, based_on: String },
-    ModifyStyle { id: String, name: String, font: String, size: f32, bold: bool, italic: bool, color: String, before: f32, after: f32 },
-    Commands { query: String },
+    Font {
+        font: String,
+        size: String,
+        bold: bool,
+        italic: bool,
+        underline: bool,
+        strike: bool,
+        sup: bool,
+        sub: bool,
+        small_caps: bool,
+        caps: bool,
+        hidden: bool,
+        color: String,
+        spacing: f32,
+    },
+    Paragraph {
+        align: String,
+        left: f32,
+        right: f32,
+        first: f32,
+        before: f32,
+        after: f32,
+        line: f32,
+        keep_next: bool,
+        keep_lines: bool,
+        page_break: bool,
+        widow: bool,
+    },
+    Find {
+        query: String,
+        replace: String,
+        match_case: bool,
+        whole_word: bool,
+        regex: bool,
+        replace_mode: bool,
+        message: String,
+    },
+    Goto {
+        page: String,
+    },
+    InsertTable {
+        rows: u32,
+        cols: u32,
+    },
+    PageSetup {
+        top: f32,
+        bottom: f32,
+        left: f32,
+        right: f32,
+        landscape: bool,
+    },
+    Link {
+        url: String,
+        text: String,
+    },
+    Bookmark {
+        name: String,
+    },
+    WordCount {
+        stats: Value,
+    },
+    Zoom {
+        percent: f32,
+    },
+    Watermark {
+        text: String,
+        diagonal: bool,
+    },
+    NewStyle {
+        name: String,
+        based_on: String,
+    },
+    ModifyStyle {
+        id: String,
+        name: String,
+        font: String,
+        size: f32,
+        bold: bool,
+        italic: bool,
+        color: String,
+        before: f32,
+        after: f32,
+    },
+    Commands {
+        query: String,
+    },
     About,
 }
 
@@ -105,7 +177,13 @@ impl Dialog {
             "insertTable" => Dialog::InsertTable { rows: 2, cols: 5 },
             "pageSetup" => {
                 let sp = wordcraft_engine::cmd::page::sect(&app.session);
-                Dialog::PageSetup { top: sp.margin_top / 72.0, bottom: sp.margin_bottom / 72.0, left: sp.margin_left / 72.0, right: sp.margin_right / 72.0, landscape: sp.landscape }
+                Dialog::PageSetup {
+                    top: sp.margin_top / 72.0,
+                    bottom: sp.margin_bottom / 72.0,
+                    left: sp.margin_left / 72.0,
+                    right: sp.margin_right / 72.0,
+                    landscape: sp.landscape,
+                }
             }
             "link" => Dialog::Link { url: "https://".into(), text: app.session.selected_text() },
             "bookmark" => Dialog::Bookmark { name: String::new() },
@@ -121,7 +199,13 @@ impl Dialog {
 
     pub fn modify_style(app: &WordApp, id: &str) -> Option<Dialog> {
         let st = app.session.doc.styles.get(id)?;
-        let rc = app.session.doc.styles.resolve_char(if st.kind == wordcraft_doc::StyleKind::Paragraph { Some(id) } else { None }, &wordcraft_doc::CharProps { style: if st.kind == wordcraft_doc::StyleKind::Character { Some(id.into()) } else { None }, ..Default::default() });
+        let rc = app.session.doc.styles.resolve_char(
+            if st.kind == wordcraft_doc::StyleKind::Paragraph { Some(id) } else { None },
+            &wordcraft_doc::CharProps {
+                style: if st.kind == wordcraft_doc::StyleKind::Character { Some(id.into()) } else { None },
+                ..Default::default()
+            },
+        );
         let rp = app.session.doc.styles.resolve_para(&wordcraft_doc::ParaProps { style: Some(id.into()), ..Default::default() });
         Some(Dialog::ModifyStyle {
             id: id.into(),
@@ -153,7 +237,13 @@ pub fn table_grid_picker(ui: &mut Ui, app: &mut WordApp) {
             for c in 1..=10 {
                 let (rect, resp) = ui.allocate_exact_size(vec2(16.0, 16.0), Sense::click());
                 let on = r <= hover.0 && c <= hover.1;
-                ui.painter().rect(rect, 1.0, if on { t.checked } else { t.input }, egui::Stroke::new(1.0, if on { t.accent } else { t.border_strong }), egui::StrokeKind::Inside);
+                ui.painter().rect(
+                    rect,
+                    1.0,
+                    if on { t.checked } else { t.input },
+                    egui::Stroke::new(1.0, if on { t.accent } else { t.border_strong }),
+                    egui::StrokeKind::Inside,
+                );
                 if resp.hovered() {
                     new_hover = (r, c);
                 }
@@ -193,10 +283,13 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
         Dialog::Commands { .. } => "Search Commands",
         Dialog::About => "About WordCraft",
     };
-    egui::Window::new(title).collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, vec2(0.0, -40.0)).open(&mut open).show(ctx, |ui| {
-        ui.set_min_width(340.0);
-        close = body(app, ui, &mut d);
-    });
+    egui::Window::new(title).collapsible(false).resizable(false).anchor(egui::Align2::CENTER_CENTER, vec2(0.0, -40.0)).open(&mut open).show(
+        ctx,
+        |ui| {
+            ui.set_min_width(340.0);
+            close = body(app, ui, &mut d);
+        },
+    );
     if open && !close {
         app.dialog = Some(d);
     } else {
@@ -315,11 +408,14 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             let (ok, cancel) = buttons(ui, "OK");
             if ok {
                 let _ = app.run("para.align", json!({"value": align}));
-                let _ = app.run("para.set", json!({"props": {
-                    "indentLeft": *left * 72.0, "indentRight": *right * 72.0, "indentFirst": *first * 72.0,
-                    "spaceBefore": *before, "spaceAfter": *after, "lineSpacing": {"rule": "multiple", "value": *line},
-                    "keepNext": *keep_next, "keepLines": *keep_lines, "pageBreakBefore": *page_break, "widowControl": *widow,
-                }}));
+                let _ = app.run(
+                    "para.set",
+                    json!({"props": {
+                        "indentLeft": *left * 72.0, "indentRight": *right * 72.0, "indentFirst": *first * 72.0,
+                        "spaceBefore": *before, "spaceAfter": *after, "lineSpacing": {"rule": "multiple", "value": *line},
+                        "keepNext": *keep_next, "keepLines": *keep_lines, "pageBreakBefore": *page_break, "widowControl": *widow,
+                    }}),
+                );
             }
             ok || cancel
         }
@@ -425,7 +521,8 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             let (ok, cancel) = buttons(ui, "OK");
             if ok {
                 let _ = app.run("layout.orientation", json!({"value": if *landscape { "landscape" } else { "portrait" }}));
-                let _ = app.run("layout.margins", json!({"top": *top * 72.0, "bottom": *bottom * 72.0, "left": *left * 72.0, "right": *right * 72.0}));
+                let _ =
+                    app.run("layout.margins", json!({"top": *top * 72.0, "bottom": *bottom * 72.0, "left": *left * 72.0, "right": *right * 72.0}));
             }
             ok || cancel
         }
@@ -461,7 +558,14 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
         }
         Dialog::WordCount { stats } => {
             egui::Grid::new("wc").num_columns(2).spacing(vec2(30.0, 6.0)).show(ui, |ui| {
-                for (l, k) in [("Pages", "pages"), ("Words", "words"), ("Characters (no spaces)", "characters"), ("Characters (with spaces)", "charactersWithSpaces"), ("Paragraphs", "paragraphs"), ("Lines", "lines")] {
+                for (l, k) in [
+                    ("Pages", "pages"),
+                    ("Words", "words"),
+                    ("Characters (no spaces)", "characters"),
+                    ("Characters (with spaces)", "charactersWithSpaces"),
+                    ("Paragraphs", "paragraphs"),
+                    ("Lines", "lines"),
+                ] {
                     ui.label(l);
                     ui.label(stats.get(k).map(|v| v.to_string()).unwrap_or_default());
                     ui.end_row();
@@ -561,7 +665,8 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
                 if let Some(c) = wordcraft_doc::Rgb::parse(color) {
                     chr["color"] = json!({"Rgb": [c.0, c.1, c.2]});
                 }
-                let _ = app.run("styles.modify", json!({"style": id, "name": name, "chr": chr, "para": {"spaceBefore": *before, "spaceAfter": *after}}));
+                let _ =
+                    app.run("styles.modify", json!({"style": id, "name": name, "chr": chr, "para": {"spaceBefore": *before, "spaceAfter": *after}}));
             }
             ok || cancel
         }
@@ -570,7 +675,14 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             r.request_focus();
             let q = query.to_lowercase();
             let reg = app.session.registry.clone();
-            let mut hits: Vec<&wordcraft_engine::CommandSpec> = reg.all().iter().filter(|c| !q.is_empty() && (c.label.to_lowercase().contains(&q) || c.id.to_lowercase().contains(&q) || c.location.to_lowercase().contains(&q))).collect();
+            let mut hits: Vec<&wordcraft_engine::CommandSpec> = reg
+                .all()
+                .iter()
+                .filter(|c| {
+                    !q.is_empty()
+                        && (c.label.to_lowercase().contains(&q) || c.id.to_lowercase().contains(&q) || c.location.to_lowercase().contains(&q))
+                })
+                .collect();
             hits.truncate(14);
             let mut close = false;
             for c in hits {

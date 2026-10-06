@@ -55,28 +55,30 @@ pub fn specs() -> Vec<CommandSpec> {
         })
         .key("F4")
         .pure(),
-        CommandSpec::new("tools.recordMacro", "Record Macro", "View › Macros", |s, v| {
-            match s.recording.take() {
-                Some((name, steps)) => {
-                    let n = steps.len();
-                    s.macros.insert(name.clone(), steps);
-                    Ok(json!({"recording": false, "saved": name, "steps": n}))
-                }
-                None => {
-                    let name = p::str(v, "name").unwrap_or("Macro1").to_string();
-                    s.recording = Some((name.clone(), Vec::new()));
-                    Ok(json!({"recording": true, "name": name}))
-                }
+        CommandSpec::new("tools.recordMacro", "Record Macro", "View › Macros", |s, v| match s.recording.take() {
+            Some((name, steps)) => {
+                let n = steps.len();
+                s.macros.insert(name.clone(), steps);
+                Ok(json!({"recording": false, "saved": name, "steps": n}))
+            }
+            None => {
+                let name = p::str(v, "name").unwrap_or("Macro1").to_string();
+                s.recording = Some((name.clone(), Vec::new()));
+                Ok(json!({"recording": true, "name": name}))
             }
         })
         .params(r#"{"name"?: string} (call again to stop)"#)
         .pure(),
-        CommandSpec::new("tools.macros", "Macros", "View › Macros", macros).params(r#"{"run"?: name, "define"?: {"name": string, "steps": [{"command", "params"}]}, "delete"?: name}"#).pure(),
+        CommandSpec::new("tools.macros", "Macros", "View › Macros", macros)
+            .params(r#"{"run"?: name, "define"?: {"name": string, "steps": [{"command", "params"}]}, "delete"?: name}"#)
+            .pure(),
         CommandSpec::new("tools.autocorrect", "AutoCorrect Options", "File › Options › Proofing", |s, v| {
             if let Some(b) = p::bool(v, "enabled") {
                 s.autocorrect_on = b;
             }
-            if let (Some(f), Some(t)) = (v.get("add").and_then(|a| a.get("from")).and_then(Value::as_str), v.get("add").and_then(|a| a.get("to")).and_then(Value::as_str)) {
+            if let (Some(f), Some(t)) =
+                (v.get("add").and_then(|a| a.get("from")).and_then(Value::as_str), v.get("add").and_then(|a| a.get("to")).and_then(Value::as_str))
+            {
                 s.autocorrect_user.retain(|(a, _)| a != f);
                 s.autocorrect_user.push((f.to_string(), t.to_string()));
             }
@@ -87,7 +89,8 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("review.compare", "Compare", "Review › Compare", compare).params(r#"{"path"?: string, "text"?: string (revised version)}"#),
         CommandSpec::new("review.combine", "Combine", "Review › Compare", compare).params(r#"{"path"?: string}"#),
         CommandSpec::new("file.accessibility", "Check Accessibility", "Review › Accessibility", accessibility).pure(),
-        CommandSpec::new("file.inspect", "Inspect Document", "File › Info", inspect_doc).params(r#"{"remove"?: ["comments", "revisions", "properties", "hidden", "headers"]}"#),
+        CommandSpec::new("file.inspect", "Inspect Document", "File › Info", inspect_doc)
+            .params(r#"{"remove"?: ["comments", "revisions", "properties", "hidden", "headers"]}"#),
         CommandSpec::new("review.restrict", "Restrict Editing", "Review › Protect", |s, v| {
             let mode = p::str(v, "mode").unwrap_or("readOnly").to_string();
             s.doc.settings.protection = if mode == "none" { None } else { Some(mode.clone()) };
@@ -152,7 +155,11 @@ pub fn specs() -> Vec<CommandSpec> {
             if s.doc.settings.watermark.is_some() {
                 issues.push("Watermarks are kept in WordCraft documents but not yet written to .docx.");
             }
-            if s.doc.para_paths(StoryRef::Body).iter().any(|p| s.doc.para(StoryRef::Body, p).is_some_and(|x| x.objects.iter().any(|o| matches!(o, InlineObject::Opaque { .. })))) {
+            if s.doc
+                .para_paths(StoryRef::Body)
+                .iter()
+                .any(|p| s.doc.para(StoryRef::Body, p).is_some_and(|x| x.objects.iter().any(|o| matches!(o, InlineObject::Opaque { .. }))))
+            {
                 issues.push("Some embedded objects from the original file are shown as text only.");
             }
             Ok(json!({"issues": issues}))
@@ -168,7 +175,8 @@ pub fn specs() -> Vec<CommandSpec> {
             Err(CmdError::Failed("password encryption isn't available yet".into()))
         })
         .pure(),
-        CommandSpec::new("insert.quickParts", "Quick Parts", "Insert › Text", quick_parts).params(r#"{"save"?: name (from the selection), "insert"?: name, "delete"?: name} → list"#),
+        CommandSpec::new("insert.quickParts", "Quick Parts", "Insert › Text", quick_parts)
+            .params(r#"{"save"?: name (from the selection), "insert"?: name, "delete"?: name} → list"#),
         CommandSpec::new("insert.autoText", "AutoText", "Insert › Text › Quick Parts", quick_parts).params(r#"{"save"?: name, "insert"?: name}"#),
         CommandSpec::new("insert.docProperty", "Document Property", "Insert › Text › Quick Parts", |s, v| {
             let name = p::str(v, "name").unwrap_or("Title").to_string();
@@ -205,7 +213,9 @@ pub fn specs() -> Vec<CommandSpec> {
             if !title.is_empty() {
                 lines.push(title);
             }
-            let frag = wordcraft_doc::edit::Fragment { blocks: lines.iter().map(|l| Block::Para(Paragraph::with_text(l, CharProps::default()).styled("NoSpacing"))).collect() };
+            let frag = wordcraft_doc::edit::Fragment {
+                blocks: lines.iter().map(|l| Block::Para(Paragraph::with_text(l, CharProps::default()).styled("NoSpacing"))).collect(),
+            };
             let end = s.doc.insert_fragment(&at, &frag)?;
             s.sel = Selection::caret(end);
             sel_result(s)
@@ -270,7 +280,13 @@ pub fn specs() -> Vec<CommandSpec> {
         }),
         CommandSpec::new("table.cellMargins", "Cell Margins", "Table Layout › Alignment", |s, v| {
             let Some((tp, _, _)) = s.sel.focus.path.cell() else { return Err(CmdError::Disabled("not in a table".into())) };
-            let m = [p::f32(v, "top").unwrap_or(0.0), p::f32(v, "left").unwrap_or(5.4), p::f32(v, "bottom").unwrap_or(0.0), p::f32(v, "right").unwrap_or(5.4)].map(|x| x.clamp(0.0, 144.0));
+            let m = [
+                p::f32(v, "top").unwrap_or(0.0),
+                p::f32(v, "left").unwrap_or(5.4),
+                p::f32(v, "bottom").unwrap_or(0.0),
+                p::f32(v, "right").unwrap_or(5.4),
+            ]
+            .map(|x| x.clamp(0.0, 144.0));
             let story = s.sel.focus.story;
             s.doc.table_mut(story, &tp)?.props.cell_margins = Some(m);
             for path in s.doc.para_paths(story).into_iter().filter(|p| p.0.starts_with(&tp.0) && p.0.len() > tp.0.len()) {
@@ -279,11 +295,21 @@ pub fn specs() -> Vec<CommandSpec> {
             sel_result(s)
         })
         .params(r#"{"top"?, "left"?, "bottom"?, "right"? (pt)}"#),
-        CommandSpec::new("table.borderPainter", "Border Painter", "Table Design › Borders", |s, v| s.run("table.borders", &json!({"kind": p::str(v, "kind").unwrap_or("all"), "width": p::f32(v, "width").unwrap_or(0.5), "color": p::str(v, "color")}))),
+        CommandSpec::new("table.borderPainter", "Border Painter", "Table Design › Borders", |s, v| {
+            s.run(
+                "table.borders",
+                &json!({"kind": p::str(v, "kind").unwrap_or("all"), "width": p::f32(v, "width").unwrap_or(0.5), "color": p::str(v, "color")}),
+            )
+        }),
         CommandSpec::new("para.setNumberingValue", "Set Numbering Value", "Home › Paragraph › Numbering", |s, v| {
             let value = p::u64(v, "value").unwrap_or(1).clamp(0, 100_000) as u32;
             let f = s.sel.focus.clone();
-            let n = s.doc.para_at(&f).and_then(|x| x.props.numbering).filter(|n| n.num != 0).ok_or_else(|| CmdError::Failed("not in a numbered list".into()))?;
+            let n = s
+                .doc
+                .para_at(&f)
+                .and_then(|x| x.props.numbering)
+                .filter(|n| n.num != 0)
+                .ok_or_else(|| CmdError::Failed("not in a numbered list".into()))?;
             let new = s.doc.numbering.restart(n.num).ok_or_else(|| CmdError::Failed("bad list".into()))?;
             if let Some(num) = s.doc.numbering.nums.iter_mut().find(|x| x.id == new) {
                 num.start_overrides = vec![(n.level, value)];
@@ -300,7 +326,10 @@ pub fn specs() -> Vec<CommandSpec> {
             sel_result(s)
         })
         .params(r#"{"value": n}"#),
-        CommandSpec::new("para.defineBullet", "Define New Bullet", "Home › Paragraph › Bullets", |s, v| s.run("para.bullets", &json!({"kind": p::str(v, "char").unwrap_or("★")}))).params(r#"{"char": string}"#),
+        CommandSpec::new("para.defineBullet", "Define New Bullet", "Home › Paragraph › Bullets", |s, v| {
+            s.run("para.bullets", &json!({"kind": p::str(v, "char").unwrap_or("★")}))
+        })
+        .params(r#"{"char": string}"#),
         CommandSpec::new("para.defineNumber", "Define New Number Format", "Home › Paragraph › Numbering", |s, v| {
             let fmt = wordcraft_doc::section::NumFormat::from_ooxml(p::str(v, "format").unwrap_or("decimal"));
             let text = p::str(v, "text").unwrap_or("%1.").to_string();
@@ -354,8 +383,6 @@ pub fn specs() -> Vec<CommandSpec> {
                 "select.word"
             } else if a.path == b.path && (a.off > 0 || b.off < para_len) {
                 if s.doc.para_at(&a).map(|x| x.sentence_at(a.off)) == Some((a.off, b.off)) { "select.paragraph" } else { "select.sentence" }
-            } else if a.path == b.path || a.path.with_last(a.path.last() + 1) == b.path {
-                "select.all"
             } else {
                 "select.all"
             };
@@ -364,7 +391,8 @@ pub fn specs() -> Vec<CommandSpec> {
         .key("F8")
         .pure(),
         CommandSpec::new("design.effects", "Effects", "Design › Document Formatting", |s, v| {
-            s.doc.settings.theme_name = format!("{} ({})", s.doc.settings.theme_name.split(" (").next().unwrap_or("Craft"), p::str(v, "name").unwrap_or("Subtle"));
+            s.doc.settings.theme_name =
+                format!("{} ({})", s.doc.settings.theme_name.split(" (").next().unwrap_or("Craft"), p::str(v, "name").unwrap_or("Subtle"));
             sel_result(s)
         }),
         CommandSpec::new("view.immersive", "Immersive Reader", "View › Immersive", |s, _| {
@@ -394,7 +422,9 @@ fn macros(s: &mut Session, v: &Value) -> CmdResult {
         let steps: Vec<(String, Value)> = d
             .get("steps")
             .and_then(Value::as_array)
-            .map(|a| a.iter().filter_map(|st| Some((st.get("command")?.as_str()?.to_string(), st.get("params").cloned().unwrap_or(json!({}))))).collect())
+            .map(|a| {
+                a.iter().filter_map(|st| Some((st.get("command")?.as_str()?.to_string(), st.get("params").cloned().unwrap_or(json!({}))))).collect()
+            })
             .unwrap_or_default();
         s.macros.insert(name, steps);
     }
@@ -411,7 +441,9 @@ fn macros(s: &mut Session, v: &Value) -> CmdResult {
         }
         return Ok(json!({"ran": n, "steps": steps.len()}));
     }
-    Ok(Value::Object(s.macros.iter().map(|(k, v)| (k.clone(), json!(v.iter().map(|(c, p)| json!({"command": c, "params": p})).collect::<Vec<_>>()))).collect()))
+    Ok(Value::Object(
+        s.macros.iter().map(|(k, v)| (k.clone(), json!(v.iter().map(|(c, p)| json!({"command": c, "params": p})).collect::<Vec<_>>()))).collect(),
+    ))
 }
 
 /// Apply AutoCorrect to the word just before the caret (called after typing a space/punctuation).
@@ -434,14 +466,19 @@ pub fn autocorrect(s: &mut Session) -> Result<(), CmdError> {
         return Ok(());
     }
     let user = s.autocorrect_user.iter().find(|(a, _)| a == word).map(|(_, b)| b.clone());
-    let builtin = AUTOCORRECT.iter().find(|(a, _)| *a == word || (a.chars().all(|c| c.is_lowercase()) && word.to_lowercase() == *a && word.chars().next().is_some_and(char::is_uppercase))).map(|(a, b)| {
-        if *a != word && b.chars().next().is_some_and(char::is_lowercase) {
-            let mut c = b.chars();
-            c.next().map(|x| x.to_uppercase().chain(c).collect::<String>()).unwrap_or_default()
-        } else {
-            b.to_string()
-        }
-    });
+    let builtin = AUTOCORRECT
+        .iter()
+        .find(|(a, _)| {
+            *a == word || (a.chars().all(|c| c.is_lowercase()) && word.to_lowercase() == *a && word.chars().next().is_some_and(char::is_uppercase))
+        })
+        .map(|(a, b)| {
+            if *a != word && b.chars().next().is_some_and(char::is_lowercase) {
+                let mut c = b.chars();
+                c.next().map(|x| x.to_uppercase().chain(c).collect::<String>()).unwrap_or_default()
+            } else {
+                b.to_string()
+            }
+        });
     let Some(rep) = user.or(builtin) else { return Ok(()) };
     let para = s.doc.para_mut(f.story, &f.path)?;
     let props = para.props_of_char(start).clone();
@@ -649,8 +686,13 @@ fn accessibility(s: &mut Session, _: &Value) -> CmdResult {
 }
 
 fn inspect_doc(s: &mut Session, v: &Value) -> CmdResult {
-    let remove: Vec<String> = v.get("remove").and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
-    let has_hidden = s.doc.para_paths(StoryRef::Body).iter().any(|p| s.doc.para(StoryRef::Body, p).is_some_and(|x| x.runs.iter().any(|r| r.props.hidden == Some(true))));
+    let remove: Vec<String> =
+        v.get("remove").and_then(Value::as_array).map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+    let has_hidden = s
+        .doc
+        .para_paths(StoryRef::Body)
+        .iter()
+        .any(|p| s.doc.para(StoryRef::Body, p).is_some_and(|x| x.runs.iter().any(|r| r.props.hidden == Some(true))));
     let report = json!({
         "comments": s.doc.comments.len(),
         "revisions": s.doc.para_paths(StoryRef::Body).iter().filter(|p| s.doc.para(StoryRef::Body, p).is_some_and(|x| x.runs.iter().any(|r| r.props.ins.is_some() || r.props.del.is_some()))).count(),
@@ -673,7 +715,11 @@ fn inspect_doc(s: &mut Session, v: &Value) -> CmdResult {
             }
             "hidden" => {
                 for path in s.doc.para_paths(StoryRef::Body) {
-                    let ranges: Vec<(usize, usize)> = s.doc.para(StoryRef::Body, &path).map(|p| p.run_ranges().filter(|(_, c)| c.hidden == Some(true)).map(|(r, _)| (r.start, r.end)).collect()).unwrap_or_default();
+                    let ranges: Vec<(usize, usize)> = s
+                        .doc
+                        .para(StoryRef::Body, &path)
+                        .map(|p| p.run_ranges().filter(|(_, c)| c.hidden == Some(true)).map(|(r, _)| (r.start, r.end)).collect())
+                        .unwrap_or_default();
                     let para = s.doc.para_mut(StoryRef::Body, &path)?;
                     for (a, b) in ranges.into_iter().rev() {
                         para.delete(a, b)?;
@@ -716,7 +762,10 @@ fn hf_nav(s: &mut Session, dir: i32) -> CmdResult {
     let StoryRef::Part(cur) = s.sel.focus.story else { return Err(CmdError::Disabled("edit a header or footer first".into())) };
     let mut ids: Vec<u32> = Vec::new();
     for (_, sect) in s.doc.sections() {
-        for id in [sect.headers.default, sect.headers.first, sect.headers.even, sect.footers.default, sect.footers.first, sect.footers.even].into_iter().flatten() {
+        for id in [sect.headers.default, sect.headers.first, sect.headers.even, sect.footers.default, sect.footers.first, sect.footers.even]
+            .into_iter()
+            .flatten()
+        {
             if !ids.contains(&id) {
                 ids.push(id);
             }
@@ -732,7 +781,13 @@ fn hf_nav(s: &mut Session, dir: i32) -> CmdResult {
 fn read_aloud(s: &mut Session, _: &Value) -> CmdResult {
     let text = if s.sel.is_collapsed() {
         let f = s.sel.focus.clone();
-        s.doc.para_paths(f.story).into_iter().filter(|p| *p >= f.path).filter_map(|p| s.doc.para(f.story, &p).map(|x| x.plain_text())).collect::<Vec<_>>().join("\n")
+        s.doc
+            .para_paths(f.story)
+            .into_iter()
+            .filter(|p| *p >= f.path)
+            .filter_map(|p| s.doc.para(f.story, &p).map(|x| x.plain_text()))
+            .collect::<Vec<_>>()
+            .join("\n")
     } else {
         s.selected_text()
     };
@@ -744,8 +799,10 @@ fn read_aloud(s: &mut Session, _: &Value) -> CmdResult {
     }
     #[cfg(target_os = "windows")]
     {
-        let script = format!("Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak([Console]::In.ReadToEnd())");
-        if let Ok(mut c) = std::process::Command::new("powershell").args(["-NoProfile", "-Command", &script]).stdin(std::process::Stdio::piped()).spawn()
+        let script =
+            format!("Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak([Console]::In.ReadToEnd())");
+        if let Ok(mut c) =
+            std::process::Command::new("powershell").args(["-NoProfile", "-Command", &script]).stdin(std::process::Stdio::piped()).spawn()
             && let Some(mut i) = c.stdin.take()
         {
             use std::io::Write;
@@ -755,7 +812,11 @@ fn read_aloud(s: &mut Session, _: &Value) -> CmdResult {
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        let _ = std::process::Command::new("spd-say").arg(&text).spawn().or_else(|_| std::process::Command::new("espeak").arg(&text).spawn()).map_err(|e| CmdError::Failed(format!("no speech engine found: {e}")))?;
+        let _ = std::process::Command::new("spd-say")
+            .arg(&text)
+            .spawn()
+            .or_else(|_| std::process::Command::new("espeak").arg(&text).spawn())
+            .map_err(|e| CmdError::Failed(format!("no speech engine found: {e}")))?;
         return Ok(json!({"speaking": text.len()}));
     }
     #[allow(unreachable_code)]

@@ -95,8 +95,21 @@ fn ordinal_suffix(n: u32) -> &'static str {
 
 /// Lowercase roman numerals (0 → empty; values above 3999 use repeated `m`).
 pub fn roman(mut n: u32) -> String {
-    const T: [(u32, &str); 13] =
-        [(1000, "m"), (900, "cm"), (500, "d"), (400, "cd"), (100, "c"), (90, "xc"), (50, "l"), (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i")];
+    const T: [(u32, &str); 13] = [
+        (1000, "m"),
+        (900, "cm"),
+        (500, "d"),
+        (400, "cd"),
+        (100, "c"),
+        (90, "xc"),
+        (50, "l"),
+        (40, "xl"),
+        (10, "x"),
+        (9, "ix"),
+        (5, "v"),
+        (4, "iv"),
+        (1, "i"),
+    ];
     let mut s = String::new();
     n = n.min(50_000);
     for (v, r) in T {
@@ -150,15 +163,15 @@ pub fn cardinal_text(n: u32) -> String {
             0..=19 => ONES.get(n as usize).copied().unwrap_or("").to_string(),
             20..=99 => {
                 let t = TENS.get((n / 10) as usize).copied().unwrap_or("");
-                if n % 10 == 0 { t.to_string() } else { format!("{t}-{}", ONES.get((n % 10) as usize).copied().unwrap_or("")) }
+                if n.is_multiple_of(10) { t.to_string() } else { format!("{t}-{}", ONES.get((n % 10) as usize).copied().unwrap_or("")) }
             }
             100..=999 => {
                 let h = format!("{} hundred", words(n / 100));
-                if n % 100 == 0 { h } else { format!("{h} {}", words(n % 100)) }
+                if n.is_multiple_of(100) { h } else { format!("{h} {}", words(n % 100)) }
             }
             _ => {
                 let th = format!("{} thousand", words(n / 1000));
-                if n % 1000 == 0 { th } else { format!("{th} {}", words(n % 1000)) }
+                if n.is_multiple_of(1000) { th } else { format!("{th} {}", words(n % 1000)) }
             }
         }
     }

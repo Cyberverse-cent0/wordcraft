@@ -37,8 +37,20 @@ fn substitutes(family: &str) -> &'static [&'static str] {
         "times new roman" | "times" => TIMES,
         "courier new" | "courier" | "consolas" | "lucida console" | "cascadia code" | "cascadia mono" => MONO,
         "symbol" | "wingdings" | "segoe ui symbol" | "webdings" => SYMBOL,
-        "cambria" | "cambria math" | "georgia" | "garamond" | "book antiqua" | "palatino linotype" | "constantia" | "baskerville old face"
-        | "century" | "century schoolbook" | "bookman old style" | "sitka text" | "sitka" | "aptos serif" => SERIF,
+        "cambria"
+        | "cambria math"
+        | "georgia"
+        | "garamond"
+        | "book antiqua"
+        | "palatino linotype"
+        | "constantia"
+        | "baskerville old face"
+        | "century"
+        | "century schoolbook"
+        | "bookman old style"
+        | "sitka text"
+        | "sitka"
+        | "aptos serif" => SERIF,
         _ if f.contains("mono") || f.contains("code") => MONO,
         _ if f.contains("serif") && !f.contains("sans") => SERIF,
         _ => SANS,
@@ -70,12 +82,7 @@ pub fn resolve(family: &str, bold: bool, italic: bool) -> Resolved {
         (s.to_string(), true)
     };
     let face = db.face(&fam, style_name(bold, italic));
-    let r = Resolved {
-        synth_bold: bold && face.weight < 600.0,
-        synth_italic: italic && !face.italic,
-        substituted,
-        face: FaceRef::of(&face),
-    };
+    let r = Resolved { synth_bold: bold && face.weight < 600.0, synth_italic: italic && !face.italic, substituted, face: FaceRef::of(&face) };
     cache.lock().unwrap_or_else(|e| e.into_inner()).insert(key, r);
     r
 }

@@ -28,7 +28,7 @@ pub struct Rendered {
 impl Rendered {
     pub fn to_straight(&self) -> Vec<u8> {
         let mut out = self.pixels.clone();
-        for px in out.chunks_exact_mut(4) {
+        for px in out.as_chunks_mut::<4>().0 {
             let a = px[3] as u32;
             if a != 0 && a != 255 {
                 for c in px.iter_mut().take(3) {
@@ -56,7 +56,9 @@ impl Rendered {
     pub fn to_jpeg(&self, quality: u8) -> Vec<u8> {
         let rgba = self.to_straight();
         let rgb: Vec<u8> = rgba
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .flat_map(|p| {
                 let a = p[3] as u32;
                 let mix = |c: u8| ((c as u32 * a + 255 * (255 - a)) / 255) as u8;
@@ -193,7 +195,9 @@ fn draw_watermark(ctx: &mut RenderContext, view: Affine, page: &Page, wm: &wordc
     let size = (diag * 0.7 / raw_w).min(300.0);
     let k = size / upem;
     let angle = if wm.diagonal { -((page.h.min(2000.0) as f64) / page.w.max(1.0) as f64).atan() } else { 0.0 };
-    let base = Affine::translate((page.w as f64 / 2.0, page.h.min(2000.0) as f64 / 2.0)) * Affine::rotate(angle) * Affine::translate((-raw_w * size / 2.0, size * 0.35));
+    let base = Affine::translate((page.w as f64 / 2.0, page.h.min(2000.0) as f64 / 2.0))
+        * Affine::rotate(angle)
+        * Affine::translate((-raw_w * size / 2.0, size * 0.35));
     ctx.set_paint(color(wm.color, if wm.semitransparent { 0.5 } else { 1.0 }));
     let db = FontDb::global();
     let mut x = 0.0;
@@ -374,7 +378,15 @@ pub fn shape_path(kind: ShapeKind, r: kurbo::Rect) -> BezPath {
         }
         ShapeKind::Arrow => {
             let h = r.height();
-            poly(&[(r.x0, cy - h * 0.2), (r.x1 - h * 0.5, cy - h * 0.2), (r.x1 - h * 0.5, r.y0), (r.x1, cy), (r.x1 - h * 0.5, r.y1), (r.x1 - h * 0.5, cy + h * 0.2), (r.x0, cy + h * 0.2)])
+            poly(&[
+                (r.x0, cy - h * 0.2),
+                (r.x1 - h * 0.5, cy - h * 0.2),
+                (r.x1 - h * 0.5, r.y0),
+                (r.x1, cy),
+                (r.x1 - h * 0.5, r.y1),
+                (r.x1 - h * 0.5, cy + h * 0.2),
+                (r.x0, cy + h * 0.2),
+            ])
         }
         ShapeKind::Star => {
             let mut pts = Vec::new();
@@ -397,6 +409,15 @@ pub fn shape_path(kind: ShapeKind, r: kurbo::Rect) -> BezPath {
             p
         }
     }
+}
+
+/// Render the page area (`x`, `y`, `w`×`h` points) at `scale` px/pt — for previews and thumbnails.
+pub fn render_area(doc: &Document, page: &Page, x: f32, y: f32, w: f32, h: f32, scale: f32, opts: &RenderOptions) -> Rendered {
+    let scale = if scale.is_finite() && scale > 0.0 { scale } else { 1.0 };
+    let pw = ((w * scale).ceil() as u32).clamp(1, MAX_SIDE);
+    let ph = ((h * scale).ceil() as u32).clamp(1, MAX_SIDE);
+    let view = Affine::scale(scale as f64) * Affine::translate((-x as f64, -y as f64));
+    render_region(doc, page, pw, ph, view, opts)
 }
 
 #[cfg(test)]
@@ -435,13 +456,4 @@ mod tests {
             assert!(!shape_path(k, r).elements().is_empty());
         }
     }
-}
-
-/// Render the page area (`x`, `y`, `w`×`h` points) at `scale` px/pt — for previews and thumbnails.
-pub fn render_area(doc: &Document, page: &Page, x: f32, y: f32, w: f32, h: f32, scale: f32, opts: &RenderOptions) -> Rendered {
-    let scale = if scale.is_finite() && scale > 0.0 { scale } else { 1.0 };
-    let pw = ((w * scale).ceil() as u32).clamp(1, MAX_SIDE);
-    let ph = ((h * scale).ceil() as u32).clamp(1, MAX_SIDE);
-    let view = Affine::scale(scale as f64) * Affine::translate((-x as f64, -y as f64));
-    render_region(doc, page, pw, ph, view, opts)
 }

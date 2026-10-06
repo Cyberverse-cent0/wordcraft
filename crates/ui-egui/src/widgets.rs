@@ -71,7 +71,8 @@ fn bg(ui: &Ui, r: Rect, resp: &Response, checked: bool, t: &Tokens) {
 /// A large ribbon button: 32 px icon over a (possibly two-line) label.
 pub fn big(ui: &mut Ui, app: &mut WordApp, icon: &str, label: &str, id: &str, params: Value, menu: bool) -> Response {
     let t = Tokens::get(ui.ctx());
-    let galley_w = label.split('\n').map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
+    let galley_w =
+        label.split('\n').map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
     let w = (galley_w + 12.0).max(44.0);
     let (r, resp) = ui.allocate_exact_size(vec2(w, CONTENT_H), Sense::click());
     let on = enabled(app, id);
@@ -114,7 +115,17 @@ pub fn small(ui: &mut Ui, app: &mut WordApp, icon: &str, label: Option<&str>, ti
 }
 
 /// A split button: the left part runs `id`, the arrow opens a menu filled by `menu`.
-pub fn split(ui: &mut Ui, app: &mut WordApp, icon: &str, tip: &str, id: &str, params: Value, checked: bool, swatch: Option<Color32>, menu: impl FnOnce(&mut Ui, &mut WordApp)) {
+pub fn split(
+    ui: &mut Ui,
+    app: &mut WordApp,
+    icon: &str,
+    tip: &str,
+    id: &str,
+    params: Value,
+    checked: bool,
+    swatch: Option<Color32>,
+    menu: impl FnOnce(&mut Ui, &mut WordApp),
+) {
     let t = Tokens::get(ui.ctx());
     let (r, resp) = ui.allocate_exact_size(vec2(24.0, 22.0), Sense::click());
     let (ar, aresp) = ui.allocate_exact_size(vec2(11.0, 22.0), Sense::click());
@@ -137,10 +148,22 @@ pub fn split(ui: &mut Ui, app: &mut WordApp, icon: &str, tip: &str, id: &str, pa
 }
 
 /// A button that only opens a menu (icon + label + ▾).
-pub fn menu_button(ui: &mut Ui, app: &mut WordApp, icon: &str, label: Option<&str>, tip: &str, big_btn: bool, menu: impl FnOnce(&mut Ui, &mut WordApp)) {
+pub fn menu_button(
+    ui: &mut Ui,
+    app: &mut WordApp,
+    icon: &str,
+    label: Option<&str>,
+    tip: &str,
+    big_btn: bool,
+    menu: impl FnOnce(&mut Ui, &mut WordApp),
+) {
     let t = Tokens::get(ui.ctx());
     let resp = if big_btn {
-        let galley_w = label.unwrap_or("").split('\n').map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x)).fold(0.0, f32::max);
+        let galley_w = label
+            .unwrap_or("")
+            .split('\n')
+            .map(|l| ui.ctx().fonts_mut(|f| f.layout_no_wrap(l.to_string(), regular(11.5), t.text).size().x))
+            .fold(0.0, f32::max);
         let w = (galley_w + 22.0).max(44.0);
         let (r, resp) = ui.allocate_exact_size(vec2(w, CONTENT_H), Sense::click());
         bg(ui, r, &resp, false, &t);
@@ -252,12 +275,24 @@ fn swatch(ui: &mut Ui, c: wordcraft_doc::Rgb) -> bool {
     let (r, resp) = ui.allocate_exact_size(vec2(15.0, 15.0), Sense::click());
     ui.painter().rect_filled(r, 0.0, Color32::from_rgb(c.0, c.1, c.2));
     let t = Tokens::get(ui.ctx());
-    ui.painter().rect_stroke(r, 0.0, Stroke::new(if resp.hovered() { 1.5 } else { 0.5 }, if resp.hovered() { t.accent } else { t.border_strong }), egui::StrokeKind::Inside);
+    ui.painter().rect_stroke(
+        r,
+        0.0,
+        Stroke::new(if resp.hovered() { 1.5 } else { 0.5 }, if resp.hovered() { t.accent } else { t.border_strong }),
+        egui::StrokeKind::Inside,
+    );
     resp.on_hover_text(format!("#{}", c.hex())).clicked()
 }
 
 /// A ribbon-style text field with a dropdown list. Returns a chosen/typed value.
-pub fn combo(ui: &mut Ui, id: &str, width: f32, current: &str, items: &[String], preview: Option<&dyn Fn(&mut Ui, &str) -> Response>) -> Option<String> {
+pub fn combo(
+    ui: &mut Ui,
+    id: &str,
+    width: f32,
+    current: &str,
+    items: &[String],
+    preview: Option<&dyn Fn(&mut Ui, &str) -> Response>,
+) -> Option<String> {
     let mut out = None;
     let edit_id = ui.id().with(("combo_text", id));
     let mut text = ui.data_mut(|d| d.get_temp::<String>(edit_id)).unwrap_or_else(|| current.to_string());
