@@ -1,0 +1,228 @@
+use super::*;
+use wordcraft_doc::para::InlineObject;
+use wordcraft_doc::props::{Align, ParaProps};
+use wordcraft_doc::{Pos, Table};
+
+fn lay(doc: &Document) -> DocLayout {
+    let mut c = LayoutCache::new();
+    layout(doc, &mut c, &LayoutOptions::default())
+}
+
+fn lines_of(l: &DocLayout) -> usize {
+    l.pages.iter().flat_map(|p| p.items.iter()).map(|it| if let Placed::Lines { l0, l1, .. } = it { l1 - l0 } else { 0 }).sum()
+}
+
+#[test]
+fn empty_doc_has_one_page() {
+    let d = Document::new();
+    let l = lay(&d);
+    assert_eq!(l.pages.len(), 1);
+    assert_eq!(lines_of(&l), 1);
+    let c = l.caret(&Pos::body(0, 0)).unwrap();
+    assert_eq!(c.page, 0);
+    assert!((c.x - 72.0).abs() < 0.5, "{c:?}");
+    assert!(c.top >= 72.0 && c.height > 8.0);
+}
+
+#[test]
+fn long_paragraph_wraps_and_paginates() {
+    let text = "The quick brown fox jumps over the lazy dog. ".repeat(400);
+    let d = Document::from_text(&text);
+    let l = lay(&d);
+    assert!(l.pages.len() >= 3, "pages {}", l.pages.len());
+    // Every line fits the text width.
+    for p in &l.pages {
+        for it in &p.items {
+            if let Placed::Lines { para, l0, l1, x, .. } = it {
+                for li in *l0..*l1 {
+                    let line = &para.lines[li];
+                    let w = para.x_of(li, line.stop).unwrap() + x;
+                    assert!(w <= 612.0 - 72.0 + 30.0, "line too wide: {w}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn hit_and_caret_agree() {
+    let d = Document::from_text("Hello world, this is WordCraft.\nSecond paragraph here.");
+    let l = lay(&d);
+    for off in [0, 5, 12, 31] {
+        let pos = Pos::body(0, off);
+        let c = l.caret(&pos).unwrap();
+        let back = l.hit(c.page, c.x + 0.1, c.top + c.height / 2.0, StoryRef::Body).unwrap();
+        assert_eq!(back, pos, "off {off}");
+    }
+    let c1 = l.caret(&Pos::body(1, 0)).unwrap();
+    let (down, _) = l.vertical(&Pos::body(0, 0), None, 1, 0).unwrap();
+    assert_eq!(down.path, Path::top(1));
+    assert!(c1.top > l.caret(&Pos::body(0, 0)).unwrap().top);
+    let (up, _) = l.vertical(&Pos::body(1, 3), None, -1, 0).unwrap();
+    assert_eq!(up.path, Path::top(0));
+}
+
+#[test]
+fn page_break_char_starts_new_page() {
+    let mut d = Document::from_text("one");
+    d.insert_text(&Pos::body(0, 3), "\u{000C}", &Default::default()).unwrap();
+    let l = lay(&d);
+    assert_eq!(l.pages.len(), 2);
+}
+
+#[test]
+fn center_and_right_alignment() {
+    let mut d = Document::from_text("abc\nabc\nabc");
+    d.format_paragraphs(&Pos::body(1, 0), &Pos::body(1, 0), &|p| p.align = Some(Align::Center)).unwrap();
+    d.format_paragraphs(&Pos::body(2, 0), &Pos::body(2, 0), &|p| p.align = Some(Align::Right)).unwrap();
+    let l = lay(&d);
+    let x0 = l.caret(&Pos::body(0, 0)).unwrap().x;
+    let x1 = l.caret(&Pos::body(1, 0)).unwrap().x;
+    let x2 = l.caret(&Pos::body(2, 3)).unwrap().x;
+    assert!((x0 - 72.0).abs() < 0.5);
+    assert!(x1 > 250.0 && x1 < 320.0, "{x1}");
+    assert!((x2 - 540.0).abs() < 1.0, "{x2}");
+}
+
+#[test]
+fn tabs_land_on_default_stops() {
+    let d = Document::from_text("a\tb");
+    let l = lay(&d);
+    let xb = l.caret(&Pos::body(0, 2)).unwrap().x;
+    assert!((xb - (72.0 + 36.0)).abs() < 0.5, "{xb}");
+}
+
+#[test]
+fn right_tab_aligns_text_end() {
+    let mut d = Document::from_text("left\tright");
+    d.format_paragraphs(&Pos::body(0, 0), &Pos::body(0, 0), &|p| {
+        p.tabs = Some(vec![wordcraft_doc::props::TabStop { pos: 400.0, align: wordcraft_doc::props::TabAlign::Right, leader: Default::default() }])
+    })
+    .unwrap();
+    let l = lay(&d);
+    let end = l.caret(&Pos::body(0, 10)).unwrap().x;
+    assert!((end - 472.0).abs() < 1.0, "{end}");
+}
+
+#[test]
+fn lists_get_labels_and_indent() {
+    let mut d = Document::from_text("one\ntwo\nthree");
+    let id = d.numbering.add_list(wordcraft_doc::ListKind::Numbered);
+    d.format_paragraphs(&Pos::body(0, 0), &Pos::body(2, 0), &|p| p.numbering = Some(wordcraft_doc::props::NumRef { num: id, level: 0 })).unwrap();
+    let l = lay(&d);
+    let labels: Vec<String> = l.pages[0]
+        .items
+        .iter()
+        .filter_map(|it| if let Placed::Lines { para, .. } = it { para.label.as_ref().map(|x| x.text.clone()) } else { None })
+        .collect();
+    assert_eq!(labels, vec!["1.", "2.", "3."]);
+    let x = l.caret(&Pos::body(0, 0)).unwrap().x;
+    assert!((x - 108.0).abs() < 0.5, "{x}");
+}
+
+#[test]
+fn tables_lay_out_cells() {
+    let mut d = Document::from_text("before\nafter");
+    let mut t = Table::new(2, 3, 468.0);
+    t.rows[0].cells[1].blocks = vec![wordcraft_doc::para_block(wordcraft_doc::Paragraph::with_text("cell text", Default::default()))];
+    d.insert_block(StoryRef::Body, &Path::top(1), wordcraft_doc::Block::Table(t)).unwrap();
+    let l = lay(&d);
+    let pos = Pos { story: StoryRef::Body, path: Path(vec![1, 0, 1, 0]), off: 0 };
+    let c = l.caret(&pos).unwrap();
+    assert!(c.x > 72.0 + 150.0 && c.x < 72.0 + 170.0, "{c:?}");
+    let after = l.caret(&Pos::body(2, 0)).unwrap();
+    assert!(after.top > c.top + 20.0);
+    let rules = l.pages[0].items.iter().filter(|i| matches!(i, Placed::Rule { .. })).count();
+    assert!(rules >= 12, "rules {rules}");
+    assert!(l.cell_at(0, c.x, c.top + 2.0).is_some());
+}
+
+#[test]
+fn headers_and_page_fields() {
+    let mut d = Document::from_text(&"para\n".repeat(120));
+    let mut hp = wordcraft_doc::Paragraph::new();
+    hp.insert_object(0, InlineObject::Field { instr: "PAGE".into(), result: String::new(), locked: false }, &Default::default()).unwrap();
+    let id = d.add_part(wordcraft_doc::PartKind::Footer, vec![wordcraft_doc::para_block(hp)]);
+    d.last_section.footers.default = Some(id);
+    let l = lay(&d);
+    assert!(l.pages.len() >= 2);
+    for (i, p) in l.pages.iter().enumerate() {
+        assert_eq!(p.footer_story, Some(id));
+        let label = p.footer.iter().find_map(|it| if let Placed::Lines { para, .. } = it { Some(para.clusters.len()) } else { None });
+        assert!(label.is_some(), "page {i}");
+    }
+    let c = l.caret_on(&Pos { story: StoryRef::Part(id), path: Path::top(0), off: 0 }, 1).unwrap();
+    assert_eq!(c.page, 1);
+    assert!(c.top > 700.0);
+}
+
+#[test]
+fn cache_reuses_unchanged_paragraphs() {
+    let d = Document::from_text(&"some text here\n".repeat(50));
+    let mut c = LayoutCache::new();
+    layout(&d, &mut c, &LayoutOptions::default());
+    let misses = c.misses;
+    let mut d2 = d.clone();
+    d2.insert_text(&Pos::body(10, 0), "x", &Default::default()).unwrap();
+    layout(&d2, &mut c, &LayoutOptions::default());
+    assert_eq!(c.misses, misses + 1);
+}
+
+#[test]
+fn selection_rects_cover_range() {
+    let d = Document::from_text("Hello world\nSecond line");
+    let l = lay(&d);
+    let r = l.selection_rects(&d, &Pos::body(0, 6), &Pos::body(1, 6), 0);
+    assert_eq!(r.len(), 2);
+    assert!(r[0].1.w > 20.0);
+}
+
+#[test]
+fn display_has_glyphs_and_marks() {
+    let mut d = Document::from_text("Hello\tworld");
+    d.format_range(&Pos::body(0, 0), &Pos::body(0, 5), &|c| c.underline = Some(wordcraft_doc::props::Underline::Single)).unwrap();
+    let l = lay(&d);
+    let items = display::page_display(&d, &l.pages[0], &display::DisplayOptions { marks: true, ..Default::default() });
+    assert!(items.iter().any(|i| matches!(i, display::Draw::Glyphs { .. })));
+    assert!(items.iter().any(|i| matches!(i, display::Draw::Line { .. })));
+    assert!(items.iter().any(|i| matches!(i, display::Draw::Mark { ch: '¶', .. })));
+    assert!(items.iter().any(|i| matches!(i, display::Draw::Mark { ch: '→', .. })));
+}
+
+#[test]
+fn web_view_is_one_page() {
+    let d = Document::from_text(&"text ".repeat(3000));
+    let mut c = LayoutCache::new();
+    let l = layout(&d, &mut c, &LayoutOptions { view: ViewMode::Web, web_width: 800.0, show_hidden: false });
+    assert_eq!(l.pages.len(), 1);
+    assert!(l.pages[0].h > 800.0);
+}
+
+#[test]
+fn hostile_props_do_not_panic() {
+    let mut d = Document::from_text("x\ny");
+    d.format_paragraphs(&Pos::body(0, 0), &Pos::body(1, 0), &|p| {
+        *p = ParaProps { indent_left: Some(1e9), indent_right: Some(1e9), indent_first: Some(-1e9), ..Default::default() }
+    })
+    .unwrap();
+    d.last_section.page_w = 1.0;
+    d.last_section.margin_left = 500.0;
+    let l = lay(&d);
+    assert!(!l.pages.is_empty());
+}
+
+#[test]
+fn layout_is_fast() {
+    let d = Document::from_text(&"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.\n".repeat(3000));
+    let mut c = LayoutCache::new();
+    let t0 = now_ms();
+    let l = layout(&d, &mut c, &LayoutOptions::default());
+    let cold = now_ms() - t0;
+    let mut d2 = d.clone();
+    d2.insert_text(&Pos::body(1500, 0), "x", &Default::default()).unwrap();
+    let t1 = now_ms();
+    let _ = layout(&d2, &mut c, &LayoutOptions::default());
+    let warm = now_ms() - t1;
+    eprintln!("3000 paragraphs, {} pages: cold {cold:.1} ms, warm {warm:.1} ms", l.pages.len());
+    assert!(warm < cold);
+}

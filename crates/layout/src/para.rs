@@ -1,0 +1,863 @@
+//! Paragraph layout: resolve runs, shape them into clusters, break lines (first-fit, as word
+//! processors do), place tabs, list labels and alignment.
+
+use std::sync::Arc;
+
+use wordcraft_doc::numbering::{Level, LevelSuffix};
+use wordcraft_doc::para::{COLUMN_BREAK, InlineObject, LINE_BREAK, NoteKind, OBJ, PAGE_BREAK, SOFT_HYPHEN};
+use wordcraft_doc::props::{Align, CharProps, LineSpacing, TabAlign, TabLeader, TabStop};
+use wordcraft_doc::resolve::{ResolvedChar, ResolvedPara};
+use wordcraft_doc::{Document, Paragraph};
+use wordcraft_fonts::FaceRef;
+
+use crate::fields::{FieldCtx, field_text};
+
+/// A face at a size with the formatting needed to draw it.
+#[derive(Clone, Debug)]
+pub struct StyleRun {
+    pub face: FaceRef,
+    pub size: f32,
+    pub synth_bold: bool,
+    pub synth_italic: bool,
+    pub rc: Arc<ResolvedChar>,
+    /// Line ascent/descent at this size, points.
+    pub ascent: f32,
+    pub descent: f32,
+    /// Baseline shift (superscript etc.), points, positive up.
+    pub shift: f32,
+}
+
+/// A positioned glyph inside its cluster.
+#[derive(Clone, Copy, Debug)]
+pub struct Glyph {
+    pub gid: u32,
+    /// Offset from the cluster's x, points.
+    pub dx: f32,
+    pub dy: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClKind {
+    Text,
+    Space,
+    Tab,
+    LineBreak,
+    PageBreak,
+    ColumnBreak,
+    /// Inline object with its index in `Paragraph::objects`.
+    Object(usize),
+    /// Zero-width marker (bookmark, comment anchor) or hidden text.
+    Marker,
+}
+
+/// The smallest unit of layout: a grapheme cluster (or object, tab, break).
+#[derive(Clone, Debug)]
+pub struct Cluster {
+    pub start: usize,
+    pub end: usize,
+    pub adv: f32,
+    pub kind: ClKind,
+    /// Index into `ParaLayout::styles`.
+    pub style: u16,
+    /// Glyph range in `ParaLayout::glyphs`.
+    pub g0: u32,
+    pub g1: u32,
+    /// A line may break after this cluster.
+    pub break_after: bool,
+    /// Height above the baseline for objects (images), points.
+    pub obj_h: f32,
+    /// The cluster is a decimal separator (decimal tabs align on it).
+    pub dot: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LineEnd {
+    /// Wrapped (or last line).
+    Wrap,
+    LineBreak,
+    PageBreak,
+    ColumnBreak,
+    /// End of paragraph.
+    Para,
+}
+
+/// A laid-out line. Coordinates are relative to the paragraph's content box: x from the
+/// column's left edge, y from the top of the first line.
+#[derive(Clone, Debug)]
+pub struct Line {
+    pub top: f32,
+    pub height: f32,
+    pub baseline: f32,
+    /// Cluster index range.
+    pub c0: usize,
+    pub c1: usize,
+    /// x of each cluster in the line, plus the end x (len = c1 - c0 + 1).
+    pub xs: Vec<f32>,
+    /// For tab clusters: the leader to draw across them.
+    pub leaders: Vec<(usize, TabLeader)>,
+    pub end: LineEnd,
+    /// Byte range of the paragraph covered by the line.
+    pub start: usize,
+    pub stop: usize,
+    /// Left and right edges available to the line.
+    pub left: f32,
+    pub right: f32,
+}
+
+/// The list label drawn on the first line.
+#[derive(Clone, Debug)]
+pub struct Label {
+    pub text: String,
+    pub style: u16,
+    pub glyphs: Vec<Glyph>,
+    pub x: f32,
+    pub width: f32,
+}
+
+/// A laid-out paragraph.
+#[derive(Clone, Debug)]
+pub struct ParaLayout {
+    pub rp: ResolvedPara,
+    pub styles: Vec<StyleRun>,
+    pub glyphs: Vec<Glyph>,
+    pub clusters: Vec<Cluster>,
+    pub lines: Vec<Line>,
+    pub label: Option<Label>,
+    /// Sum of line heights (without space before/after).
+    pub height: f32,
+    pub text_len: usize,
+    /// Paragraph contains fields whose text depends on the page.
+    pub has_page_fields: bool,
+    /// Note references (part id) in this paragraph, by cluster index.
+    pub notes: Vec<(usize, u32)>,
+}
+
+/// Inputs that change a paragraph's layout beyond its own content.
+pub struct ParaEnv<'a> {
+    pub doc: &'a Document,
+    /// Column width, points.
+    pub width: f32,
+    pub label: Option<(String, Level)>,
+    pub fields: &'a FieldCtx,
+    pub show_hidden: bool,
+    /// Extra style applied to every run (table style conditional formatting), under direct formatting.
+    pub table_chr: Option<&'a CharProps>,
+}
+
+fn style_key(rc: &ResolvedChar) -> String {
+    format!("{}|{}|{}|{}|{}", rc.font, rc.size, rc.bold, rc.italic, rc.vert_align as u8)
+}
+
+struct Builder<'a> {
+    env: &'a ParaEnv<'a>,
+    styles: Vec<StyleRun>,
+    style_index: std::collections::HashMap<(String, u32, bool), u16>,
+    glyphs: Vec<Glyph>,
+    clusters: Vec<Cluster>,
+}
+
+impl<'a> Builder<'a> {
+    /// Style index for a resolved char in `face` (caps-scaled `size` override for small caps).
+    fn style(&mut self, rc: &Arc<ResolvedChar>, face_override: Option<FaceRef>, small: bool) -> u16 {
+        let r = wordcraft_fonts::word::resolve(&rc.font, rc.bold, rc.italic);
+        let face = face_override.unwrap_or(r.face);
+        let key = (format!("{}|{:?}|{}|{}", style_key(rc), rc.color, rc.underline as u8, small), face.id(), rc.strike || rc.double_strike || rc.link.is_some());
+        let key = (format!("{}|{:?}|{:?}|{:?}|{:?}|{}", key.0, rc.highlight, rc.shading, rc.ins, rc.del, rc.hidden), key.1, key.2);
+        if let Some(i) = self.style_index.get(&key) {
+            return *i;
+        }
+        let size = rc.draw_size() * if small { 0.8 } else { 1.0 };
+        let (a, d) = wordcraft_fonts::word::line_metrics(&face);
+        let k = size as f64 / face.upem.max(1.0);
+        let st = StyleRun {
+            face,
+            size,
+            synth_bold: r.synth_bold && face_override.is_none(),
+            synth_italic: r.synth_italic && face_override.is_none(),
+            rc: rc.clone(),
+            ascent: (a * k) as f32,
+            descent: (d * k) as f32,
+            shift: rc.baseline_shift(),
+        };
+        let i = self.styles.len().min(u16::MAX as usize) as u16;
+        self.styles.push(st);
+        self.style_index.insert(key, i);
+        i
+    }
+
+    /// Shape `text` (a piece of the paragraph starting at byte `base`) in one style and append clusters.
+    fn shape(&mut self, text: &str, base: usize, rc: &Arc<ResolvedChar>, kind_override: Option<ClKind>) {
+        if text.is_empty() {
+            return;
+        }
+        // Split by font coverage (fallback faces) and small caps case.
+        let primary = wordcraft_fonts::word::resolve(&rc.font, rc.bold, rc.italic).face;
+        let mut seg_start = 0;
+        let mut cur: Option<(Option<FaceRef>, bool)> = None;
+        let mut segs: Vec<(usize, usize, Option<FaceRef>, bool)> = Vec::new();
+        for (i, c) in text.char_indices() {
+            let face = if primary.covers(c) || c.is_whitespace() || c.is_control() || c == SOFT_HYPHEN {
+                None
+            } else {
+                wordcraft_fonts::FontDb::global().fallback_for(c, primary.id()).map(|f| FaceRef::of(&f))
+            };
+            let small = rc.small_caps && !rc.caps && c.is_lowercase();
+            let k = (face, small);
+            match cur {
+                Some(p) if p.0.map(|f| f.id()) == k.0.map(|f| f.id()) && p.1 == k.1 => {}
+                Some(p) => {
+                    segs.push((seg_start, i, p.0, p.1));
+                    seg_start = i;
+                    cur = Some(k);
+                }
+                None => cur = Some(k),
+            }
+        }
+        if let Some(p) = cur {
+            segs.push((seg_start, text.len(), p.0, p.1));
+        }
+        for (a, b, face, small) in segs {
+            let Some(sub) = text.get(a..b) else { continue };
+            let si = self.style(rc, face, small);
+            let Some(st) = self.styles.get(si as usize).cloned() else { continue };
+            let upper = rc.caps || small;
+            let shaped = wordcraft_fonts::shape(&st.face, sub, &[], |c| if upper { c.to_uppercase().next().unwrap_or(c) } else { c });
+            let k = st.size / st.face.upem.max(1.0) as f32;
+            let hscale = rc.scale / 100.0;
+            // Group glyphs by cluster byte offset; graphemes may span several shaper clusters.
+            let bounds: Vec<usize> = unicode_segmentation::UnicodeSegmentation::grapheme_indices(sub, true).map(|(i, _)| i).collect();
+            let mut gi = 0usize;
+            for (bi, &gs) in bounds.iter().enumerate() {
+                let ge = bounds.get(bi + 1).copied().unwrap_or(sub.len());
+                let g0 = self.glyphs.len() as u32;
+                let mut adv = 0.0f32;
+                while let Some(g) = shaped.get(gi) {
+                    if g.cluster >= ge {
+                        break;
+                    }
+                    self.glyphs.push(Glyph { gid: g.gid, dx: adv + g.x_offset as f32 * k * hscale, dy: g.y_offset as f32 * k });
+                    adv += g.x_advance as f32 * k * hscale;
+                    gi += 1;
+                }
+                let g1 = self.glyphs.len() as u32;
+                let s = sub.get(gs..ge).unwrap_or("");
+                let ch = s.chars().next().unwrap_or(' ');
+                let kind = kind_override.unwrap_or(if ch == ' ' || ch == '\u{3000}' {
+                    ClKind::Space
+                } else if ch == SOFT_HYPHEN {
+                    ClKind::Marker
+                } else {
+                    ClKind::Text
+                });
+                let adv = if kind == ClKind::Marker { 0.0 } else { adv + rc.spacing };
+                self.clusters.push(Cluster {
+                    start: base + a + gs,
+                    end: base + a + ge,
+                    adv,
+                    kind,
+                    style: si,
+                    g0,
+                    g1: if kind == ClKind::Marker { g0 } else { g1 },
+                    break_after: false,
+                    obj_h: 0.0,
+                    dot: s == "." || s == ",",
+                });
+            }
+        }
+    }
+
+    /// One cluster for a whole object with its display text (fields, note references).
+    fn shape_atomic(&mut self, text: &str, start: usize, end: usize, rc: &Arc<ResolvedChar>) {
+        let before = self.clusters.len();
+        self.shape(text, start, rc, None);
+        let added: Vec<Cluster> = self.clusters.drain(before..).collect();
+        let Some(first) = added.first() else {
+            let si = self.style(rc, None, false);
+            let g = self.glyphs.len() as u32;
+            self.clusters.push(Cluster { start, end, adv: 0.0, kind: ClKind::Marker, style: si, g0: g, g1: g, break_after: false, obj_h: 0.0, dot: false });
+            return;
+        };
+        // Merge into one cluster: rebase glyph dx onto the first cluster.
+        let mut x = 0.0;
+        for c in &added {
+            for g in self.glyphs.get_mut(c.g0 as usize..c.g1 as usize).into_iter().flatten() {
+                g.dx += x;
+            }
+            x += c.adv;
+        }
+        let g0 = first.g0;
+        let style = first.style;
+        let g1 = added.last().map(|c| c.g1).unwrap_or(g0);
+        self.clusters.push(Cluster { start, end, adv: x, kind: ClKind::Text, style, g0, g1, break_after: false, obj_h: 0.0, dot: false });
+    }
+}
+
+/// Lay out one paragraph.
+pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
+    let doc = env.doc;
+    let mut rp = doc.styles.resolve_para(&p.props);
+    // List level indents apply unless the paragraph sets its own.
+    if let Some((_, lvl)) = &env.label {
+        if p.props.indent_left.is_none() {
+            rp.indent_left = lvl.indent;
+        }
+        if p.props.indent_first.is_none() {
+            rp.indent_first = -lvl.hanging;
+        }
+    }
+    let para_style = p.props.style.as_deref();
+    let resolve = |c: &CharProps| -> Arc<ResolvedChar> {
+        match env.table_chr {
+            Some(t) => {
+                let merged = t.clone().overlaid(c);
+                Arc::new(doc.styles.resolve_char(para_style, &merged))
+            }
+            None => Arc::new(doc.styles.resolve_char(para_style, c)),
+        }
+    };
+    let mut b = Builder { env, styles: Vec::new(), style_index: Default::default(), glyphs: Vec::new(), clusters: Vec::new() };
+    let mark_rc = resolve(&p.mark);
+    let mark_style = b.style(&mark_rc, None, false);
+    let mut has_page_fields = false;
+    let mut notes = Vec::new();
+    let mut obj_index = 0usize;
+    for (range, props) in p.run_ranges() {
+        let rc = resolve(props);
+        let Some(text) = p.text.get(range.clone()) else { continue };
+        if rc.hidden && !b.env.show_hidden {
+            let si = b.style(&rc, None, false);
+            let g = b.glyphs.len() as u32;
+            for (i, c) in text.char_indices() {
+                if c == OBJ {
+                    obj_index += 1;
+                }
+                b.clusters.push(Cluster {
+                    start: range.start + i,
+                    end: range.start + i + c.len_utf8(),
+                    adv: 0.0,
+                    kind: ClKind::Marker,
+                    style: si,
+                    g0: g,
+                    g1: g,
+                    break_after: false,
+                    obj_h: 0.0,
+                    dot: false,
+                });
+            }
+            continue;
+        }
+        let mut seg = 0;
+        for (i, c) in text.char_indices() {
+            let special = matches!(c, '\t' | LINE_BREAK | PAGE_BREAK | COLUMN_BREAK | OBJ | '\r');
+            if !special {
+                continue;
+            }
+            if let Some(s) = text.get(seg..i) {
+                b.shape(s, range.start + seg, &rc, None);
+            }
+            seg = i + c.len_utf8();
+            let (start, end) = (range.start + i, range.start + i + c.len_utf8());
+            let si = b.style(&rc, None, false);
+            let g = b.glyphs.len() as u32;
+            let mut push = |b: &mut Builder, kind: ClKind, adv: f32, h: f32| {
+                b.clusters.push(Cluster { start, end, adv, kind, style: si, g0: g, g1: g, break_after: false, obj_h: h, dot: false })
+            };
+            match c {
+                '\t' => push(&mut b, ClKind::Tab, 0.0, 0.0),
+                LINE_BREAK | '\r' => push(&mut b, ClKind::LineBreak, 0.0, 0.0),
+                PAGE_BREAK => push(&mut b, ClKind::PageBreak, 0.0, 0.0),
+                COLUMN_BREAK => push(&mut b, ClKind::ColumnBreak, 0.0, 0.0),
+                _ => {
+                    let k = obj_index;
+                    obj_index += 1;
+                    match p.objects.get(k) {
+                        Some(InlineObject::Image { w, h, float, .. }) | Some(InlineObject::Shape { w, h, float, .. }) => {
+                            if float.wrap == wordcraft_doc::para::Wrap::Inline {
+                                let maxw = (env.width - rp.indent_left.max(0.0) - rp.indent_right.max(0.0)).max(18.0);
+                                let (w, h) = (w.clamp(1.0, 4000.0), h.clamp(1.0, 4000.0));
+                                let s = if w > maxw { maxw / w } else { 1.0 };
+                                push(&mut b, ClKind::Object(k), w * s, h * s);
+                            } else {
+                                push(&mut b, ClKind::Object(k), 0.0, 0.0);
+                            }
+                        }
+                        Some(InlineObject::Field { instr, result, .. }) => {
+                            let (t, page_dep) = field_text(instr, result, env.fields);
+                            has_page_fields |= page_dep;
+                            b.shape_atomic(&t, start, end, &rc);
+                        }
+                        Some(InlineObject::NoteRef { kind, id, custom }) => {
+                            let num = if custom.is_empty() {
+                                let n = env.fields.note_number(*id);
+                                match kind {
+                                    NoteKind::Footnote => doc.settings.footnote_format.format(n),
+                                    NoteKind::Endnote => doc.settings.endnote_format.format(n),
+                                }
+                            } else {
+                                custom.clone()
+                            };
+                            let mut sup = (*rc).clone();
+                            sup.vert_align = wordcraft_doc::props::VertAlign::Superscript;
+                            b.shape_atomic(&num, start, end, &Arc::new(sup));
+                            notes.push((b.clusters.len().saturating_sub(1), *id));
+                        }
+                        Some(InlineObject::Equation { linear, .. }) => {
+                            let mut eq = (*rc).clone();
+                            eq.italic = true;
+                            eq.font = "Cambria Math".into();
+                            b.shape_atomic(linear, start, end, &Arc::new(eq));
+                        }
+                        Some(InlineObject::Opaque { text, .. }) => b.shape_atomic(text, start, end, &rc),
+                        _ => push(&mut b, ClKind::Marker, 0.0, 0.0),
+                    }
+                }
+            }
+        }
+        if let Some(s) = text.get(seg..) {
+            b.shape(s, range.start + seg, &rc, None);
+        }
+    }
+    // Break opportunities.
+    let mut opps = std::collections::HashSet::new();
+    for (i, o) in unicode_linebreak::linebreaks(&p.text) {
+        if o == unicode_linebreak::BreakOpportunity::Allowed || i < p.text.len() {
+            opps.insert(i);
+        }
+    }
+    for c in &mut b.clusters {
+        c.break_after = opps.contains(&c.end) || matches!(c.kind, ClKind::Object(_) | ClKind::Tab);
+    }
+
+    // List label.
+    let label = env.label.as_ref().map(|(text, lvl)| {
+        let lc = p.mark.clone().overlaid(&lvl.chr);
+        let rc = resolve(&lc);
+        let before_c = b.clusters.len();
+        let before_g = b.glyphs.len();
+        b.shape(text, 0, &rc, None);
+        let cl: Vec<Cluster> = b.clusters.drain(before_c..).collect();
+        let mut glyphs = Vec::new();
+        let mut x = 0.0;
+        let mut style = mark_style;
+        for c in &cl {
+            style = c.style;
+            for g in b.glyphs.get(c.g0 as usize..c.g1 as usize).into_iter().flatten() {
+                glyphs.push(Glyph { dx: g.dx + x, ..*g });
+            }
+            x += c.adv;
+        }
+        b.glyphs.truncate(before_g);
+        Label { text: text.clone(), style, glyphs, x: 0.0, width: x }
+    });
+
+    let mut pl = ParaLayout {
+        rp,
+        styles: b.styles,
+        glyphs: b.glyphs,
+        clusters: b.clusters,
+        lines: Vec::new(),
+        label,
+        height: 0.0,
+        text_len: p.text.len(),
+        has_page_fields,
+        notes,
+    };
+    break_lines(&mut pl, env, mark_style, env.label.as_ref().map(|(_, l)| l.suffix));
+    pl
+}
+
+/// Next tab stop after `x` (column coordinates): explicit stops, the hanging-indent implicit stop,
+/// then default stops.
+fn next_tab(x: f32, tabs: &[TabStop], default_tab: f32, hanging_at: Option<f32>) -> TabStop {
+    let mut best: Option<TabStop> = tabs.iter().copied().filter(|t| t.pos > x + 0.01).min_by(|a, b| a.pos.total_cmp(&b.pos));
+    if let Some(h) = hanging_at
+        && h > x + 0.01
+        && best.is_none_or(|t| h < t.pos)
+    {
+        best = Some(TabStop { pos: h, align: TabAlign::Left, leader: TabLeader::None });
+    }
+    best.unwrap_or_else(|| {
+        let d = if default_tab > 1.0 { default_tab } else { 36.0 };
+        let n = ((x + 0.01) / d).floor() + 1.0;
+        TabStop { pos: (n * d).min(1e6), align: TabAlign::Left, leader: TabLeader::None }
+    })
+}
+
+fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Option<LevelSuffix>) {
+    let rp = pl.rp.clone();
+    let width = env.width.max(12.0);
+    let right_edge = (width - rp.indent_right).max(1.0);
+    let default_tab = env.doc.settings.default_tab;
+    let first_left = rp.indent_left + rp.indent_first;
+    let hanging_at = if rp.indent_first < 0.0 { Some(rp.indent_left) } else { None };
+    let n = pl.clusters.len();
+    let mut lines: Vec<Line> = Vec::new();
+    let mut i = 0usize;
+    let mut top = 0.0f32;
+    let mut first = true;
+    loop {
+        let left = if first { first_left } else { rp.indent_left };
+        let mut x = left;
+        // Label on the first line.
+        if first && let Some(lab) = pl.label.as_mut() {
+            lab.x = left;
+            let end = left + lab.width;
+            x = match suffix.unwrap_or(LevelSuffix::Tab) {
+                LevelSuffix::Tab => {
+                    let t = next_tab(end, &rp.tabs, default_tab, hanging_at);
+                    t.pos
+                }
+                LevelSuffix::Space => end + pl.styles.get(lab.style as usize).map(|s| s.size * 0.25).unwrap_or(3.0),
+                LevelSuffix::Nothing => end,
+            };
+        }
+        let line_start_x = x;
+        let c0 = i;
+        let mut xs: Vec<f32> = Vec::new();
+        let mut leaders = Vec::new();
+        let mut last_break: Option<usize> = None; // cluster index after which we may break
+        let mut end = LineEnd::Para;
+        let mut j = i;
+        let mut pending_tab: Option<(usize, TabStop, f32)> = None; // tab cluster, stop, x where tab started
+        while j < n {
+            let Some(c) = pl.clusters.get(j).cloned() else { break };
+            match c.kind {
+                ClKind::LineBreak | ClKind::PageBreak | ClKind::ColumnBreak => {
+                    resolve_tab(pl, &mut pending_tab, &mut xs, c0, x, &mut x);
+                    xs.push(x);
+                    end = match c.kind {
+                        ClKind::LineBreak => LineEnd::LineBreak,
+                        ClKind::PageBreak => LineEnd::PageBreak,
+                        _ => LineEnd::ColumnBreak,
+                    };
+                    j += 1;
+                    break;
+                }
+                ClKind::Tab => {
+                    resolve_tab(pl, &mut pending_tab, &mut xs, c0, x, &mut x);
+                    let stop = next_tab(x, &rp.tabs, default_tab, hanging_at);
+                    xs.push(x);
+                    if stop.pos > right_edge + 0.01 && j > c0 && stop.align == TabAlign::Left {
+                        // Tab past the right indent wraps (Word moves it to the next line).
+                        if let Some(c) = pl.clusters.get_mut(j) {
+                            c.adv = 0.0;
+                        }
+                        x = right_edge.max(x);
+                        last_break = Some(j);
+                        j += 1;
+                        continue;
+                    }
+                    match stop.align {
+                        TabAlign::Left | TabAlign::Bar | TabAlign::Clear => {
+                            let w = (stop.pos - x).max(0.0);
+                            if let Some(c) = pl.clusters.get_mut(j) {
+                                c.adv = w;
+                            }
+                            if stop.leader != TabLeader::None {
+                                leaders.push((j, stop.leader));
+                            }
+                            x += w;
+                        }
+                        _ => {
+                            pending_tab = Some((j, stop, x));
+                            if stop.leader != TabLeader::None {
+                                leaders.push((j, stop.leader));
+                            }
+                        }
+                    }
+                    last_break = Some(j);
+                    j += 1;
+                    continue;
+                }
+                _ => {}
+            }
+            let fits = x + c.adv <= right_edge + 0.01 || c.kind == ClKind::Space || c.kind == ClKind::Marker;
+            if !fits && j > c0 {
+                // Wrap: back up to the last break opportunity on this line.
+                end = LineEnd::Wrap;
+                if let Some(bk) = last_break.filter(|bk| *bk >= c0) {
+                    xs.truncate(bk + 1 - c0);
+                    j = bk + 1;
+                    // Recompute x for the kept clusters.
+                    x = xs.last().copied().unwrap_or(line_start_x) + pl.clusters.get(bk).map(|c| c.adv).unwrap_or(0.0);
+                } else {
+                    // No opportunity: break here (a long word).
+                }
+                break;
+            }
+            xs.push(x);
+            x += c.adv;
+            // Decimal/center/right tab: shift pending text as it grows.
+            if let Some((tj, stop, tx)) = pending_tab {
+                let seg_w = x - tx;
+                let shift = match stop.align {
+                    TabAlign::Right => stop.pos - tx - seg_w,
+                    TabAlign::Center => stop.pos - tx - seg_w / 2.0,
+                    TabAlign::Decimal => {
+                        // Width up to the first '.' in the segment.
+                        let mut w = 0.0;
+                        let mut found = false;
+                        for k in tj + 1..=j {
+                            let Some(cc) = pl.clusters.get(k) else { break };
+                            let s = pl_text_at(cc);
+                            if found {
+                                break;
+                            }
+                            if s {
+                                found = true;
+                                break;
+                            }
+                            w += cc.adv;
+                        }
+                        stop.pos - tx - if found { w } else { seg_w }
+                    }
+                    _ => 0.0,
+                };
+                let shift = shift.max(0.0);
+                let old = pl.clusters.get(tj).map(|c| c.adv).unwrap_or(0.0);
+                if (shift - old).abs() > 0.001 {
+                    let delta = shift - old;
+                    if let Some(c) = pl.clusters.get_mut(tj) {
+                        c.adv = shift;
+                    }
+                    let from = tj + 1 - c0;
+                    for v in xs.iter_mut().skip(from) {
+                        *v += delta;
+                    }
+                    x += delta;
+                }
+            }
+            if c.break_after {
+                last_break = Some(j);
+            }
+            j += 1;
+        }
+        if j >= n && end != LineEnd::Wrap && !matches!(end, LineEnd::LineBreak | LineEnd::PageBreak | LineEnd::ColumnBreak) {
+            end = LineEnd::Para;
+        }
+        let c1 = j.max(c0);
+        // Ensure progress.
+        let (c1, j) = if c1 == c0 && c0 < n { (c0 + 1, c0 + 1) } else { (c1, j) };
+        while xs.len() < c1 - c0 {
+            let last = xs.last().copied().unwrap_or(line_start_x);
+            let adv = pl.clusters.get(c0 + xs.len().saturating_sub(1)).map(|c| c.adv).unwrap_or(0.0);
+            xs.push(if xs.is_empty() { line_start_x } else { last + adv });
+        }
+        xs.truncate(c1 - c0);
+        let end_x = match (xs.last(), c1.checked_sub(1).and_then(|k| pl.clusters.get(k))) {
+            (Some(lx), Some(c)) => lx + c.adv,
+            _ => line_start_x,
+        };
+        xs.push(end_x);
+        pending_tab = None;
+        let _ = pending_tab;
+
+        // Vertical metrics.
+        let (mut asc, mut desc) = (0.0f32, 0.0f32);
+        let mut any = false;
+        for c in pl.clusters.get(c0..c1).into_iter().flatten() {
+            if c.kind == ClKind::Marker {
+                continue;
+            }
+            if let Some(st) = pl.styles.get(c.style as usize) {
+                let (a, d) = if matches!(c.kind, ClKind::Object(_)) && c.obj_h > 0.0 {
+                    (c.obj_h, 0.0)
+                } else {
+                    (st.ascent + st.shift.max(0.0), st.descent + (-st.shift).max(0.0))
+                };
+                asc = asc.max(a);
+                desc = desc.max(d);
+                any = true;
+            }
+        }
+        if !any || (asc == 0.0 && desc == 0.0) {
+            if let Some(st) = pl.styles.get(mark_style as usize) {
+                asc = st.ascent;
+                desc = st.descent;
+            }
+        }
+        if first && let Some(lab) = &pl.label
+            && let Some(st) = pl.styles.get(lab.style as usize)
+        {
+            asc = asc.max(st.ascent);
+            desc = desc.max(st.descent);
+        }
+        let natural = asc + desc;
+        let height = match rp.line_spacing {
+            LineSpacing::Multiple(m) => natural * m,
+            LineSpacing::AtLeast(v) => natural.max(v),
+            LineSpacing::Exactly(v) => v,
+        };
+        let baseline = top + height - desc;
+
+        // Alignment / justification (trailing spaces hang).
+        let mut content_end = xs.last().copied().unwrap_or(line_start_x);
+        for k in (c0..c1).rev() {
+            match pl.clusters.get(k).map(|c| c.kind) {
+                Some(ClKind::Space) | Some(ClKind::Marker) | Some(ClKind::LineBreak) | Some(ClKind::PageBreak) | Some(ClKind::ColumnBreak) => {
+                    content_end = xs.get(k - c0).copied().unwrap_or(content_end);
+                }
+                _ => break,
+            }
+        }
+        let slack = right_edge - content_end;
+        let last_tab = (c0..c1).rev().find(|k| pl.clusters.get(*k).is_some_and(|c| c.kind == ClKind::Tab));
+        let align_from = last_tab.map(|k| k + 1).unwrap_or(c0);
+        let shift = match rp.align {
+            Align::Center => slack / 2.0,
+            Align::Right => slack,
+            _ => 0.0,
+        };
+        if shift > 0.0 && slack > 0.0 {
+            for v in xs.iter_mut().skip(align_from - c0) {
+                *v += shift;
+            }
+        }
+        let justify = (rp.align == Align::Justify && end == LineEnd::Wrap) || rp.align == Align::Distribute;
+        if justify && slack > 0.0 {
+            // Spaces inside the content (after the last tab).
+            let spaces: Vec<usize> = (align_from..c1)
+                .filter(|k| {
+                    pl.clusters.get(*k).is_some_and(|c| c.kind == ClKind::Space) && xs.get(k - c0).copied().unwrap_or(f32::MAX) < content_end - 0.01
+                })
+                .collect();
+            if rp.align == Align::Distribute || spaces.is_empty() {
+                let cnt = (c1 - align_from).saturating_sub(1).max(1) as f32;
+                if rp.align == Align::Distribute {
+                    let per = slack / cnt;
+                    for (q, v) in xs.iter_mut().enumerate().skip(align_from - c0) {
+                        let k = (q + c0 - align_from) as f32;
+                        *v += per * k.min(cnt);
+                    }
+                }
+            } else {
+                let per = slack / spaces.len() as f32;
+                let mut add = 0.0;
+                let mut si = 0;
+                for k in align_from..c1 {
+                    if let Some(v) = xs.get_mut(k - c0) {
+                        *v += add;
+                    }
+                    if spaces.get(si) == Some(&k) {
+                        add += per;
+                        si += 1;
+                    }
+                }
+                if let Some(v) = xs.last_mut() {
+                    *v += add;
+                }
+            }
+        }
+        let start = pl.clusters.get(c0).map(|c| c.start).unwrap_or(pl.text_len);
+        let stop = if c1 > c0 { pl.clusters.get(c1 - 1).map(|c| c.end).unwrap_or(pl.text_len) } else { start };
+        lines.push(Line { top, height, baseline, c0, c1, xs, leaders, end, start, stop, left: if first { first_left } else { rp.indent_left }, right: right_edge });
+        top += height;
+        first = false;
+        i = j;
+        if i >= n {
+            // A paragraph ending with a line break gets an empty last line.
+            if matches!(end, LineEnd::LineBreak | LineEnd::PageBreak | LineEnd::ColumnBreak) {
+                let (asc, desc) = pl.styles.get(mark_style as usize).map(|s| (s.ascent, s.descent)).unwrap_or((10.0, 3.0));
+                let natural = asc + desc;
+                let h = match rp.line_spacing {
+                    LineSpacing::Multiple(m) => natural * m,
+                    LineSpacing::AtLeast(v) => natural.max(v),
+                    LineSpacing::Exactly(v) => v,
+                };
+                let x0 = rp.indent_left;
+                lines.push(Line {
+                    top,
+                    height: h,
+                    baseline: top + h - desc,
+                    c0: n,
+                    c1: n,
+                    xs: vec![x0],
+                    leaders: Vec::new(),
+                    end: LineEnd::Para,
+                    start: pl.text_len,
+                    stop: pl.text_len,
+                    left: x0,
+                    right: right_edge,
+                });
+                top += h;
+            }
+            break;
+        }
+        if lines.len() > 200_000 {
+            break;
+        }
+    }
+    pl.height = top;
+    pl.lines = lines;
+}
+
+fn pl_text_at(c: &Cluster) -> bool {
+    c.dot
+}
+
+fn resolve_tab(_pl: &mut ParaLayout, pending: &mut Option<(usize, TabStop, f32)>, _xs: &mut [f32], _c0: usize, _x: f32, _xo: &mut f32) {
+    *pending = None;
+}
+
+impl ParaLayout {
+    /// x of byte offset `off` within line `li` (clamped to the line).
+    pub fn x_of(&self, li: usize, off: usize) -> Option<f32> {
+        let l = self.lines.get(li)?;
+        for k in l.c0..l.c1 {
+            let c = self.clusters.get(k)?;
+            if off <= c.start {
+                return l.xs.get(k - l.c0).copied();
+            }
+            if off < c.end {
+                return l.xs.get(k - l.c0).copied();
+            }
+        }
+        l.xs.last().copied()
+    }
+    /// The line holding offset `off` (a position at a wrap point belongs to the next line).
+    pub fn line_of(&self, off: usize) -> usize {
+        for (i, l) in self.lines.iter().enumerate() {
+            let next_start = self.lines.get(i + 1).map(|n| n.start);
+            match next_start {
+                Some(ns) if off < ns => return i,
+                Some(_) => {}
+                None => return i,
+            }
+            if matches!(l.end, LineEnd::LineBreak | LineEnd::PageBreak | LineEnd::ColumnBreak) && off < l.stop {
+                return i;
+            }
+        }
+        self.lines.len().saturating_sub(1)
+    }
+    /// Byte offset closest to x on line `li`.
+    pub fn off_at_x(&self, li: usize, x: f32) -> usize {
+        let Some(l) = self.lines.get(li) else { return self.text_len };
+        let mut best = l.start;
+        let mut bestd = f32::MAX;
+        for k in l.c0..=l.c1 {
+            let Some(cx) = l.xs.get(k - l.c0) else { break };
+            let off = if k < l.c1 { self.clusters.get(k).map(|c| c.start).unwrap_or(l.stop) } else { l.stop };
+            // Don't place the caret after a line-ending break or wrap-trailing space on a wrapped line.
+            if k == l.c1 && k > l.c0 {
+                let lastc = self.clusters.get(k - 1);
+                if lastc.is_some_and(|c| matches!(c.kind, ClKind::LineBreak | ClKind::PageBreak | ClKind::ColumnBreak)) {
+                    continue;
+                }
+                if l.end == LineEnd::Wrap && self.lines.get(li + 1).is_some() {
+                    continue;
+                }
+            }
+            let d = (cx - x).abs();
+            if d < bestd {
+                bestd = d;
+                best = off;
+            }
+        }
+        best
+    }
+    /// Line ascent/descent of the paragraph mark (for empty paragraphs and caret height).
+    pub fn caret_metrics(&self, li: usize) -> (f32, f32) {
+        let Some(l) = self.lines.get(li) else { return (10.0, 3.0) };
+        (l.baseline - l.top, l.top + l.height - l.baseline)
+    }
+}
