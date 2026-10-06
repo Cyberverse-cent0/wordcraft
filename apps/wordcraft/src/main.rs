@@ -91,6 +91,15 @@ fn services() -> Services {
     }
 }
 
+/// Window, Dock and taskbar icon.
+fn app_icon() -> Option<egui::IconData> {
+    #[cfg(target_os = "macos")]
+    let png: &[u8] = include_bytes!("../../../assets/app-icon/wordcraft-macos-512.png");
+    #[cfg(not(target_os = "macos"))]
+    let png: &[u8] = include_bytes!("../../../assets/app-icon/hicolor/256x256/apps/ai.storyteller.wordcraft.png");
+    eframe::icon_data::from_png_bytes(png).map_err(|e| log::warn!("app icon: {e}")).ok()
+}
+
 fn main() -> eframe::Result {
     let mut control_port: Option<u16> = std::env::var("WORDCRAFT_CONTROL_PORT").ok().and_then(|p| p.parse().ok());
     let mut files = Vec::new();
@@ -107,7 +116,7 @@ fn main() -> eframe::Result {
             _ => files.push(a),
         }
     }
-    let options = eframe::NativeOptions {
+    let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("WordCraft")
             .with_app_id("ai.storyteller.wordcraft")
@@ -119,6 +128,9 @@ fn main() -> eframe::Result {
             .with_title_shown(false),
         ..Default::default()
     };
+    if let Some(icon) = app_icon() {
+        options.viewport = options.viewport.with_icon(icon);
+    }
     eframe::run_native(
         "WordCraft",
         options,

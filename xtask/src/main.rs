@@ -17,14 +17,14 @@ const USAGE: &str = "\
 usage: cargo xtask <command>
 
 commands:
-  assets          check that every icon/image/font/asset is attributed in ASSETS.md
+  assets          check that every icon/image/font/asset is attributed in ATTRIBUTION.md
   layers          enforce the crate dependency layering (plan/architecture.md §3)
   wasm            cargo check --target wasm32-unknown-unknown for the wasm-safe crates
   ci              fmt --check, clippy -D warnings, test, assets, layers, wasm (stops at first failure)
   corpus [--download]
                   show where test corpora live; --download fetches PngSuite into corpus/pngsuite
   stats [--exact] count tests and lines per crate (--exact: ask the test harness via `-- --list`)
-  parity          recompute the InDesign feature-parity summary in docs/parity.md
+  parity          recompute the Word feature-parity summary in docs/parity.md
   ico <out.ico> <in.png>...
                   pack square PNGs (<= 256 px) into a Windows .ico (see packaging/icons.sh)
 ";
@@ -207,7 +207,7 @@ fn cmd_corpus(download: bool) -> Result<(), String> {
         "Test corpora live under {} (git-ignored, never committed).
 Tests that use a corpus skip cleanly when it is absent.
 
-  corpus/pngsuite/   PngSuite (public domain) — designcraft-codecs compares every file
+  corpus/pngsuite/   PngSuite (public domain) — wordcraft-codecs compares every file
                      against the `image` crate. Fetch: cargo xtask corpus --download
   corpus/psd/        PSD samples from MIT/BSD projects (ag-psd, psd-tools test data).
                      Copy files in manually; licences must be MIT/BSD/CC0.

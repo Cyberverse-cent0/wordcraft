@@ -1,8 +1,8 @@
-//! `cargo xtask assets`: every non-code asset must be attributed in `ASSETS.md`.
+//! `cargo xtask assets`: every non-code asset must be attributed in `ATTRIBUTION.md`.
 //!
 //! Scans all git-tracked (and untracked, not ignored) files with an asset extension, plus
 //! everything under `assets/`, `docs/images/` and `examples/`, and fails if a path is not listed
-//! as `` `path` `` in ASSETS.md. See the asset policy in AGENTS.md.
+//! as `` `path` `` in ATTRIBUTION.md. See the asset policy in AGENTS.md.
 
 use std::path::Path;
 use std::process::Command;
@@ -34,7 +34,9 @@ const ASSET_EXT: &[&str] = &[
     "idml",
     "aco",
     "abr",
-    "designcraft",
+    "docx",
+    "odt",
+    "rtf",
     "mp4",
     "wav",
     "mp3",
@@ -46,7 +48,7 @@ pub fn is_asset(path: &str) -> bool {
     ASSET_DIRS.iter().any(|d| path.starts_with(d)) || ASSET_EXT.contains(&ext.as_str())
 }
 
-/// Paths that need an ASSETS.md entry but lack one.
+/// Paths that need an ATTRIBUTION.md entry but lack one.
 pub fn missing(files: &[String], assets_md: &str) -> Vec<String> {
     files.iter().filter(|f| is_asset(f) && !assets_md.contains(&format!("`{f}`"))).cloned().collect()
 }
@@ -58,13 +60,13 @@ pub fn run(root: &Path) -> Result<(), String> {
         .output()
         .map_err(|e| format!("git ls-files: {e}"))?;
     let files: Vec<String> = String::from_utf8_lossy(&out.stdout).lines().filter(|l| root.join(l).exists()).map(str::to_owned).collect();
-    let md = std::fs::read_to_string(root.join("ASSETS.md")).map_err(|e| format!("ASSETS.md: {e}"))?;
+    let md = std::fs::read_to_string(root.join("ATTRIBUTION.md")).map_err(|e| format!("ATTRIBUTION.md: {e}"))?;
     let miss = missing(&files, &md);
     if miss.is_empty() {
-        println!("assets: all {} asset files attributed in ASSETS.md", files.iter().filter(|f| is_asset(f)).count());
+        println!("assets: all {} asset files attributed in ATTRIBUTION.md", files.iter().filter(|f| is_asset(f)).count());
         Ok(())
     } else {
-        Err(format!("{} asset file(s) lack an ASSETS.md entry (author, source, licence):\n  {}", miss.len(), miss.join("\n  ")))
+        Err(format!("{} asset file(s) lack an ATTRIBUTION.md entry (author, source, licence):\n  {}", miss.len(), miss.join("\n  ")))
     }
 }
 
