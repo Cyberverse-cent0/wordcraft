@@ -792,6 +792,8 @@ fn read_aloud(s: &mut Session, _: &Value) -> CmdResult {
         s.selected_text()
     };
     let text: String = text.chars().take(20_000).collect();
+    #[cfg(target_arch = "wasm32")]
+    let _ = &text;
     #[cfg(target_os = "macos")]
     {
         let _ = std::process::Command::new("say").arg(&text).spawn().map_err(|e| CmdError::Failed(e.to_string()))?;

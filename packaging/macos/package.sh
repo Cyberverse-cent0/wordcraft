@@ -155,7 +155,7 @@ copy_docs "$CLI_DIR"
 sign --options runtime "$CLI_DIR/wordcraft-cli"
 codesign --verify --strict --verbose=2 "$CLI_DIR/wordcraft-cli"
 rm -f "$CLI_ZIP"
-ditto -c -k --keepParent "$CLI_DIR" "$CLI_ZIP"
+ditto -c -k --norsrc --noextattr --keepParent "$CLI_DIR" "$CLI_ZIP"
 # A bare Mach-O can't carry a stapled ticket; Gatekeeper looks the notarization up online.
 if [ "$NOTARIZE" = 1 ]; then notarize "$CLI_ZIP"; fi
 

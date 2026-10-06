@@ -224,6 +224,8 @@ pub fn save_screenshot(image: &egui::ColorImage, path: Option<&str>) -> Value {
     let bytes: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
     let rendered = wordcraft_render::Rendered { width: w as u32, height: h as u32, pixels: bytes };
     let png = rendered.to_png();
+    #[cfg(target_arch = "wasm32")]
+    let _ = (&png, path);
     #[cfg(not(target_arch = "wasm32"))]
     {
         if let Err(e) = std::fs::write(path, &png) {
