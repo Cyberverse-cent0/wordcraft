@@ -50,6 +50,9 @@ fn insert(s: &mut Session, v: &Value) -> CmdResult {
     let raw = p::bool(v, "raw").unwrap_or(false);
     let t = if raw { None } else { autoformat(s, text) };
     type_text(s, t.as_deref().unwrap_or(text))?;
+    if !raw && text.chars().count() == 1 && text.chars().all(|c| c == ' ' || ",.;:!?".contains(c)) {
+        super::tools::autocorrect(s)?;
+    }
     if !raw && text == " " {
         list_autoformat(s)?;
         dash_autoformat(s)?;

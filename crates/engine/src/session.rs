@@ -134,6 +134,20 @@ pub struct Session {
     layout: Option<(u64, f32, ViewMode, Arc<DocLayout>, bool)>,
     /// Picture edits: edited media key → original media key (Reset Picture).
     pub originals: std::collections::HashMap<String, String>,
+    /// Last mutating command (Repeat).
+    pub last_command: Option<(String, Value)>,
+    /// Macro being recorded: (name, steps).
+    pub recording: Option<(String, Vec<(String, Value)>)>,
+    pub macros: std::collections::BTreeMap<String, Vec<(String, Value)>>,
+    pub autocorrect_on: bool,
+    pub autocorrect_user: Vec<(String, String)>,
+    /// Saved versions: (label, date, document).
+    pub versions: Vec<(String, String, Document)>,
+    /// Quick Parts / AutoText entries.
+    pub building_blocks: std::collections::BTreeMap<String, Fragment>,
+    pub autosave: bool,
+    /// Citation style: APA, MLA, Chicago, IEEE.
+    pub bib_style: String,
     /// Mail merge data source and preview.
     pub merge: crate::cmd::mailings::MergeState,
     /// Requests from commands to the UI (open a dialog, scroll…), drained by the front end.
@@ -169,6 +183,15 @@ impl Session {
             cache: LayoutCache::new(),
             layout: None,
             originals: Default::default(),
+            last_command: None,
+            recording: None,
+            macros: Default::default(),
+            autocorrect_on: true,
+            autocorrect_user: Vec::new(),
+            versions: Vec::new(),
+            building_blocks: Default::default(),
+            autosave: true,
+            bib_style: "APA".into(),
             merge: Default::default(),
             ui_requests: Vec::new(),
         }
@@ -291,6 +314,27 @@ impl Session {
         let Some(spec) = reg.get(id) else { return Err(CmdError::Unknown(id.to_string())) };
         if let Some(why) = (spec.enabled)(self) {
             return Err(CmdError::Disabled(format!("{id}: {why}")));
+        }
+        // Restrict Editing.
+        if spec.mutates
+            && let Some(mode) = self.doc.settings.protection.clone()
+        {
+            let allowed = id.starts_with("review.restrict") || id.starts_with("file.") || id == "edit.undo" || id == "edit.redo";
+            let comment_ok = id.starts_with("review.") && (id.contains("Comment") || id == "review.reply");
+            match mode.as_str() {
+                "readOnly" | "forms" if !allowed => return Err(CmdError::Disabled(format!("{id}: the document is protected (read only)"))),
+                "comments" if !allowed && !comment_ok => return Err(CmdError::Disabled(format!("{id}: only comments are allowed in this document"))),
+                "trackedChanges" => self.doc.settings.track_changes = true,
+                _ => {}
+            }
+        }
+        // Macro recording and Repeat.
+        let record = !matches!(id, "tools.recordMacro" | "tools.macros" | "edit.undo" | "edit.redo" | "edit.repeat") && (spec.mutates || id.starts_with("caret.") || id.starts_with("select."));
+        if record && let Some((_, steps)) = self.recording.as_mut() {
+            steps.push((id.to_string(), params.clone()));
+        }
+        if spec.mutates && !matches!(id, "edit.undo" | "edit.redo" | "edit.repeat") {
+            self.last_command = Some((id.to_string(), params.clone()));
         }
         let before_doc = if spec.mutates { Some((self.doc.clone(), self.sel.clone(), self.history.len(), self.typing_open)) } else { None };
         if spec.mutates && spec.id != "text.insert" {

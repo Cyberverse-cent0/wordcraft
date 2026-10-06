@@ -196,6 +196,26 @@ pub struct Revision {
     pub date: String,
 }
 
+/// A bibliography source.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Source {
+    /// Unique tag cited by CITATION fields.
+    pub tag: String,
+    /// book, article, website, report, film, other
+    pub kind: String,
+    /// "Last, First; Last, First"
+    pub author: String,
+    pub title: String,
+    pub year: String,
+    pub publisher: String,
+    pub city: String,
+    pub journal: String,
+    pub volume: String,
+    pub pages: String,
+    pub url: String,
+}
+
 /// Document properties (File › Info).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 #[serde(default, rename_all = "camelCase")]
@@ -301,6 +321,8 @@ pub struct Document {
     pub revisions: Vec<Revision>,
     pub settings: Settings,
     pub core: CoreProps,
+    /// Bibliography sources (References › Manage Sources).
+    pub sources: Vec<Source>,
     /// Embedded media (images) by key.
     #[serde(skip)]
     pub media: BTreeMap<String, Arc<Vec<u8>>>,
@@ -328,6 +350,7 @@ impl Document {
             revisions: Vec::new(),
             settings: Settings::default(),
             core: CoreProps::default(),
+            sources: Vec::new(),
             media: BTreeMap::new(),
             passthrough: BTreeMap::new(),
         }

@@ -4876,8 +4876,10 @@ dependencies = [
  "wordcraft-doc",
  "wordcraft-docx",
  "wordcraft-fonts",
+ "wordcraft-formats",
  "wordcraft-geom",
  "wordcraft-layout",
+ "wordcraft-pdf",
  "wordcraft-proof",
  "wordcraft-render",
 ]

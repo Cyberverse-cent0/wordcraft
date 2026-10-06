@@ -1,6 +1,7 @@
 //! Command implementations, one module per area. Each module exposes `specs()`.
 
 pub mod caret;
+pub mod citations;
 pub mod design;
 pub mod edit;
 pub mod file;
@@ -14,6 +15,7 @@ pub mod references;
 pub mod review;
 pub mod table;
 pub mod text;
+pub mod tools;
 pub mod view;
 
 use serde_json::{Value, json};
@@ -39,7 +41,9 @@ pub fn registry() -> Registry {
     v.extend(design::specs());
     v.extend(references::specs());
     v.extend(mailings::specs());
+    v.extend(citations::specs());
     v.extend(objects::specs());
+    v.extend(tools::specs());
     Registry::new(v)
 }
 

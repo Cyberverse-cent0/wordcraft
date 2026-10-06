@@ -270,5 +270,6 @@ pub fn update_fields(s: &mut Session) -> Result<(), CmdError> {
         }
         para.touch();
     }
+    super::citations::update_citations(s)?;
     update_toc(s)
 }
