@@ -331,3 +331,47 @@ fn line_numbers_borders_text_boxes() {
     assert!(p.items.iter().filter(|i| matches!(i, Placed::Rule { .. })).count() >= 4);
     assert!(l.caret(&Pos { story: StoryRef::Part(id), path: Path::top(0), off: 0 }).is_some());
 }
+
+#[test]
+fn tall_rows_split_across_pages() {
+    let mut d = Document::from_text("before\nafter");
+    let mut t = Table::new(2, 2, 468.0);
+    let long = "Row text that keeps going and going so the cell grows taller than a page. ".repeat(120);
+    t.rows[0].cells[0].blocks = vec![wordcraft_doc::para_block(wordcraft_doc::Paragraph::with_text(&long, Default::default()))];
+    d.insert_block(StoryRef::Body, &Path::top(1), wordcraft_doc::Block::Table(t.clone())).unwrap();
+    let l = lay(&d);
+    assert!(l.pages.len() >= 2, "pages {}", l.pages.len());
+    // The cell's lines start on page 1 (row split, not moved) and continue on page 2.
+    let cell_lines = |p: &Page| p.items.iter().filter(|i| matches!(i, Placed::Lines { path, .. } if path.0 == vec![1, 0, 0, 0])).count();
+    assert!(cell_lines(&l.pages[0]) > 0);
+    assert!(cell_lines(&l.pages[1]) > 0);
+    // Nothing runs past the bottom margin.
+    for p in &l.pages[..l.pages.len() - 1] {
+        for it in &p.items {
+            if let Placed::Lines { y, para, l0, l1, .. } = it {
+                let b = item_bottom(*y, para, *l0, *l1).unwrap_or(0.0);
+                assert!(b <= 792.0 - 72.0 + 0.5, "line bottom {b}");
+            }
+        }
+    }
+    // Every line of the long paragraph is placed exactly once.
+    let total: usize = l
+        .pages
+        .iter()
+        .flat_map(|p| p.items.iter())
+        .filter_map(|i| if let Placed::Lines { path, l0, l1, .. } = i { (path.0 == vec![1, 0, 0, 0]).then_some(l1 - l0) } else { None })
+        .sum();
+    let n = l
+        .pages
+        .iter()
+        .flat_map(|p| p.items.iter())
+        .find_map(|i| if let Placed::Lines { path, para, .. } = i { (path.0 == vec![1, 0, 0, 0]).then_some(para.lines.len()) } else { None })
+        .unwrap_or(0);
+    assert_eq!(total, n);
+    // "Can't split" rows move whole instead.
+    let mut d2 = Document::from_text("before\nafter");
+    t.rows[0].props.cant_split = true;
+    d2.insert_block(StoryRef::Body, &Path::top(1), wordcraft_doc::Block::Table(t)).unwrap();
+    let l2 = lay(&d2);
+    assert!(l2.pages.len() >= 2);
+}

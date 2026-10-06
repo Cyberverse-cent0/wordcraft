@@ -1,6 +1,6 @@
 //! Table layout: column widths, cell boxes, row heights, merged cells, borders and shading,
 //! table-style conditional formatting. Rows are laid out as free-standing boxes; pagination
-//! moves whole rows.
+//! moves whole rows or splits them between lines (`split_row`).
 
 use wordcraft_doc::props::{Align, Border, Borders, CharProps, HeightRule, Rgb, VAlign, VMerge};
 use wordcraft_doc::styles::TableStyleParts;
@@ -256,4 +256,113 @@ pub fn layout_table(ctx: &mut Ctx, story: StoryRef, t: &Table, path: &[u32], ava
         out.push(RowLayout { height: rh, items });
     }
     TableLayout { x, width: total, rows: out }
+}
+
+/// Split a row at `cut` (points below the row's top) so the part above fits on this page.
+/// Paragraph lines break between lines; fills, vertical rules and cell areas are cut; the
+/// rest moves up to the top of the continuation. `None` when no line fits above the cut.
+pub fn split_row(row: &RowLayout, cut: f32) -> Option<(RowLayout, RowLayout)> {
+    if cut <= 0.0 || cut >= row.height {
+        return None;
+    }
+    // Where each paragraph splits, and how far up the continuation moves.
+    let mut first_moved = f32::MAX;
+    let mut kept_any = false;
+    for it in &row.items {
+        match it {
+            Placed::Lines { para, l0, l1, y, .. } => {
+                let base = para.lines.get(*l0).map(|l| l.top).unwrap_or(0.0);
+                for k in *l0..*l1 {
+                    let Some(l) = para.lines.get(k) else { continue };
+                    let (top, bottom) = (y + l.top - base, y + l.top - base + l.height);
+                    if bottom <= cut + 0.01 {
+                        kept_any = true;
+                    } else {
+                        first_moved = first_moved.min(top);
+                        break;
+                    }
+                }
+            }
+            Placed::Image { rect, .. } | Placed::Shape { rect, .. } => {
+                if rect.bottom() <= cut + 0.01 {
+                    kept_any = true;
+                } else {
+                    first_moved = first_moved.min(rect.y);
+                }
+            }
+            _ => {}
+        }
+    }
+    if !kept_any || first_moved == f32::MAX {
+        return None;
+    }
+    // Keep a little of the cell's top margin on the continuation.
+    let shift = (first_moved - 2.0).max(0.0);
+    let (mut a, mut b) = (Vec::new(), Vec::new());
+    for it in &row.items {
+        match it {
+            Placed::Lines { story, path, para, l0, l1, x, y } => {
+                let base = para.lines.get(*l0).map(|l| l.top).unwrap_or(0.0);
+                let mut split = *l1;
+                for k in *l0..*l1 {
+                    let Some(l) = para.lines.get(k) else { continue };
+                    if y + l.top - base + l.height > cut + 0.01 {
+                        split = k;
+                        break;
+                    }
+                }
+                if split > *l0 {
+                    a.push(Placed::Lines { story: *story, path: path.clone(), para: para.clone(), l0: *l0, l1: split, x: *x, y: *y });
+                }
+                if split < *l1 {
+                    let top = para.lines.get(split).map(|l| y + l.top - base).unwrap_or(*y);
+                    b.push(Placed::Lines { story: *story, path: path.clone(), para: para.clone(), l0: split, l1: *l1, x: *x, y: top - shift });
+                }
+            }
+            Placed::Image { rect, .. } | Placed::Shape { rect, .. } => {
+                if rect.bottom() <= cut + 0.01 {
+                    a.push(it.clone());
+                } else {
+                    let mut it = it.clone();
+                    it.translate(0.0, -shift);
+                    b.push(it);
+                }
+            }
+            Placed::Fill { rect, color } => {
+                a.push(Placed::Fill { rect: Rect::new(rect.x, rect.y, rect.w, (cut - rect.y).max(0.0)), color: *color });
+                let h = (rect.bottom() - shift - 0.0).max(0.0);
+                b.push(Placed::Fill { rect: Rect::new(rect.x, 0.0, rect.w, h), color: *color });
+            }
+            Placed::Cell { rect, table, row: r, cell, story } => {
+                a.push(Placed::Cell { rect: Rect::new(rect.x, rect.y, rect.w, cut), table: table.clone(), row: *r, cell: *cell, story: *story });
+                let h = (rect.bottom() - shift).max(0.0);
+                b.push(Placed::Cell { rect: Rect::new(rect.x, 0.0, rect.w, h), table: table.clone(), row: *r, cell: *cell, story: *story });
+            }
+            Placed::Rule { x0, y0, x1, y1, border } => {
+                if (y0 - y1).abs() < 0.01 {
+                    // Horizontal: the top edge stays, the bottom edge moves; both fragments close.
+                    if *y0 <= 0.01 {
+                        a.push(it.clone());
+                        b.push(Placed::Rule { x0: *x0, y0: 0.0, x1: *x1, y1: 0.0, border: *border });
+                    } else if *y0 >= row.height - 0.01 {
+                        a.push(Placed::Rule { x0: *x0, y0: cut, x1: *x1, y1: cut, border: *border });
+                        b.push(Placed::Rule { x0: *x0, y0: y0 - shift, x1: *x1, y1: y1 - shift, border: *border });
+                    } else if *y0 <= cut {
+                        a.push(it.clone());
+                    } else {
+                        b.push(Placed::Rule { x0: *x0, y0: y0 - shift, x1: *x1, y1: y1 - shift, border: *border });
+                    }
+                } else {
+                    let (t, bt) = (y0.min(*y1), y0.max(*y1));
+                    if t < cut {
+                        a.push(Placed::Rule { x0: *x0, y0: t, x1: *x1, y1: bt.min(cut), border: *border });
+                    }
+                    if bt > cut {
+                        b.push(Placed::Rule { x0: *x0, y0: (t - shift).max(0.0), x1: *x1, y1: bt - shift, border: *border });
+                    }
+                }
+            }
+        }
+    }
+    Some((RowLayout { height: cut, items: a }, RowLayout { height: (row.height - shift).max(4.0), items: b }))
 }

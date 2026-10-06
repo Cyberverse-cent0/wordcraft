@@ -1030,26 +1030,7 @@ fn place_table(ctx: &mut Ctx, pb: &mut PageBuilder, t: &wordcraft_doc::Table, bl
     let width = pb.col_w();
     let tl = table::layout_table(ctx, StoryRef::Body, t, &[block as u32], width, 1);
     let header_rows: Vec<usize> = (0..t.rows.len()).take_while(|r| t.rows.get(*r).is_some_and(|row| row.props.header)).collect();
-    for (ri, row) in tl.rows.iter().enumerate() {
-        if pb.y + row.height > pb.bottom + 0.01 && !pb.at_top() {
-            pb.advance(block, body_top);
-            // Repeat header rows.
-            if !header_rows.contains(&ri) {
-                for hr in &header_rows {
-                    if let Some(h) = tl.rows.get(*hr) {
-                        let (x, y) = (pb.col_x() + tl.x, pb.y);
-                        if let Some(pg) = pb.page() {
-                            for it in &h.items {
-                                let mut it = it.clone();
-                                it.translate(x, y);
-                                pg.items.push(it);
-                            }
-                        }
-                        pb.y += h.height;
-                    }
-                }
-            }
-        }
+    let place = |pb: &mut PageBuilder, row: &table::RowLayout| {
         let (x, y) = (pb.col_x() + tl.x, pb.y);
         if let Some(pg) = pb.page() {
             for it in &row.items {
@@ -1059,6 +1040,36 @@ fn place_table(ctx: &mut Ctx, pb: &mut PageBuilder, t: &wordcraft_doc::Table, bl
             }
         }
         pb.y += row.height;
+    };
+    for (ri, row) in tl.rows.iter().enumerate() {
+        let splittable = !header_rows.contains(&ri) && !t.rows.get(ri).is_some_and(|r| r.props.cant_split);
+        let mut rest: Option<table::RowLayout> = None;
+        // Each pass places the part of the row that fits, then breaks the page.
+        for _ in 0..1000 {
+            let cur = rest.as_ref().unwrap_or(row);
+            if pb.y + cur.height <= pb.bottom + 0.01 {
+                break;
+            }
+            let split = if splittable { table::split_row(cur, pb.bottom - pb.y) } else { None };
+            match split {
+                Some((a, b)) => {
+                    place(pb, &a);
+                    rest = Some(b);
+                }
+                None if pb.at_top() => break,
+                None => {}
+            }
+            pb.advance(block, body_top);
+            // Repeat header rows.
+            if !header_rows.contains(&ri) {
+                for hr in &header_rows {
+                    if let Some(h) = tl.rows.get(*hr) {
+                        place(pb, h);
+                    }
+                }
+            }
+        }
+        place(pb, rest.as_ref().unwrap_or(row));
     }
 }
 
