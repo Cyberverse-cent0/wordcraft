@@ -19,3 +19,4 @@ log = { workspace = true }
 [dev-dependencies]
 proptest = { workspace = true }
 image = { workspace = true }
+zip = { workspace = true }

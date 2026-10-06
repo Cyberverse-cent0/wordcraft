@@ -6,6 +6,8 @@ pub mod edit;
 pub mod file;
 pub mod format;
 pub mod insert;
+pub mod mailings;
+pub mod objects;
 pub mod page;
 pub mod para;
 pub mod references;
@@ -36,6 +38,8 @@ pub fn registry() -> Registry {
     v.extend(file::specs());
     v.extend(design::specs());
     v.extend(references::specs());
+    v.extend(mailings::specs());
+    v.extend(objects::specs());
     Registry::new(v)
 }
 

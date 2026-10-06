@@ -3,8 +3,9 @@
 use wordcraft_doc::Document;
 
 /// Open a format other than plain text / JSON.
-pub fn open(ext: &str, _bytes: &[u8]) -> Option<Result<Document, String>> {
+pub fn open(ext: &str, bytes: &[u8]) -> Option<Result<Document, String>> {
     match ext {
+        "docx" | "docm" | "dotx" | "dotm" => Some(wordcraft_docx::read(bytes).map_err(|e| e.to_string())),
         _ => None,
     }
 }
@@ -13,6 +14,7 @@ pub fn open(ext: &str, _bytes: &[u8]) -> Option<Result<Document, String>> {
 pub fn save(ext: &str, doc: &Document) -> Option<Result<Vec<u8>, String>> {
     match ext {
         "png" => Some(render_png(doc, 0, 2.0)),
+        "docx" | "docm" | "dotx" => Some(wordcraft_docx::write(doc).map_err(|e| e.to_string())),
         _ => None,
     }
 }

@@ -334,6 +334,8 @@ struct PageBuilder<'a> {
     notes: Vec<(u32, Vec<Placed>, f32)>,
     /// Page bottom before footnotes took space.
     orig_bottom: f32,
+    /// The previous paragraph: (style, contextual spacing, space after) for contextual spacing.
+    prev: Option<(String, bool, f32)>,
 }
 
 /// Gap above the footnote separator and its length.
@@ -453,7 +455,7 @@ pub fn layout(doc: &Document, cache: &mut LayoutCache, opts: &LayoutOptions) -> 
     } else {
         first_sect
     };
-    let mut pb = PageBuilder { pages: Vec::new(), sect: sect_ref, sect_idx: 0, col: 0, cols: Vec::new(), y: 0.0, top: 0.0, bottom: 0.0, number: 0, web, notes: Vec::new(), orig_bottom: 0.0 };
+    let mut pb = PageBuilder { pages: Vec::new(), sect: sect_ref, sect_idx: 0, col: 0, cols: Vec::new(), y: 0.0, top: 0.0, bottom: 0.0, number: 0, web, notes: Vec::new(), orig_bottom: 0.0, prev: None };
     let mut block = 0usize;
     for (si, (end, sect)) in sections.iter().enumerate() {
         let sect: &SectionProps = if web { sect_ref } else { sect };
@@ -572,7 +574,20 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
     if pl.rp.page_break_before && !pb.at_top() && !pb.web {
         pb.new_page(block, body_top);
     }
-    pb.y += pl.rp.space_before;
+    // Contextual spacing: no space between paragraphs of the same style when either asks for it.
+    let mut before = pl.rp.space_before;
+    if let Some((style, ctxl, after)) = pb.prev.take()
+        && style == pl.rp.style
+        && !pb.at_top()
+    {
+        if ctxl {
+            pb.y -= after;
+        }
+        if pl.rp.contextual_spacing {
+            before = 0.0;
+        }
+    }
+    pb.y += before;
     let n = pl.lines.len();
     // Keep lines together: if it doesn't fit but would on an empty column, move it.
     if pl.rp.keep_lines || pl.rp.keep_next {
@@ -646,7 +661,44 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
         let y = pb.y;
         let mut items = Vec::new();
         push_para(&mut items, StoryRef::Body, &[block as u32], &pl, l0, l1, x, y, width);
+        // Floating pictures/shapes anchored in these lines.
+        let mut behind = Vec::new();
+        if let (Some(fl), Some(ll)) = (pl.lines.get(l0), pl.lines.get(l1.saturating_sub(1))) {
+            for k in fl.c0..ll.c1 {
+                let Some(c) = pl.clusters.get(k) else { continue };
+                let para::ClKind::Object(oi) = c.kind else { continue };
+                let Some(obj) = p.objects.get(oi) else { continue };
+                let (w, h, float) = match obj {
+                    InlineObject::Image { w, h, float, .. } | InlineObject::Shape { w, h, float, .. } if float.wrap != Wrap::Inline => (*w, *h, *float),
+                    _ => continue,
+                };
+                let fx = match float.h_rel {
+                    wordcraft_doc::para::Anchor::Page => float.x,
+                    wordcraft_doc::para::Anchor::Margin => pb.sect.margin_left + pb.sect.gutter + float.x,
+                    _ => x + float.x,
+                };
+                let fy = match float.v_rel {
+                    wordcraft_doc::para::Anchor::Page => float.y,
+                    wordcraft_doc::para::Anchor::Margin => pb.top + float.y,
+                    _ => y + float.y,
+                };
+                let rect = Rect::new(fx, fy, w.clamp(1.0, 4000.0), h.clamp(1.0, 4000.0));
+                let it = match obj {
+                    InlineObject::Image { media, crop, .. } => Placed::Image { rect, media: media.clone(), crop: *crop, story: StoryRef::Body, path: Path(vec![block as u32]), off: c.start },
+                    InlineObject::Shape { kind, fill, stroke, stroke_width, .. } => Placed::Shape { rect, kind: *kind, fill: *fill, stroke: *stroke, stroke_width: *stroke_width },
+                    _ => continue,
+                };
+                if float.wrap == Wrap::BehindText {
+                    behind.push(it);
+                } else {
+                    items.push(it);
+                }
+            }
+        }
         if let Some(pg) = pb.page() {
+            for (i, it) in behind.into_iter().enumerate() {
+                pg.items.insert(i.min(pg.items.len()), it);
+            }
             pg.items.extend(items);
         }
         if let (Some(f), Some(l)) = (pl.lines.get(l0), pl.lines.get(l1 - 1)) {
@@ -661,6 +713,7 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
         }
     }
     pb.y += pl.rp.space_after;
+    pb.prev = Some((pl.rp.style.clone(), pl.rp.contextual_spacing, pl.rp.space_after));
 }
 
 /// Height of the first line of the block after `block` (for keep-with-next).
@@ -680,6 +733,7 @@ fn next_first_line(ctx: &mut Ctx, block: usize, width: f32) -> f32 {
 }
 
 fn place_table(ctx: &mut Ctx, pb: &mut PageBuilder, t: &wordcraft_doc::Table, block: usize, body_top: f32) {
+    pb.prev = None;
     let width = pb.col_w();
     let tl = table::layout_table(ctx, StoryRef::Body, t, &[block as u32], width, 1);
     let header_rows: Vec<usize> = (0..t.rows.len()).take_while(|r| t.rows.get(*r).is_some_and(|row| row.props.header)).collect();

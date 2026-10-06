@@ -137,7 +137,7 @@ fn export_png(s: &mut Session, v: &Value) -> CmdResult {
     let path = p::req_str(v, "path")?;
     let page = p::u64(v, "page").unwrap_or(1).max(1) as usize - 1;
     let scale = p::f32(v, "scale").unwrap_or(2.0).clamp(0.1, 8.0);
-    let l = s.layout();
+    let l = s.export_layout();
     let pg = l.pages.get(page).ok_or_else(|| CmdError::Params(format!("no page {}", page + 1)))?;
     let img = wordcraft_render::render_page(&s.doc, pg, scale, &Default::default());
     let png = img.to_png();

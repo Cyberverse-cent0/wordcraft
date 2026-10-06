@@ -132,6 +132,10 @@ pub struct Session {
     rev: u64,
     cache: LayoutCache,
     layout: Option<(u64, f32, ViewMode, Arc<DocLayout>, bool)>,
+    /// Picture edits: edited media key → original media key (Reset Picture).
+    pub originals: std::collections::HashMap<String, String>,
+    /// Mail merge data source and preview.
+    pub merge: crate::cmd::mailings::MergeState,
     /// Requests from commands to the UI (open a dialog, scroll…), drained by the front end.
     pub ui_requests: Vec<Value>,
 }
@@ -164,6 +168,8 @@ impl Session {
             rev: 1,
             cache: LayoutCache::new(),
             layout: None,
+            originals: Default::default(),
+            merge: Default::default(),
             ui_requests: Vec::new(),
         }
     }
@@ -193,6 +199,12 @@ impl Session {
         self.layout = Some((self.rev, ww, self.view.mode, l.clone(), self.view.proofing));
         l
     }
+    /// A layout for output (PDF, images, print): no proofing marks, print view.
+    pub fn export_layout(&self) -> Arc<DocLayout> {
+        let opts = LayoutOptions { view: ViewMode::Print, web_width: 0.0, show_hidden: false, proofing: false };
+        Arc::new(wordcraft_layout::layout(&self.doc, &mut LayoutCache::new(), &opts))
+    }
+
     /// Invalidate the cached layout (fonts changed etc.).
     pub fn relayout(&mut self) {
         self.layout = None;
