@@ -375,3 +375,31 @@ fn tall_rows_split_across_pages() {
     let l2 = lay(&d2);
     assert!(l2.pages.len() >= 2);
 }
+
+#[test]
+fn drop_cap_indents_its_lines() {
+    let mut p =
+        wordcraft_doc::Paragraph::with_text(&"Every line of this paragraph wraps around a large first letter. ".repeat(6), Default::default());
+    p.props.drop_cap = Some(3);
+    let mut d = Document::from_text("x");
+    d.body = vec![wordcraft_doc::para_block(p)];
+    let l = lay(&d);
+    let Some(pl) = l.pages[0].items.iter().find_map(|i| if let Placed::Lines { para, .. } = i { Some(para.clone()) } else { None }) else {
+        panic!("no lines")
+    };
+    let (nc, lines, w) = pl.drop_cap.unwrap_or((0, 0, 0.0));
+    assert_eq!((nc, lines), (1, 3));
+    assert!(w > 20.0, "drop cap width {w}");
+    assert!(pl.lines.len() > 4);
+    for (k, line) in pl.lines.iter().enumerate() {
+        let x = line.xs.first().copied().unwrap_or(0.0);
+        if k < 3 {
+            assert!(x >= w - 0.5, "line {k} at {x}");
+        } else {
+            assert!(x < 1.0, "line {k} at {x}");
+        }
+    }
+    // The letter's glyphs are lowered toward the third line's baseline.
+    let g = pl.glyphs.first().map(|g| g.dy).unwrap_or(0.0);
+    assert!(g < -20.0, "dy {g}");
+}

@@ -132,6 +132,8 @@ pub struct ParaLayout {
     pub notes: Vec<(usize, u32)>,
     /// Proofing issues: (byte start, byte end, grammar?).
     pub issues: Vec<(usize, usize, bool)>,
+    /// Drop cap: (clusters at the start that form it, lines it drops, width with its gap).
+    pub drop_cap: Option<(usize, u8, f32)>,
 }
 
 /// Inputs that change a paragraph's layout beyond its own content.
@@ -353,6 +355,13 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
     let mut has_page_fields = false;
     let mut notes = Vec::new();
     let mut obj_index = 0usize;
+    // Drop cap: the first character, sized so its capital spans `lines` lines.
+    let drop_first = (rp.drop_cap > 0)
+        .then(|| p.text.chars().next())
+        .flatten()
+        .filter(|c| !matches!(*c, '\t' | LINE_BREAK | PAGE_BREAK | COLUMN_BREAK | OBJ | '\r' | ' '))
+        .filter(|c| p.text.len() > c.len_utf8());
+    let mut drop_cap = None;
     for (range, props) in p.run_ranges() {
         let rc = resolve(props);
         let Some(text) = p.text.get(range.clone()) else { continue };
@@ -379,7 +388,29 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
             continue;
         }
         let mut seg = 0;
+        if range.start == 0
+            && let Some(c) = drop_first
+            && let Some(first) = text.get(..c.len_utf8())
+        {
+            let line_h = (rc.size * 1.2).max(1.0);
+            let lines = rp.drop_cap as f32;
+            // Capital height is ~0.7 em: the letter's cap spans from line 1's caps to line N's baseline.
+            let mut big = (*rc).clone();
+            big.size = (((lines - 1.0) * line_h + rc.size * 0.7) / 0.7).clamp(rc.size, 1000.0);
+            let before = b.clusters.len();
+            b.shape(first, 0, &Arc::new(big), None);
+            let w: f32 = b.clusters.get(before..).map(|c| c.iter().map(|c| c.adv).sum()).unwrap_or(0.0);
+            drop_cap = Some((b.clusters.len() - before, rp.drop_cap, w + rc.size * 0.3));
+            // The letter hangs beside the text; lines flow at the indent `break_lines` adds.
+            for c in b.clusters.iter_mut().skip(before) {
+                c.adv = 0.0;
+            }
+            seg = c.len_utf8();
+        }
         for (i, c) in text.char_indices() {
+            if i < seg {
+                continue;
+            }
             let special = matches!(c, '\t' | LINE_BREAK | PAGE_BREAK | COLUMN_BREAK | OBJ | '\r');
             if !special {
                 continue;
@@ -494,6 +525,7 @@ pub fn layout_para(p: &Paragraph, env: &ParaEnv) -> ParaLayout {
         has_page_fields,
         notes,
         issues: if env.proofing { proof_issues(p) } else { Vec::new() },
+        drop_cap,
     };
     break_lines(&mut pl, env, mark_style, env.label.as_ref().map(|(_, l)| l.suffix));
     pl
@@ -541,6 +573,11 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
         let mut guard = 0;
         loop {
             let (mut lo, mut hi) = (if first { first_left } else { rp.indent_left }, base_right);
+            if let Some((_, dl, dw)) = pl.drop_cap
+                && lines.len() < dl as usize
+            {
+                lo = first_left.max(rp.indent_left) + dw;
+            }
             let mut push: Option<f32> = None;
             for e in env.exclusions {
                 if e.bottom <= top || e.top >= top + est_h {
@@ -747,8 +784,9 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
         // Vertical metrics.
         let (mut asc, mut desc) = (0.0f32, 0.0f32);
         let mut any = false;
-        for c in pl.clusters.get(c0..c1).into_iter().flatten() {
-            if c.kind == ClKind::Marker {
+        let dropped = pl.drop_cap.map_or(0, |d| d.0);
+        for (k, c) in pl.clusters.get(c0..c1).into_iter().flatten().enumerate() {
+            if c.kind == ClKind::Marker || c0 + k < dropped {
                 continue;
             }
             if let Some(st) = pl.styles.get(c.style as usize) {
@@ -878,6 +916,23 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
         }
         if lines.len() > 200_000 {
             break;
+        }
+    }
+    // Hang the drop cap from the first line's caps down to line N's baseline, left of the text.
+    if let Some((nc, dl, dw)) = pl.drop_cap
+        && let (Some(l0), Some(ln)) = (lines.first(), lines.get((dl as usize).min(lines.len()).saturating_sub(1)))
+    {
+        let short = lines.len() < dl as usize;
+        let dy = if short { (dl as f32 - 1.0) * l0.height } else { ln.baseline - l0.baseline };
+        let dx = dw.min(l0.xs.first().copied().unwrap_or(0.0) - first_left.max(rp.indent_left));
+        if short {
+            top = top.max(l0.top + l0.height * dl as f32);
+        }
+        for c in pl.clusters.get(..nc).unwrap_or(&[]).to_vec() {
+            for g in pl.glyphs.get_mut(c.g0 as usize..c.g1 as usize).into_iter().flatten() {
+                g.dy -= dy;
+                g.dx -= dx;
+            }
         }
     }
     pl.height = top;
