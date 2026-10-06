@@ -145,6 +145,20 @@ pub struct ParaEnv<'a> {
     /// Extra style applied to every run (table style conditional formatting), under direct formatting.
     pub table_chr: Option<&'a CharProps>,
     pub proofing: bool,
+    /// Areas text must flow around (floating objects), relative to the paragraph: x from the
+    /// column's left edge, y from the top of the first line.
+    pub exclusions: &'a [Exclusion],
+}
+
+/// An area text wraps around.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Exclusion {
+    pub top: f32,
+    pub bottom: f32,
+    pub left: f32,
+    pub right: f32,
+    /// Text only above and below (no text beside it).
+    pub top_bottom: bool,
 }
 
 fn style_key(rc: &ResolvedChar) -> String {
@@ -505,7 +519,7 @@ fn next_tab(x: f32, tabs: &[TabStop], default_tab: f32, hanging_at: Option<f32>)
 fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Option<LevelSuffix>) {
     let rp = pl.rp.clone();
     let width = env.width.max(12.0);
-    let right_edge = (width - rp.indent_right).max(1.0);
+    let base_right = (width - rp.indent_right).max(1.0);
     let default_tab = env.doc.settings.default_tab;
     let first_left = rp.indent_left + rp.indent_first;
     let hanging_at = if rp.indent_first < 0.0 { Some(rp.indent_left) } else { None };
@@ -514,8 +528,54 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
     let mut i = 0usize;
     let mut top = 0.0f32;
     let mut first = true;
+    let est_h = pl
+        .styles
+        .get(mark_style as usize)
+        .map(|st| (st.ascent + st.descent) * if let LineSpacing::Multiple(m) = rp.line_spacing { m } else { 1.0 })
+        .unwrap_or(14.0)
+        .max(1.0);
     loop {
-        let left = if first { first_left } else { rp.indent_left };
+        let left;
+        let right_edge;
+        // Flow around floating objects: narrow the line or move it below them.
+        let mut guard = 0;
+        loop {
+            let (mut lo, mut hi) = (if first { first_left } else { rp.indent_left }, base_right);
+            let mut push: Option<f32> = None;
+            for e in env.exclusions {
+                if e.bottom <= top || e.top >= top + est_h {
+                    continue;
+                }
+                if e.top_bottom || (e.left <= lo + 1.0 && e.right >= hi - 1.0) {
+                    push = Some(push.map_or(e.bottom, |p: f32| p.max(e.bottom)));
+                    continue;
+                }
+                if (e.left + e.right) / 2.0 < (lo + hi) / 2.0 {
+                    lo = lo.max(e.right);
+                } else {
+                    hi = hi.min(e.left);
+                }
+            }
+            if push.is_none() && hi - lo < 36.0 {
+                push = env
+                    .exclusions
+                    .iter()
+                    .filter(|e| e.bottom > top && e.top < top + est_h)
+                    .map(|e| e.bottom)
+                    .fold(None, |a: Option<f32>, b| Some(a.map_or(b, |a| a.min(b))));
+            }
+            match push {
+                Some(y) if y > top && guard < 50 => {
+                    top = y;
+                    guard += 1;
+                }
+                _ => {
+                    left = lo;
+                    right_edge = hi.max(lo + 12.0);
+                    break;
+                }
+            }
+        }
         let mut x = left;
         // Label on the first line.
         if first && let Some(lab) = pl.label.as_mut() {
@@ -783,20 +843,7 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
         }
         let start = pl.clusters.get(c0).map(|c| c.start).unwrap_or(pl.text_len);
         let stop = if c1 > c0 { pl.clusters.get(c1 - 1).map(|c| c.end).unwrap_or(pl.text_len) } else { start };
-        lines.push(Line {
-            top,
-            height,
-            baseline,
-            c0,
-            c1,
-            xs,
-            leaders,
-            end,
-            start,
-            stop,
-            left: if first { first_left } else { rp.indent_left },
-            right: right_edge,
-        });
+        lines.push(Line { top, height, baseline, c0, c1, xs, leaders, end, start, stop, left, right: right_edge });
         top += height;
         first = false;
         i = j;
@@ -823,7 +870,7 @@ fn break_lines(pl: &mut ParaLayout, env: &ParaEnv, mark_style: u16, suffix: Opti
                     start: pl.text_len,
                     stop: pl.text_len,
                     left: x0,
-                    right: right_edge,
+                    right: base_right,
                 });
                 top += h;
             }

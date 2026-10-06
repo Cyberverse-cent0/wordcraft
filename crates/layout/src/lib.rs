@@ -159,6 +159,7 @@ struct Key {
     page: Option<(u32, u32, u32, u32)>,
     table_chr: u64,
     notes: u64,
+    excl: u64,
 }
 
 /// Memoised paragraph layouts.
@@ -214,10 +215,41 @@ struct Ctx<'a> {
     counters: Counters,
     fields: FieldCtx,
     notes_hash: u64,
+    numbers: HashMap<u32, Arc<ParaLayout>>,
 }
 
 impl Ctx<'_> {
+    /// A laid-out line number (cached).
+    fn number_para(&mut self, n: u32) -> Arc<ParaLayout> {
+        if let Some(p) = self.numbers.get(&n) {
+            return p.clone();
+        }
+        let mut p = Paragraph::with_text(
+            &n.to_string(),
+            CharProps { size: Some(10.0), color: Some(wordcraft_doc::TextColor::Rgb(Rgb(0x60, 0x60, 0x60))), ..Default::default() },
+        );
+        p.props.space_after = Some(0.0);
+        p.props.space_before = Some(0.0);
+        let env = para::ParaEnv {
+            doc: self.doc,
+            width: 60.0,
+            label: None,
+            fields: &self.fields,
+            show_hidden: false,
+            table_chr: None,
+            proofing: false,
+            exclusions: &[],
+        };
+        let pl = Arc::new(para::layout_para(&p, &env));
+        self.numbers.insert(n, pl.clone());
+        pl
+    }
+
     fn para(&mut self, p: &Paragraph, width: f32, table_chr: Option<&CharProps>) -> Arc<ParaLayout> {
+        self.para_x(p, width, table_chr, &[])
+    }
+
+    fn para_x(&mut self, p: &Paragraph, width: f32, table_chr: Option<&CharProps>, exclusions: &[para::Exclusion]) -> Arc<ParaLayout> {
         let label = p.props.numbering.or_else(|| self.doc.styles.resolve_para(&p.props).numbering).filter(|n| n.num != 0).and_then(|n| {
             // Only count paragraphs that will show (list labels advance in order).
             self.counters.next_label(&self.doc.numbering, n.num, n.level)
@@ -230,6 +262,7 @@ impl Ctx<'_> {
             page,
             table_chr: table_chr.map(|c| hash_of(&format!("{c:?}"))).unwrap_or(0),
             notes: if p.objects.iter().any(|o| matches!(o, InlineObject::NoteRef { .. })) { self.notes_hash } else { 0 },
+            excl: if exclusions.is_empty() { 0 } else { hash_of(&format!("{exclusions:?}")) },
         };
         self.cache.used.insert(key.clone());
         if let Some(pl) = self.cache.paras.get(&key) {
@@ -245,6 +278,7 @@ impl Ctx<'_> {
             show_hidden: self.opts.show_hidden,
             table_chr,
             proofing: self.opts.proofing,
+            exclusions,
         };
         let pl = Arc::new(para::layout_para(p, &env));
         self.cache.paras.insert(key, pl.clone());
@@ -388,6 +422,12 @@ struct PageBuilder<'a> {
     orig_bottom: f32,
     /// The previous paragraph: (style, contextual spacing, space after) for contextual spacing.
     prev: Option<(String, bool, f32)>,
+    /// Wrap areas of floating objects on this page: (rect, top-and-bottom only, distance).
+    excl: Vec<(Rect, bool, f32)>,
+    /// Line numbering counter.
+    line_no: u32,
+    /// Index of the first body item of the current page (vertical alignment shifts from here).
+    page_items_start: usize,
 }
 
 /// Gap above the footnote separator and its length.
@@ -424,13 +464,63 @@ impl PageBuilder<'_> {
             }
         }
     }
+    /// Section vertical alignment: move the page's body down (centre/bottom).
+    fn apply_valign(&mut self) {
+        let k = match self.sect.valign {
+            wordcraft_doc::props::VAlign::Top => return,
+            wordcraft_doc::props::VAlign::Center => 0.5,
+            wordcraft_doc::props::VAlign::Bottom => 1.0,
+        };
+        if self.web {
+            return;
+        }
+        let space = (self.orig_bottom - self.notes_h() - self.y).max(0.0) * k;
+        let start = self.page_items_start;
+        if let Some(pg) = self.pages.last_mut() {
+            for it in pg.items.iter_mut().skip(start) {
+                it.translate(0.0, space);
+            }
+        }
+    }
     fn new_page(&mut self, first_block: usize, body_top: f32) {
+        self.apply_valign();
         self.flush_notes();
+        self.excl.clear();
+        if self.sect.line_numbers.as_ref().is_some_and(|l| l.restart == wordcraft_doc::section::LineNumberRestart::Page) {
+            self.line_no = 0;
+        }
         let s = self.sect;
         self.number += 1;
         let (w, h) = if self.web { (s.page_w, f32::MAX / 4.0) } else { (s.page_w, s.page_h) };
         let body = Rect::new(s.margin_left + s.gutter, body_top, s.text_width(), (s.page_h - s.margin_bottom - body_top).max(36.0));
-        self.pages.push(Page { w, h, section: self.sect_idx, number: self.number, body, first_block, ..Default::default() });
+        let mut decor = Vec::new();
+        if !self.web {
+            // Page borders, measured from the page edge (Word's default), so they surround the
+            // header, footer and line numbers.
+            if let Some(b) = &s.page_borders {
+                let sp = |e: &Option<Border>| e.map(|x| x.space).unwrap_or(24.0);
+                let (x0, x1, y0, y1) = (sp(&b.left), s.page_w - sp(&b.right), sp(&b.top), s.page_h - sp(&b.bottom));
+                for (e, a, bb) in
+                    [(b.top, (x0, y0), (x1, y0)), (b.bottom, (x0, y1), (x1, y1)), (b.left, (x0, y0), (x0, y1)), (b.right, (x1, y0), (x1, y1))]
+                {
+                    if let Some(e) = e.filter(Border::is_visible) {
+                        decor.push(Placed::Rule { x0: a.0, y0: a.1, x1: bb.0, y1: bb.1, border: e });
+                    }
+                }
+            }
+            // Lines between columns.
+            if s.columns.separator && s.columns.count > 1 {
+                let cols = s.column_boxes();
+                for w in cols.windows(2) {
+                    if let [(ax, aw), (bx, _)] = w {
+                        let x = s.margin_left + s.gutter + (ax + aw + bx) / 2.0;
+                        decor.push(Placed::Rule { x0: x, y0: body_top, x1: x, y1: s.page_h - s.margin_bottom, border: Border::single(0.5) });
+                    }
+                }
+            }
+        }
+        self.page_items_start = decor.len();
+        self.pages.push(Page { w, h, section: self.sect_idx, number: self.number, body, first_block, items: decor, ..Default::default() });
         self.col = 0;
         self.cols = s.column_boxes();
         self.top = body_top;
@@ -492,6 +582,7 @@ pub fn layout(doc: &Document, cache: &mut LayoutCache, opts: &LayoutOptions) -> 
             ..Default::default()
         },
         notes_hash,
+        numbers: HashMap::new(),
     };
     let sections = doc.sections();
     let web = opts.view != ViewMode::Print;
@@ -527,6 +618,9 @@ pub fn layout(doc: &Document, cache: &mut LayoutCache, opts: &LayoutOptions) -> 
         notes: Vec::new(),
         orig_bottom: 0.0,
         prev: None,
+        excl: Vec::new(),
+        line_no: 0,
+        page_items_start: 0,
     };
     let mut block = 0usize;
     for (si, (end, sect)) in sections.iter().enumerate() {
@@ -535,6 +629,9 @@ pub fn layout(doc: &Document, cache: &mut LayoutCache, opts: &LayoutOptions) -> 
         pb.sect_idx = si;
         let body_top = if web { sect.margin_top } else { body_top_for(&mut ctx, sect, si) };
         let restart = sect.page_num_start;
+        if sect.line_numbers.as_ref().is_some_and(|l| l.restart == wordcraft_doc::section::LineNumberRestart::Section) {
+            pb.line_no = 0;
+        }
         let start = if si == 0 { SectionStart::NextPage } else { sect.start };
         if web && si > 0 {
             // one long page
@@ -610,6 +707,7 @@ pub fn layout(doc: &Document, cache: &mut LayoutCache, opts: &LayoutOptions) -> 
             pb.y += h;
         }
     }
+    pb.apply_valign();
     pb.flush_notes();
     let mut pages = pb.pages;
     if web && let Some(p) = pages.first_mut() {
@@ -655,10 +753,54 @@ fn body_top_for(ctx: &mut Ctx, sect: &SectionProps, _si: usize) -> f32 {
     sect.margin_top.max(sect.header + h + 6.0)
 }
 
+/// Where a floating object goes: page coordinates for an anchor paragraph whose top is `y0`.
+fn float_rect(pb: &PageBuilder, col_x: f32, y0: f32, w: f32, h: f32, float: &wordcraft_doc::para::Float) -> Rect {
+    let fx = match float.h_rel {
+        wordcraft_doc::para::Anchor::Page => float.x,
+        wordcraft_doc::para::Anchor::Margin => pb.sect.margin_left + pb.sect.gutter + float.x,
+        _ => col_x + float.x,
+    };
+    let fy = match float.v_rel {
+        wordcraft_doc::para::Anchor::Page => float.y,
+        wordcraft_doc::para::Anchor::Margin => pb.top + float.y,
+        _ => y0 + float.y,
+    };
+    Rect::new(fx, fy, w.clamp(1.0, 4000.0), h.clamp(1.0, 4000.0))
+}
+
 fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, body_top: f32) {
     let width = pb.col_w();
     ctx.fields.page = pb.number;
-    let pl = ctx.para(p, width, None);
+    // Floating objects anchored here join the page's wrap areas before the text is laid out.
+    let col_x = pb.col_x();
+    let y0 = pb.y + ctx.doc.styles.resolve_para(&p.props).space_before;
+    let mut float_rects: HashMap<usize, Rect> = HashMap::new();
+    if !pb.web {
+        for (oi, o) in p.objects.iter().enumerate() {
+            if let InlineObject::Image { w, h, float, .. } | InlineObject::Shape { w, h, float, .. } = o
+                && float.wrap != Wrap::Inline
+            {
+                let r = float_rect(pb, col_x, y0, *w, *h, float);
+                float_rects.insert(oi, r);
+                if !matches!(float.wrap, Wrap::BehindText | Wrap::InFrontOfText) {
+                    pb.excl.push((r, float.wrap == Wrap::TopAndBottom, float.dist.max(9.0)));
+                }
+            }
+        }
+    }
+    let rel: Vec<para::Exclusion> = pb
+        .excl
+        .iter()
+        .map(|(r, tb, d)| para::Exclusion {
+            top: r.y - d - y0,
+            bottom: r.bottom() + d - y0,
+            left: r.x - d - col_x,
+            right: r.right() + d - col_x,
+            top_bottom: *tb,
+        })
+        .filter(|e| e.bottom > 0.0)
+        .collect();
+    let pl = ctx.para_x(p, width, None, &rel);
     if pl.rp.page_break_before && !pb.at_top() && !pb.web {
         pb.new_page(block, body_top);
     }
@@ -768,17 +910,7 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
                     }
                     _ => continue,
                 };
-                let fx = match float.h_rel {
-                    wordcraft_doc::para::Anchor::Page => float.x,
-                    wordcraft_doc::para::Anchor::Margin => pb.sect.margin_left + pb.sect.gutter + float.x,
-                    _ => x + float.x,
-                };
-                let fy = match float.v_rel {
-                    wordcraft_doc::para::Anchor::Page => float.y,
-                    wordcraft_doc::para::Anchor::Margin => pb.top + float.y,
-                    _ => y + float.y,
-                };
-                let rect = Rect::new(fx, fy, w.clamp(1.0, 4000.0), h.clamp(1.0, 4000.0));
+                let rect = float_rects.get(&oi).copied().unwrap_or_else(|| float_rect(pb, x, y, w, h, &float));
                 let it = match obj {
                     InlineObject::Image { media, crop, .. } => {
                         Placed::Image { rect, media: media.clone(), crop: *crop, story: StoryRef::Body, path: Path(vec![block as u32]), off: c.start }
@@ -793,6 +925,58 @@ fn place_para(ctx: &mut Ctx, pb: &mut PageBuilder, p: &Paragraph, block: usize, 
                 } else {
                     items.push(it);
                 }
+            }
+        }
+        // Text box contents (inline and floating shapes that own a story).
+        if let (Some(fl), Some(ll)) = (pl.lines.get(l0), pl.lines.get(l1.saturating_sub(1))) {
+            for li in l0..l1 {
+                let Some(line) = pl.lines.get(li) else { continue };
+                for k in line.c0..line.c1 {
+                    let Some(c) = pl.clusters.get(k) else { continue };
+                    let para::ClKind::Object(oi) = c.kind else { continue };
+                    let Some(InlineObject::Shape { story: Some(id), w, h, .. }) = p.objects.get(oi) else { continue };
+                    let rect = match float_rects.get(&oi) {
+                        Some(r) => *r,
+                        None => {
+                            let cx = x + line.xs.get(k - line.c0).copied().unwrap_or(0.0);
+                            Rect::new(cx, y + (line.baseline - fl.top) - c.obj_h, c.adv, c.obj_h)
+                        }
+                    };
+                    let _ = (w, h, ll);
+                    let Some(part) = ctx.doc.parts.get(id) else { continue };
+                    let blocks = part.blocks.clone();
+                    let (inner, _) = layout_box(ctx, StoryRef::Part(*id), &blocks, &[], (rect.w - 14.4).max(12.0), None, 1);
+                    for mut it in inner {
+                        it.translate(rect.x + 7.2, rect.y + 3.6);
+                        items.push(it);
+                    }
+                }
+            }
+        }
+        // Line numbers in the left margin.
+        if let Some(ln) = pb.sect.line_numbers.clone().filter(|_| !pb.web && pl.rp.style != "Header" && p.props.suppress_line_numbers != Some(true))
+            && let Some(first) = pl.lines.get(l0)
+        {
+            for li in l0..l1 {
+                let Some(line) = pl.lines.get(li) else { continue };
+                pb.line_no += 1;
+                let n = pb.line_no + ln.start.saturating_sub(1);
+                if ln.count_by > 1 && !n.is_multiple_of(ln.count_by) {
+                    continue;
+                }
+                let num = ctx.number_para(n);
+                let w = num.lines.first().and_then(|l| l.xs.last().copied()).unwrap_or(10.0);
+                let dist = if ln.distance > 0.0 { ln.distance } else { 18.0 };
+                let ly = y + (line.top - first.top) + (line.baseline - line.top) - num.lines.first().map(|l| l.baseline).unwrap_or(10.0);
+                items.push(Placed::Lines {
+                    story: StoryRef::Part(u32::MAX),
+                    path: Path(vec![]),
+                    para: num.clone(),
+                    l0: 0,
+                    l1: 1,
+                    x: pb.sect.margin_left + pb.sect.gutter - dist - w,
+                    y: ly,
+                });
             }
         }
         if let Some(pg) = pb.page() {
@@ -830,6 +1014,7 @@ fn next_first_line(ctx: &mut Ctx, block: usize, width: f32) -> f32 {
                 show_hidden: ctx.opts.show_hidden,
                 table_chr: None,
                 proofing: false,
+                exclusions: &[],
             };
             let _ = rp;
             let pl = para::layout_para(p, &env);

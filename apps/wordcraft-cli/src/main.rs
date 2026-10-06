@@ -104,7 +104,14 @@ fn run(args: &[String]) -> Result<(), String> {
             }
             if let Some(out) = arg_value(&rest, "--save") {
                 let r = if out.to_ascii_lowercase().ends_with(".png") {
-                    s.run("file.exportPng", &json!({"path": out}))
+                    let mut v = json!({"path": out});
+                    if let Some(n) = arg_value(&rest, "--page").and_then(|p| p.parse::<u64>().ok()) {
+                        v["page"] = json!(n);
+                    }
+                    if let Some(k) = arg_value(&rest, "--scale").and_then(|p| p.parse::<f64>().ok()) {
+                        v["scale"] = json!(k);
+                    }
+                    s.run("file.exportPng", &v)
                 } else {
                     s.run("file.save", &json!({"path": out}))
                 };
