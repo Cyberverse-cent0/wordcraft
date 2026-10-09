@@ -49,9 +49,9 @@ impl Previews {
                 ui.painter().rect_filled(r, 3.0, t.hover);
             }
             let tex = tex.or_else(|| {
+                let now = ui.input(|i| i.time);
                 let n = ui.ctx().data_mut(|d| {
                     let c = d.get_temp_mut_or_default::<(f64, u32)>(egui::Id::new("font_preview_budget"));
-                    let now = ui.input(|i| i.time);
                     if c.0 != now {
                         *c = (now, 0);
                     }
@@ -126,6 +126,23 @@ impl Previews {
             self.styles_hash = (rev, h.finish());
         }
         self.styles_hash.1
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Previews;
+
+    #[test]
+    fn font_preview_does_not_reenter_context_data_lock() {
+        let mut previews = Previews::default();
+        let preview = previews.font_preview_fn();
+        let ctx = egui::Context::default();
+
+        let output = ctx.run_ui(Default::default(), |ui| {
+            let _ = preview(ui, "DejaVu Sans");
+        });
+        output.drop_without_applying_deltas();
     }
 }
 
