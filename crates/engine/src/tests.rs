@@ -2942,3 +2942,33 @@ fn enclose_characters_make_an_eq_field_and_come_back_out() {
     assert_eq!(text(&s), "No 12 and 字 hereA");
     assert_eq!(field(&s), Some(("eq \\o\\ac(△,A)".to_string(), "A".to_string())));
 }
+
+#[test]
+fn list_buttons_follow_the_paragraphs_own_level() {
+    use crate::cmd::para::{ListButtons, list_buttons};
+    let mut s = s();
+    run(&mut s, "text.insert", json!({"text": "item"}));
+    let state = |s: &Session| {
+        let rp = s.doc.para_at(&s.sel.focus).map(|p| s.doc.styles.resolve_para(&p.props));
+        list_buttons(&s.doc, rp.and_then(|r| r.numbering))
+    };
+    assert_eq!(state(&s), ListButtons::default(), "plain text: no list button on");
+    run(&mut s, "para.bullets", json!({}));
+    assert_eq!(state(&s), ListButtons { bullets: true, numbering: false, multilevel: false });
+    // A bulleted list whose second level is numbered: at level 2 the paragraph is numbered.
+    let num = s.doc.para_at(&s.sel.focus).unwrap().props.numbering.unwrap().num;
+    let numbered = wordcraft_doc::numbering::Level { text: "%2.".into(), ..Default::default() };
+    s.doc.numbering.nums.iter_mut().find(|n| n.id == num).unwrap().level_overrides.push((1, numbered));
+    run(&mut s, "para.listLevel", json!({"level": 1}));
+    assert_eq!(state(&s), ListButtons { bullets: false, numbering: true, multilevel: false });
+    run(&mut s, "para.numbering", json!({}));
+    assert_eq!(state(&s), ListButtons { bullets: false, numbering: true, multilevel: false }, "1. a. i. is not multilevel");
+    // Legal numbering (1. 1.1. 1.1.1.) numbers levels together, even on its first level.
+    run(&mut s, "para.multilevel", json!({"kind": "legal"}));
+    run(&mut s, "para.listLevel", json!({"level": 0}));
+    assert_eq!(state(&s), ListButtons { bullets: false, numbering: true, multilevel: true });
+    run(&mut s, "para.listLevel", json!({"level": 2}));
+    assert!(state(&s).multilevel);
+    run(&mut s, "para.numbering", json!({"off": true}));
+    assert_eq!(state(&s), ListButtons::default());
+}
