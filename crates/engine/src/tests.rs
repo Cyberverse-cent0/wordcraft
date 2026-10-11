@@ -2963,7 +2963,9 @@ fn list_buttons_follow_the_paragraphs_own_level() {
     assert_eq!(state(&s), ListButtons { bullets: false, numbering: true, multilevel: false });
     run(&mut s, "para.numbering", json!({}));
     assert_eq!(state(&s), ListButtons { bullets: false, numbering: true, multilevel: false }, "1. a. i. is not multilevel");
-    // Legal numbering (1. 1.1. 1.1.1.) numbers levels together, even on its first level.
+    // Legal numbering (1. 1.1. 1.1.1.) numbers levels together, even on its first level. (Its
+    // first level reads like "1." numbering, which the button would toggle off, so start plain.)
+    run(&mut s, "para.numbering", json!({"off": true}));
     run(&mut s, "para.multilevel", json!({"kind": "legal"}));
     run(&mut s, "para.listLevel", json!({"level": 0}));
     assert_eq!(state(&s), ListButtons { bullets: false, numbering: true, multilevel: true });
