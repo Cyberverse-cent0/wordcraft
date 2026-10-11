@@ -76,6 +76,8 @@ pub struct CanvasState {
     /// The last key ran an Alt shortcut: the text its key sends (it may arrive a frame later)
     /// isn't typed. The next key press clears it.
     pub(crate) swallow_text: bool,
+    /// Create Link is waiting for a click on the text box to link to: the linking box's object.
+    pub(crate) link_from: Option<wordcraft_doc::Pos>,
 }
 
 impl CanvasState {
@@ -124,6 +126,7 @@ impl Default for CanvasState {
             balloon_rects: Vec::new(),
             table_tool: None,
             table_stroke: None,
+            link_from: None,
         }
     }
 }
