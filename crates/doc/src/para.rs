@@ -269,6 +269,55 @@ pub enum NoteKind {
     Endnote,
 }
 
+/// How ruby (phonetic guide) text lines up over its base text (ECMA-376 `ST_RubyAlign`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum RubyAlign {
+    #[default]
+    Center,
+    /// Letters spread evenly from edge to edge.
+    DistributeLetter,
+    /// Letters spread evenly with half a gap at each edge.
+    DistributeSpace,
+    Left,
+    Right,
+    /// Right-aligned beside vertical text (laid out like `Right` in horizontal text).
+    RightVertical,
+}
+
+impl RubyAlign {
+    pub const ALL: [RubyAlign; 6] =
+        [RubyAlign::Center, RubyAlign::DistributeLetter, RubyAlign::DistributeSpace, RubyAlign::Left, RubyAlign::Right, RubyAlign::RightVertical];
+
+    /// The OOXML name (`center`, `distributeLetter`…), also used by commands.
+    pub fn ooxml(self) -> &'static str {
+        match self {
+            RubyAlign::Center => "center",
+            RubyAlign::DistributeLetter => "distributeLetter",
+            RubyAlign::DistributeSpace => "distributeSpace",
+            RubyAlign::Left => "left",
+            RubyAlign::Right => "right",
+            RubyAlign::RightVertical => "rightVertical",
+        }
+    }
+
+    pub fn from_ooxml(v: &str) -> Option<RubyAlign> {
+        RubyAlign::ALL.into_iter().find(|a| a.ooxml() == v)
+    }
+}
+
+/// Phonetic Guide's Offset for a ruby `raise` (baseline to baseline, points): the gap from the top
+/// of the base text to the bottom of the ruby text, taking letters as rising 0.8 em above their
+/// baseline and dropping 0.2 em below it.
+pub fn ruby_offset(raise: f32, base_size: f32, size: f32) -> f32 {
+    raise - 0.8 * base_size - 0.2 * size
+}
+
+/// The ruby raise (baseline to baseline, points) for a Phonetic Guide Offset (see [`ruby_offset`]).
+pub fn ruby_raise(offset: f32, base_size: f32, size: f32) -> f32 {
+    offset + 0.8 * base_size + 0.2 * size
+}
+
 /// An inline object anchored at a U+FFFC in the paragraph text.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -334,6 +383,12 @@ pub enum InlineObject {
         ch_w: f32,
         ch_h: f32,
         children: Vec<GroupChild>,
+        /// A Drawing Canvas (Insert › Shapes › New Drawing Canvas, DrawingML's `wpc:wpc`) rather
+        /// than a group: it has its own background and outline, and its frame is independent of
+        /// its members: resizing it doesn't scale them (`ch_w` × `ch_h` follow `w` × `h`), and
+        /// what lies outside the frame is clipped.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        canvas: Option<CanvasStyle>,
     },
     /// A field: `instr` is the field code (`PAGE`, `NUMPAGES`, `DATE \@ "M/d/yyyy"`, `TOC \o "1-3"`…);
     /// `result` the cached display text. A `locked` field keeps its result when fields update.
@@ -390,6 +445,27 @@ pub enum InlineObject {
         #[serde(default, skip_serializing_if = "crate::math::Math::is_empty")]
         math: crate::math::Math,
     },
+    /// Ruby (Phonetic Guide): small `ruby` text (furigana, pinyin…) set over `base` text. The base
+    /// text takes the formatting of the object's run; it reads as the paragraph's text.
+    Ruby {
+        base: String,
+        ruby: String,
+        #[serde(default)]
+        align: RubyAlign,
+        /// Ruby text size, points (`w:hps`).
+        size: f32,
+        /// From the base text's baseline up to the ruby text's baseline, points (`w:hpsRaise`).
+        raise: f32,
+        /// The base text size the ruby was set for, points (`w:hpsBaseText`).
+        #[serde(default)]
+        base_size: f32,
+        /// Language of the ruby (`w:lid`, e.g. `ja-JP`); empty = unspecified.
+        #[serde(default, skip_serializing_if = "String::is_empty")]
+        lang: String,
+        /// Formatting of the ruby text over the run's (font, colour…); its size is `size`.
+        #[serde(default, skip_serializing_if = "CharProps::is_empty")]
+        props: Box<CharProps>,
+    },
     /// Something we don't model, kept for round-trip (raw XML of the source format).
     Opaque {
         format: String,
@@ -411,6 +487,16 @@ pub struct GroupChild {
 
 /// Most members a group keeps (hostile files).
 pub const MAX_GROUP_CHILDREN: usize = 1000;
+
+/// The background fill and outline of a Drawing Canvas (an [`InlineObject::Group`] with `canvas`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct CanvasStyle {
+    pub fill: Option<crate::props::Rgb>,
+    pub stroke: Option<crate::props::Rgb>,
+    /// Outline width, points.
+    pub stroke_width: f32,
+}
 
 impl InlineObject {
     /// A picture, chart or diagram, shape, text box or group: something drawn with a frame, sized and wrapped.
@@ -437,7 +523,7 @@ impl InlineObject {
             _ => None,
         }
     }
-    /// Resize a drawing (a group's members scale with it).
+    /// Resize a drawing (a group's members scale with it; a canvas's keep their size and place).
     pub fn set_size(&mut self, nw: f32, nh: f32) {
         if let InlineObject::Image { w, h, .. }
         | InlineObject::Graphic { w, h, .. }
@@ -447,6 +533,21 @@ impl InlineObject {
             *w = nw;
             *h = nh;
         }
+        if let InlineObject::Group { ch_w, ch_h, canvas: Some(_), .. } = self {
+            *ch_w = nw;
+            *ch_h = nh;
+        }
+    }
+    /// A Drawing Canvas's background and outline (`None` for anything else).
+    pub fn canvas_style(&self) -> Option<&CanvasStyle> {
+        match self {
+            InlineObject::Group { canvas, .. } => canvas.as_ref(),
+            _ => None,
+        }
+    }
+    /// Whether this is a Drawing Canvas.
+    pub fn is_canvas(&self) -> bool {
+        self.canvas_style().is_some()
     }
     /// The text box story this object shows, if it is a text box.
     pub fn text_box(&self) -> Option<u32> {
@@ -522,11 +623,30 @@ impl InlineObject {
             _ => None,
         }
     }
+    /// The line a footnote or endnote separator draws (ECMA-376 §17.11: the `w:separator` and
+    /// `w:continuationSeparator` run elements): a short line, or with `continuation` one across
+    /// the column. Kept as the run element itself.
+    pub fn note_separator(continuation: bool) -> InlineObject {
+        let el = if continuation { "w:continuationSeparator" } else { "w:separator" };
+        InlineObject::Opaque { format: "docx".into(), xml: format!("<w:r><{el}/></w:r>"), text: String::new() }
+    }
+    /// For a [`InlineObject::note_separator`]: whether it is the continuation separator.
+    pub fn as_note_separator(&self) -> Option<bool> {
+        match self {
+            InlineObject::Opaque { format, xml, .. } if format == "docx" => match xml.as_str() {
+                "<w:r><w:separator/></w:r>" => Some(false),
+                "<w:r><w:continuationSeparator/></w:r>" => Some(true),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
     /// The text this object contributes to plain-text extraction.
     pub fn plain_text(&self) -> &str {
         match self {
             InlineObject::Field { result, .. } => result,
             InlineObject::Equation { linear, .. } => linear,
+            InlineObject::Ruby { base, .. } => base,
             InlineObject::Opaque { text, .. } => text,
             _ => "",
         }

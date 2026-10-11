@@ -107,12 +107,18 @@ pub enum Draw {
         turn: TextDirection,
         items: Vec<Draw>,
     },
-    /// A rotated or flipped picture, shape or chart: `items` drawn turned by `spin` about page
-    /// point (`cx`, `cy`) (see [`Spin::matrix`]).
+    /// A rotated or flipped picture, shape, chart, group or Drawing Canvas: `items` drawn
+    /// turned by `spin` about page point (`cx`, `cy`) (see [`Spin::matrix`]).
     Rotated {
         cx: f32,
         cy: f32,
         spin: Spin,
+        items: Vec<Draw>,
+    },
+    /// `items` clipped to `rect` (a Drawing Canvas's members to its frame). Inside a
+    /// [`Draw::Rotated`], `rect` is in the turned frame's (unturned) coordinates.
+    Clip {
+        rect: Rect,
         items: Vec<Draw>,
     },
     /// A formatting-mark label (a section break's name) in the UI's mark colour, left edge at
@@ -401,6 +407,12 @@ fn char_box(b: &Border, x0: f32, x1: f32, top: f32, bottom: f32, alpha: f32, out
 }
 
 fn item(doc: &Document, it: &Placed, opts: &DisplayOptions, alpha: f32, out: &mut Vec<Draw>) {
+    item_in(doc, it, opts, alpha, Spin::default(), out)
+}
+
+/// [`item`] drawn inside the turn `outer` (a turned Drawing Canvas's members): a shape's
+/// effects follow all the turns it is drawn inside.
+fn item_in(doc: &Document, it: &Placed, opts: &DisplayOptions, alpha: f32, outer: Spin, out: &mut Vec<Draw>) {
     match it {
         Placed::Fill { rect, color } => out.push(Draw::Fill { rect: *rect, color: *color, alpha }),
         Placed::Rule { x0, y0, x1, y1, border } => out.push(rule(*x0, *y0, *x1, *y1, border, alpha)),
@@ -409,10 +421,17 @@ fn item(doc: &Document, it: &Placed, opts: &DisplayOptions, alpha: f32, out: &mu
         }
         Placed::Shape { rect, kind, fill, stroke, stroke_width, effects, freeform, spin } => {
             let mut items = Vec::new();
-            shape_draws(*rect, *kind, *fill, *stroke, *stroke_width, effects_in(*effects, *spin), freeform.as_deref(), opts, &mut items);
+            shape_draws(*rect, *kind, *fill, *stroke, *stroke_width, effects_in(*effects, spin.within(outer)), freeform.as_deref(), opts, &mut items);
             spun(*spin, *rect, items, out)
         }
         Placed::Graphic { rect, graphic, spin, .. } => spun(*spin, *rect, graphic_draws(doc, graphic, *rect, alpha), out),
+        Placed::Clip { rect, spin, items } => {
+            let mut inner = Vec::new();
+            for it in items {
+                item_in(doc, it, opts, alpha, spin.within(outer), &mut inner);
+            }
+            spun(*spin, *rect, vec![Draw::Clip { rect: *rect, items: inner }], out)
+        }
         Placed::Cell { .. } | Placed::Object { .. } => {}
         Placed::Lines { story, path, para, l0, l1, x, y, turn } if turn.is_turned() => {
             let mut items = Vec::new();
@@ -809,6 +828,52 @@ fn lines(
                 _ => {}
             }
         }
+        // Enclosed characters' shapes, in the text's colour.
+        for (k, e) in &pl.enclosures {
+            if *k < line.c0 || *k >= line.c1 {
+                continue;
+            }
+            let (Some(c), Some(left)) = (pl.clusters.get(*k), line.cl_left(*k)) else { continue };
+            let Some(st) = pl.styles.get(c.style as usize) else { continue };
+            let rect = Rect::new(x + left + e.x, base - st.shift - e.top, e.w, e.h);
+            out.push(Draw::Shape {
+                rect,
+                kind: e.kind,
+                fill: None,
+                stroke: Some(text_color(&st.rc.color, None)),
+                stroke_width: e.stroke,
+                effects: Default::default(),
+            });
+        }
+        // Ruby (Phonetic Guide) text over its base text, in runs of one style.
+        for r in pl.rubies.iter().filter(|r| (line.c0..line.c1).contains(&r.cluster)) {
+            let Some(bst) = pl.clusters.get(r.cluster).and_then(|c| pl.styles.get(c.style as usize)) else { continue };
+            if bst.rc.del.is_some() && !opts.markup {
+                continue;
+            }
+            let cx = x + line.cl_left(r.cluster).unwrap_or(0.0);
+            let y = base - bst.shift - r.raise;
+            let mut i = 0;
+            while let Some(&(style, _)) = r.glyphs.get(i) {
+                let n = r.glyphs.get(i..).map_or(0, |g| g.iter().take_while(|(s, _)| *s == style).count()).max(1);
+                let run = r.glyphs.get(i..i + n).unwrap_or(&[]);
+                let ranges = r.ranges.get(i..i + n).map(<[_]>::to_vec).unwrap_or_default();
+                i += n;
+                let Some(st) = pl.styles.get(style as usize) else { continue };
+                out.push(Draw::Glyphs {
+                    face: st.face,
+                    size: st.size,
+                    glyphs: run.iter().map(|(_, g)| (g.gid, cx + g.dx, y - g.dy)).collect(),
+                    color: text_color(&st.rc.color, st.rc.shading.or(st.rc.highlight)),
+                    alpha,
+                    synth_bold: st.synth_bold,
+                    synth_italic: st.synth_italic,
+                    text: r.text.clone(),
+                    link: None,
+                    ranges,
+                });
+            }
+        }
         // Formatting marks.
         if opts.marks {
             let msize = pl.styles.first().map(|s| s.size).unwrap_or(11.0);
@@ -1197,7 +1262,12 @@ fn object_draws(o: &InlineObject, rect: Rect, outer: Spin, alpha: f32, opts: &Di
             for ([x, y, w, h], c) in o.group_rects(rect.x, rect.y, rect.w, rect.h) {
                 object_draws(c, Rect::new(x, y, w, h), own.within(outer), alpha, opts, &mut members);
             }
-            spun(own, rect, members, out)
+            match o.canvas_style() {
+                // A Drawing Canvas: its background and outline, then its members clipped to its
+                // frame, all inside its turn.
+                Some(c) => spun(own, rect, vec![canvas_background(rect, c), Draw::Clip { rect, items: members }], out),
+                None => spun(own, rect, members, out),
+            }
         }
         _ => {}
     }
@@ -1230,4 +1300,9 @@ pub(crate) fn inline_rect(obj: Option<&InlineObject>, cx: f32, base: f32, adv: f
     let k = if bw > 0.0 { room.w / bw } else { 1.0 };
     let (fw, fh) = (w * k, h * k);
     Rect::new(room.x + (room.w - fw) / 2.0, room.y + (room.h - fh) / 2.0, fw, fh)
+}
+
+/// A Drawing Canvas's background and outline over its frame `rect`.
+fn canvas_background(rect: Rect, c: &wordcraft_doc::para::CanvasStyle) -> Draw {
+    Draw::Shape { rect, kind: ShapeKind::Rectangle, fill: c.fill, stroke: c.stroke, stroke_width: c.stroke_width, effects: Default::default() }
 }

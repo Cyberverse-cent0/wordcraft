@@ -40,8 +40,16 @@ fn has_movable(s: &Session) -> Option<&'static str> {
 }
 fn has_group(s: &Session) -> Option<&'static str> {
     match selected(s) {
+        Some((_, o)) if o.is_canvas() => Some("a drawing canvas can't be ungrouped"),
         Some((_, InlineObject::Group { .. })) => None,
         _ => Some("select a group first"),
+    }
+}
+/// Shape Fill and Shape Outline: a shape, or a Drawing Canvas's background and border.
+fn has_shape_or_canvas(s: &Session) -> Option<&'static str> {
+    match selected(s) {
+        Some((_, o)) if o.is_canvas() => None,
+        _ => has_shape(s),
     }
 }
 fn can_group(s: &Session) -> Option<&'static str> {
@@ -105,6 +113,20 @@ pub fn specs() -> Vec<CommandSpec> {
             adjust(s, move |img| recolor(img, &mode, sat))
         })
         .params(r#"{"mode": "grayscale|sepia|washout|blackAndWhite|saturation|tint", "saturation"?: 0..400}"#)
+        .when(has_picture),
+        CommandSpec::new("picture.iconColor", "Icon Color", "Picture Format › Adjust", |s, v| {
+            let c = p::str(v, "color").and_then(Rgb::parse).ok_or_else(|| CmdError::Params("`color` (RRGGBB) is required".into()))?;
+            // One colour everywhere, transparency kept: recolours an inserted icon or other
+            // one-colour line art without redrawing it.
+            adjust(s, move |img| {
+                let mut rgba = img.to_rgba8();
+                for px in rgba.pixels_mut() {
+                    px.0 = [c.0, c.1, c.2, px.0[3]];
+                }
+                image::DynamicImage::ImageRgba8(rgba)
+            })
+        })
+        .params(r#"{"color": "RRGGBB"}"#)
         .when(has_picture),
         CommandSpec::new("picture.effects", "Artistic Effects", "Picture Format › Adjust", |s, v| {
             let e = p::str(v, "effect").unwrap_or("blur").to_string();
@@ -315,25 +337,32 @@ pub fn specs() -> Vec<CommandSpec> {
             with_obj(s, |o| {
                 if let InlineObject::Shape { fill, .. } = o {
                     *fill = c;
+                } else if let Some(style) = super::canvas::style_mut(o) {
+                    style.fill = c;
                 }
             })
         })
-        .params(r#"{"color": "RRGGBB" | null}"#)
-        .when(has_shape),
+        .params(r#"{"color": "RRGGBB" | null}  (a selected drawing canvas: its background)"#)
+        .when(has_shape_or_canvas),
         CommandSpec::new("shape.outline", "Shape Outline", "Shape Format › Shape Styles", |s, v| {
             let c = p::str(v, "color").and_then(Rgb::parse);
-            let w = p::f32(v, "width");
+            let w = p::f32(v, "width").map(|w| w.clamp(0.0, 72.0));
             with_obj(s, |o| {
                 if let InlineObject::Shape { stroke, stroke_width, .. } = o {
                     *stroke = c;
                     if let Some(w) = w {
-                        *stroke_width = w.clamp(0.0, 72.0);
+                        *stroke_width = w;
+                    }
+                } else if let Some(style) = super::canvas::style_mut(o) {
+                    style.stroke = c;
+                    if let Some(w) = w {
+                        style.stroke_width = w;
                     }
                 }
             })
         })
-        .params(r#"{"color": "RRGGBB" | null, "width"?: pt}"#)
-        .when(has_shape),
+        .params(r#"{"color": "RRGGBB" | null, "width"?: pt}  (a selected drawing canvas: its border)"#)
+        .when(has_shape_or_canvas),
         CommandSpec::new("shape.effects", "Shape Effects", "Shape Format › Shape Styles", shape_effects)
             .params(
                 r#"{"shadow"?: preset|{"preset"?, "color"?: "RRGGBB", "transparency"?: %, "blur"?: pt, "distance"?: pt, "angle"?: deg}|null, "glow"?: pt|{"color"?: "RRGGBB", "size"?: pt, "transparency"?: %}|null, "softEdge"?: pt|null}  (shadow presets: offsetBottomRight, offsetBottom, offsetBottomLeft, offsetRight, offsetCenter, offsetLeft, offsetTopRight, offsetTop, offsetTopLeft; an omitted key is left as it is; applies to every shape in the selection)"#,
@@ -947,6 +976,9 @@ fn group(s: &mut Session, _: &Value) -> CmdResult {
         if matches!(obj, InlineObject::Graphic { .. }) {
             return Err(CmdError::Disabled(FROZEN.into()));
         }
+        if obj.is_canvas() {
+            return Err(CmdError::Disabled("a drawing canvas can't be grouped".into()));
+        }
         if !obj.is_floating() {
             return Err(CmdError::Disabled("objects in line with text can't be grouped: choose a text wrapping for them first".into()));
         }
@@ -993,7 +1025,7 @@ fn group(s: &mut Session, _: &Value) -> CmdResult {
         .collect();
     let mut float = found.first().and_then(|(o, _)| o.frame()).map(|(_, _, f)| f.clone()).unwrap_or_default();
     float.set_spin(Spin::default());
-    let grouped = InlineObject::Group { w, h, float, ch_w: w, ch_h: h, children };
+    let grouped = InlineObject::Group { w, h, float, ch_w: w, ch_h: h, children, canvas: None };
     // Take the members out, last first so the earlier positions hold, and put the group where
     // the first one was.
     let len = wordcraft_doc::para::OBJ.len_utf8();

@@ -115,6 +115,14 @@
 	Restart list after:	重新开始列表的级别：
 	Right border	右框线
 	Right Margin	右边距
+	Base text:	基准文字：
+	Distribute letters	字母均匀分布
+	Distribute spacing	间距均匀分布
+	Offset (pt):	偏移量（磅）：
+	Phonetic Guide	拼音指南
+	Remove	删除
+	Right (vertical)	右对齐（竖排）
+	Ruby text:	拼音文字：
 	Search for templates	搜索模板
 	Show all revisions inline	以嵌入方式显示所有修订
 	Show documents with their colours inverted, like View › Switch Modes. Saving, printing and PDFs are unchanged.	像“视图 › 切换模式”一样以反转的颜色显示文档。保存、打印和 PDF 不受影响。
@@ -751,6 +759,7 @@
 	Single	单线
 	Single Spacing	单倍行距
 	Size	纸张大小
+	Size (pt):	字号（磅）：
 	Size:	字号：
 	Small Caps	小型大写字母
 	Small caps	小型大写字母
@@ -1103,6 +1112,8 @@
 	Type at least one recipient.	请至少键入一个收件人。
 	Type the recipients, or load them from a file.	键入收件人，或从文件加载。
 	Use an Existing List…	使用现有列表…
+	Choose the sheet that holds the recipients.	选择包含收件人的工作表。
+	First row of data contains column headers	数据首行包含列标题
 	Interface theme:	界面主题：
 	Interface\nTheme	界面主题
 	Interface Theme	界面主题
@@ -1373,7 +1384,6 @@
 	Not used by any command	未被任何命令使用
 	Remove every custom shortcut and restore the built-in keys?	删除所有自定义快捷键并恢复内置按键？
 	Assign	指定
-	Remove	删除
 	Reset All…	全部重置…
 	Press a key combination	请按组合键
 	Customize	自定义
@@ -1398,3 +1408,30 @@
 	New Group	新建组
 	Rename…	重命名…
 	Ribbon and Quick Access Toolbar:	功能区和快速访问工具栏：
+	Right-to-Left Table	从右向左表格
+	Right-to-Left Section	从右向左节
+	Table direction:	表格方向：
+	Section direction:	节方向：
+	Drawing Canvas	绘图画布
+	New Drawing Canvas	新建绘图画布
+	Fit	适应
+	Expand	扩展
+	Scale Drawing	缩放绘图
+	Canvas Member	画布成员
+	Arrows	箭头
+	Communication	通信
+	Office	办公
+	People	人物
+	Nature	自然
+	Weather	天气
+	Technology	科技
+	Transport	交通
+	Icon Color	图标颜色
+	Search icons	搜索图标
+	No icons match your search.	没有与搜索匹配的图标。
+	Recolor a one-color picture, such as an icon	为图标等单色图片重新着色
+	Enclose Characters	带圈字符
+	Shrink text	缩小文字
+	Enlarge symbol	增大圈号
+	Enclosure	圈号
+	Circle	圆形

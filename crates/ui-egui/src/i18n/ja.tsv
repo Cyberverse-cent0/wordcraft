@@ -103,6 +103,14 @@
 	Restart list after:	リストを振り直すレベル:
 	Right border	右罫線
 	Right Margin	右余白
+	Base text:	親文字:
+	Distribute letters	文字を均等に配置
+	Distribute spacing	間隔を均等に配置
+	Offset (pt):	オフセット (pt):
+	Phonetic Guide	ルビ
+	Remove	削除
+	Right (vertical)	右 (縦書き)
+	Ruby text:	ルビ文字:
 	Search for templates	テンプレートを検索
 	Show all revisions inline	すべての変更履歴を本文中に表示
 	Show documents with their colours inverted, like View › Switch Modes. Saving, printing and PDFs are unchanged.	表示 › モードの切り替えと同様に、文書の色を反転して表示します。保存、印刷、PDF は変わりません。
@@ -739,6 +747,7 @@
 	Single	一重線
 	Single Spacing	1 行
 	Size	サイズ
+	Size (pt):	サイズ (pt):
 	Size:	サイズ:
 	Small Caps	小型英大文字
 	Small caps	小型英大文字
@@ -1091,6 +1100,8 @@
 	Type at least one recipient.	宛先を1件以上入力してください。
 	Type the recipients, or load them from a file.	宛先を入力するか、ファイルから読み込みます。
 	Use an Existing List…	既存のリストを使用…
+	Choose the sheet that holds the recipients.	宛先が入っているシートを選んでください。
+	First row of data contains column headers	データの先頭行を列見出しとして使う
 	Interface theme:	表示テーマ:
 	Interface\nTheme	表示テーマ
 	Interface Theme	表示テーマ
@@ -1361,7 +1372,6 @@
 	Not used by any command	どのコマンドにも割り当てられていません
 	Remove every custom shortcut and restore the built-in keys?	すべてのカスタム ショートカットを削除し、既定のキーに戻しますか?
 	Assign	割り当て
-	Remove	削除
 	Reset All…	すべてリセット…
 	Press a key combination	キーの組み合わせを押してください
 	Customize	ユーザー設定
@@ -1386,3 +1396,30 @@
 	New Group	新しいグループ
 	Rename…	名前の変更…
 	Ribbon and Quick Access Toolbar:	リボンとクイック アクセス ツール バー:
+	Right-to-Left Table	右から左の表
+	Right-to-Left Section	右から左のセクション
+	Table direction:	表の方向:
+	Section direction:	セクションの方向:
+	Drawing Canvas	描画キャンバス
+	New Drawing Canvas	新しい描画キャンバス
+	Fit	サイズに合わせる
+	Expand	拡大
+	Scale Drawing	描画の拡大縮小
+	Canvas Member	キャンバス内の図形
+	Arrows	矢印
+	Communication	コミュニケーション
+	Office	オフィス
+	People	人物
+	Nature	自然
+	Weather	天気
+	Technology	テクノロジー
+	Transport	乗り物
+	Icon Color	アイコンの色
+	Search icons	アイコンを検索
+	No icons match your search.	検索に一致するアイコンはありません。
+	Recolor a one-color picture, such as an icon	アイコンなどの単色の画像の色を変更
+	Enclose Characters	囲い文字
+	Shrink text	文字を縮小
+	Enlarge symbol	記号を拡大
+	Enclosure	囲い
+	Circle	円

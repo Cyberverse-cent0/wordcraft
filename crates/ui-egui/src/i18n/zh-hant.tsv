@@ -104,6 +104,14 @@
 	Restart list after:	重新開始清單的層級：
 	Right border	右框線
 	Right Margin	右邊界
+	Base text:	基準文字：
+	Distribute letters	字母平均分散
+	Distribute spacing	間距平均分散
+	Offset (pt):	位移（點）：
+	Phonetic Guide	注音標示
+	Remove	移除
+	Right (vertical)	靠右（直書）
+	Ruby text:	注音文字：
 	Search for templates	搜尋範本
 	Show all revisions inline	以內嵌方式顯示所有修訂
 	Show documents with their colours inverted, like View › Switch Modes. Saving, printing and PDFs are unchanged.	像「檢視 › 切換模式」一樣以反轉的色彩顯示文件。儲存、列印和 PDF 不受影響。
@@ -740,6 +748,7 @@
 	Single	單線
 	Single Spacing	單行間距
 	Size	大小
+	Size (pt):	大小（點）：
 	Size:	大小：
 	Small Caps	小型大寫字
 	Small caps	小型大寫字
@@ -1092,6 +1101,8 @@
 	Type at least one recipient.	請至少輸入一位收件者。
 	Type the recipients, or load them from a file.	輸入收件者，或從檔案載入。
 	Use an Existing List…	使用現有清單…
+	Choose the sheet that holds the recipients.	選擇包含收件者的工作表。
+	First row of data contains column headers	資料第一列包含欄標題
 	Interface theme:	介面主題：
 	Interface\nTheme	介面主題
 	Interface Theme	介面主題
@@ -1362,7 +1373,6 @@
 	Not used by any command	未被任何命令使用
 	Remove every custom shortcut and restore the built-in keys?	要移除所有自訂快速鍵並還原內建按鍵嗎？
 	Assign	指定
-	Remove	移除
 	Reset All…	全部重設…
 	Press a key combination	請按組合鍵
 	Customize	自訂
@@ -1387,3 +1397,30 @@
 	New Group	新增群組
 	Rename…	重新命名…
 	Ribbon and Quick Access Toolbar:	功能區和快速存取工具列：
+	Right-to-Left Table	從右至左表格
+	Right-to-Left Section	從右至左節
+	Table direction:	表格方向：
+	Section direction:	節方向：
+	Drawing Canvas	繪圖畫布
+	New Drawing Canvas	新增繪圖畫布
+	Fit	調整大小
+	Expand	擴展
+	Scale Drawing	縮放繪圖
+	Canvas Member	畫布成員
+	Arrows	箭頭
+	Communication	通訊
+	Office	辦公
+	People	人物
+	Nature	自然
+	Weather	天氣
+	Technology	科技
+	Transport	交通
+	Icon Color	圖示色彩
+	Search icons	搜尋圖示
+	No icons match your search.	沒有符合搜尋的圖示。
+	Recolor a one-color picture, such as an icon	為圖示等單色圖片重新著色
+	Enclose Characters	圍繞字元
+	Shrink text	縮小文字
+	Enlarge symbol	放大符號
+	Enclosure	圍繞符號
+	Circle	圓形

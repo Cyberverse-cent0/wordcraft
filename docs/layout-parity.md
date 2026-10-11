@@ -28,10 +28,10 @@ font can't match Word's metrics.
 | Tabs (left, center, right, decimal, bar), leaders | 🟡 | Bar tabs untested | 1–2 |
 | Hyphenation (automatic, 0.25" zone, soft hyphens, consecutive limit) | 🟡 | English patterns only; other languages hyphenate wrongly or not at all | in localization |
 | Drop caps | ✅ | 2026-10-06 | — |
-| Columns, column breaks, separators | 🟡 | **Columns don't balance** at a continuous section break or document end | 4–6 |
+| Columns, column breaks, separators, balancing | ✅ | Columns balance on a section's last page when the next section starts continuous (also at the document end, which Word only balances when the document ends with a continuous break); not after next-page/even/odd breaks or on a page with a column break; keep-together, keep-with-next, widow/orphan control and unsplittable rows can leave them slightly uneven (#350) | — |
 | Section breaks (next page, continuous, even, odd), different first page, odd/even headers | ✅ | Section breaks don't show in Draft view (#42) | 1–2 |
 | Body top below a tall header, footer pushes body up | ✅ | #138 | — |
-| Footnotes at the page bottom, endnotes at the end, note numbering | 🟡 | A long note continues onto the next page at a line boundary (its first line stays with the reference), first in that page's note area under a full-width continuation separator (#352); the document's own `w:continuationSeparator`/`w:continuationNotice` aren't read (default line, no notice); per-section restart partial | 2–4 |
+| Footnotes at the page bottom, endnotes at the end, note numbering | 🟡 | A long note continues onto the next page at a line boundary (its first line stays with the reference), first in that page's note area under a full-width continuation separator (#352); the document's own separator, continuation separator and continuation notice are drawn (the notice under a note that continues; endnotes use the document's separator but don't continue onto a page of their own); per-section restart partial | 1–3 |
 | Tables: row heights (at least/exact), rows split across pages, header rows repeat, Can't Split | ✅ | 2026-10-06, #138 | — |
 | Tables: autofit to contents/window, fixed widths, Word 2013 edge | 🟡 | #137; #44: AutoFit Contents measures each column's narrowest and widest text and shares the width like Word, once (not live as you type); cell preferred widths and spans still differ | 3–5 |
 | Floating tables (`w:tblpPr`) | 🟡 | #137; overlap rules untested | 2–3 |
@@ -47,8 +47,8 @@ font can't match Word's metrics.
 | Gutter, mirror margins, book fold, 2 pages per sheet | 🟡 | gutter and mirror margins; book fold missing | 2–3 |
 | Document grid (`w:docGrid`, lines per page, characters per line) | ❌ | East Asian documents paginate differently without it | 4–6 |
 | Vertical text (`tbRl`) in sections and text boxes; cell text direction | 🟡 | cell text direction landed (#245); page-level and text-box vertical text missing | 8–12 |
-| Ruby / phonetic guide, enclose characters, combined characters | ❌ | | 4–6 |
-| Bidirectional paragraphs, mixed-direction lines | 🟡 | #207; RTL sections and tables (`w:bidiVisual`) missing | 4–6 |
+| Ruby / phonetic guide, enclose characters, combined characters | 🟡 | ruby (Phonetic Guide) landed (#288): ruby text over its base by alignment, line grows to fit, in PDF; enclose and combined characters missing; ruby not yet compared with Word page by page | 2–4 |
+| Bidirectional paragraphs, mixed-direction lines; RTL tables and sections | 🟡 | #207; RTL tables (#362): grid columns from the right edge, start alignment and indent from the right margin, cell margins and left/right borders mirrored, merged and turned cells and nested tables included; RTL sections (#362): newspaper columns right to left with the line between mirrored. Right-hand page gutter (`w:rtlGutter`) missing | 1 |
 | Equations: display layout, numbering, wrapping long display equations | ✅ | #191; long display equations break at top-level operators (`m:brkBin`, `m:brkBinSub`), manual breaks and `m:alnAt`, continuation lines indented by `m:wrapIndent` or set right (`m:wrapRight`) (#326) | — |
 | Hidden text excluded from breaking and hyphenation | ✅ | #173 | — |
 | Fields: PAGE, NUMPAGES, SECTIONPAGES, TOC page numbers | ✅ | #52 | — |
@@ -68,8 +68,13 @@ font can't match Word's metrics.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-11 | trivial | Right-to-left tables and sections laid out mirrored (#362) |
+| 2026-10-10 | trivial | The document's own note separators and continuation notice are drawn (#352) |
+| 2026-10-11 | trivial | Newspaper columns balance before a continuous section break (#350) |
 | 2026-10-11 | trivial | Group and Ungroup keep turned members' orientation and placement (#441, #443); Size resizes a group (#442); the eraser hits turned ink where it is drawn (#445) |
 | 2026-10-10 | trivial | Long footnotes continue onto the next page with a continuation separator (#352) |
+| 2026-10-11 | trivial | `EQ \o` fields overstrike their arguments; enclosed characters draw their circle, square, triangle or diamond as vectors (#297) |
+| 2026-10-11 | trivial | Ruby (Phonetic Guide) layout landed (#288) |
 | 2026-10-10 | trivial | Wrap side: text on both sides, left only, right only or the largest side of an object (#354) |
 | 2026-10-10 | trivial | Tight and Through wrapping follow the object's outline (#354) |
 | 2026-10-10 | trivial | Rotated and flipped objects laid out and drawn (#332) |

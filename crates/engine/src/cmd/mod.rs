@@ -1,5 +1,6 @@
 //! Command implementations, one module per area. Each module exposes `specs()`.
 
+pub mod canvas;
 pub mod caret;
 pub mod citations;
 pub mod column;
@@ -19,6 +20,7 @@ pub mod objects;
 pub mod page;
 pub mod para;
 pub mod paste;
+pub mod phonetic;
 pub mod references;
 pub mod review;
 pub mod speech;
@@ -44,6 +46,7 @@ pub fn registry() -> Registry {
     v.extend(edit::specs());
     v.extend(paste::specs());
     v.extend(format::specs());
+    v.extend(phonetic::specs());
     v.extend(para::specs());
     v.extend(lists::specs());
     v.extend(inspector::specs());
@@ -63,6 +66,7 @@ pub fn registry() -> Registry {
     v.extend(citations::specs());
     v.extend(objects::specs());
     v.extend(draw::specs());
+    v.extend(canvas::specs());
     v.extend(tools::specs());
     v.extend(speech::specs());
     Registry::new(v)

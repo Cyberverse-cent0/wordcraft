@@ -501,29 +501,52 @@ impl Writer<'_> {
                 w.close("w:r");
                 self.rev_close(w, props);
             }
-            InlineObject::Group { w: gw, h: gh, float, ch_w, ch_h, children } => {
+            InlineObject::Group { w: gw, h: gh, float, ch_w, ch_h, children, canvas } => {
                 self.rev_open(w, props);
                 w.open("w:r", &[]);
                 self.rpr(w, props);
                 w.open("w:drawing", &[]);
                 let docpr = self.next_docpr();
-                let name = format!("Group {docpr}");
+                let name = format!("{} {docpr}", if canvas.is_some() { "Canvas" } else { "Group" });
                 self.drawing_open(w, float, *gw, *gh, &docpr, &name, "");
                 w.empty("wp:cNvGraphicFramePr", &[]);
                 w.open("a:graphic", &[]);
-                w.open("a:graphicData", &[("uri", "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup")]);
-                // ECMA-376 §20.1.7.6 (`a:xfrm` of a group): the members' space `a:chOff`/`a:chExt`
-                // maps onto the group's `a:off`/`a:ext`.
-                w.open("wpg:wgp", &[]);
-                w.empty("wpg:cNvGrpSpPr", &[]);
-                w.open("wpg:grpSpPr", &[]);
-                w.open("a:xfrm", &spin_attrs(float.spin()).iter().map(|(k, v)| (*k, v.as_str())).collect::<Vec<_>>());
-                w.empty("a:off", &[("x", "0"), ("y", "0")]);
-                w.empty("a:ext", &[("cx", &emu(gw.max(0.0))), ("cy", &emu(gh.max(0.0)))]);
-                w.empty("a:chOff", &[("x", "0"), ("y", "0")]);
-                w.empty("a:chExt", &[("cx", &emu(ch_w.max(0.0))), ("cy", &emu(ch_h.max(0.0)))]);
-                w.close("a:xfrm");
-                w.close("wpg:grpSpPr");
+                let outer = match canvas {
+                    Some(c) => {
+                        // A Drawing Canvas: its background (`wpc:bg`) and outline (`wpc:whole`), then
+                        // its members, at offsets in the canvas's own (unscaled) space.
+                        w.open("a:graphicData", &[("uri", "http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas")]);
+                        w.open("wpc:wpc", &[]);
+                        w.open("wpc:bg", &[]);
+                        solid_fill(w, c.fill);
+                        w.close("wpc:bg");
+                        w.open("wpc:whole", &[]);
+                        match c.stroke {
+                            Some(_) => w.open("a:ln", &[("w", &emu(c.stroke_width.clamp(0.0, 100.0)))]),
+                            None => w.open("a:ln", &[]),
+                        }
+                        solid_fill(w, c.stroke);
+                        w.close("a:ln");
+                        w.close("wpc:whole");
+                        "wpc:wpc"
+                    }
+                    None => {
+                        w.open("a:graphicData", &[("uri", "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup")]);
+                        // ECMA-376 §20.1.7.6 (`a:xfrm` of a group): the members' space `a:chOff`/`a:chExt`
+                        // maps onto the group's `a:off`/`a:ext`.
+                        w.open("wpg:wgp", &[]);
+                        w.empty("wpg:cNvGrpSpPr", &[]);
+                        w.open("wpg:grpSpPr", &[]);
+                        w.open("a:xfrm", &spin_attrs(float.spin()).iter().map(|(k, v)| (*k, v.as_str())).collect::<Vec<_>>());
+                        w.empty("a:off", &[("x", "0"), ("y", "0")]);
+                        w.empty("a:ext", &[("cx", &emu(gw.max(0.0))), ("cy", &emu(gh.max(0.0)))]);
+                        w.empty("a:chOff", &[("x", "0"), ("y", "0")]);
+                        w.empty("a:chExt", &[("cx", &emu(ch_w.max(0.0))), ("cy", &emu(ch_h.max(0.0)))]);
+                        w.close("a:xfrm");
+                        w.close("wpg:grpSpPr");
+                        "wpg:wgp"
+                    }
+                };
                 for c in children.iter().take(wordcraft_doc::para::MAX_GROUP_CHILDREN) {
                     let at = (c.x, c.y);
                     match &c.obj {
@@ -539,11 +562,52 @@ impl Writer<'_> {
                         _ => {}
                     }
                 }
-                w.close("wpg:wgp");
+                if canvas.is_some() && float.spin() != wordcraft_geom::Spin::default() {
+                    // The canvas schema has no transform of its own: keep its turn in our
+                    // extension (Word draws it unturned, as it can't turn a canvas).
+                    w.open("wpc:extLst", &[]);
+                    w.open("a:ext", &[("uri", crate::CANVAS_SPIN_EXT)]);
+                    xfrm_spin_only(w, float.spin());
+                    w.close("a:ext");
+                    w.close("wpc:extLst");
+                }
+                w.close(outer);
                 w.close("a:graphicData");
                 w.close("a:graphic");
                 w.close(if float.wrap == Wrap::Inline { "wp:inline" } else { "wp:anchor" });
                 w.close("w:drawing");
+                w.close("w:r");
+                self.rev_close(w, props);
+            }
+            InlineObject::Ruby { base, ruby, align, size, raise, base_size, lang, props: ruby_props } => {
+                // ECMA-376 §17.3.3.25: a run holding w:ruby (properties, ruby text, base text).
+                let t = if self.is_del(props) { "w:delText" } else { "w:t" };
+                let fin = |v: f32, d: f32| if v.is_finite() { v } else { d };
+                let hps = |v: f32, min: f32| n(wordcraft_geom::to_half_points(v.clamp(min, 1584.0)));
+                let size = fin(*size, 5.0).clamp(1.0, 1584.0);
+                let base_size = if base_size.is_finite() && *base_size > 0.0 { *base_size } else { props.size.unwrap_or(10.5) };
+                self.rev_open(w, props);
+                w.open("w:r", &[]);
+                rpr(w, props);
+                w.open("w:ruby", &[]);
+                w.open("w:rubyPr", &[]);
+                w.val("w:rubyAlign", align.ooxml());
+                w.val("w:hps", &hps(size, 1.0));
+                w.val("w:hpsRaise", &hps(fin(*raise, 0.0), 0.0));
+                w.val("w:hpsBaseText", &hps(fin(base_size, 10.5), 1.0));
+                w.val("w:lid", if lang.is_empty() { "ja-JP" } else { lang });
+                w.close("w:rubyPr");
+                let mut rt_props = props.clone().overlaid(ruby_props);
+                rt_props.size = Some(size);
+                for (tag, p, text) in [("w:rt", &rt_props, ruby), ("w:rubyBase", props, base)] {
+                    w.open(tag, &[]);
+                    w.open("w:r", &[]);
+                    rpr(w, p);
+                    w.leaf(t, &[("xml:space", "preserve")], text);
+                    w.close("w:r");
+                    w.close(tag);
+                }
+                w.close("w:ruby");
                 w.close("w:r");
                 self.rev_close(w, props);
             }
@@ -567,6 +631,12 @@ impl Writer<'_> {
             // A TOC heading's field opens in the first entry and closes after the last (see `toc_span`).
             self.toc_hold_end = false;
             self.toc_field = Some((instr.to_string(), locked, props.clone()));
+            return;
+        }
+        if let Some(e) = wordcraft_doc::eq::Enclosure::parse(instr) {
+            self.rev_open(w, props);
+            self.enclosure(w, &e, locked, props);
+            self.rev_close(w, props);
             return;
         }
         let del = self.is_del(props);
@@ -606,6 +676,52 @@ impl Writer<'_> {
         }
         run(w, &|w| w.empty("w:fldChar", &[("w:fldCharType", "end")]));
         self.rev_close(w, props);
+    }
+
+    /// Enclosed characters as Word stores them: an `eq \o\ac(○,字)` field with no result, whose
+    /// code is split so the symbol and the text get their own sizes: "shrink text" makes the text
+    /// smaller (raised to sit in the middle), "enlarge symbol" makes the symbol bigger (lowered).
+    fn enclosure(&self, w: &mut W, e: &wordcraft_doc::eq::Enclosure, locked: bool, props: &CharProps) {
+        use wordcraft_doc::eq::EncloseStyle;
+        let del = self.is_del(props);
+        let tag = if del { "w:delInstrText" } else { "w:instrText" };
+        let base = props.size.unwrap_or_else(|| self.doc.styles.resolve_char(None, props).size).clamp(1.0, 1638.0);
+        let half = |pt: f32| (pt * 2.0).round() / 2.0;
+        let (mut sym, mut txt) = (props.clone(), props.clone());
+        match e.style {
+            EncloseStyle::Shrink => {
+                txt.size = Some(half(base * 0.7).max(1.0));
+                txt.position = Some(half(base * 0.1));
+            }
+            EncloseStyle::Enlarge => {
+                sym.size = Some(half(base * 1.5));
+                sym.position = Some(-half(base * 0.2));
+            }
+        }
+        let run = |w: &mut W, p: &CharProps, f: &dyn Fn(&mut W)| {
+            w.open("w:r", &[]);
+            rpr(w, p);
+            f(w);
+            w.close("w:r");
+        };
+        run(w, props, &|w| {
+            if locked {
+                w.empty("w:fldChar", &[("w:fldCharType", "begin"), ("w:fldLock", "1")])
+            } else {
+                w.empty("w:fldChar", &[("w:fldCharType", "begin")])
+            }
+        });
+        let code = e.word_instr();
+        // `eq \o\ac(` + symbol, `,`, the text, `)`.
+        let open = code.find('(').map(|i| i + 1).unwrap_or(0);
+        let comma = open + e.shape.symbol().len_utf8();
+        let (head, rest) = code.split_at(comma.min(code.len()));
+        let text = rest.get(1..rest.len().saturating_sub(1)).unwrap_or("");
+        run(w, &sym, &|w| w.leaf(tag, &[("xml:space", "preserve")], &format!(" {head}")));
+        run(w, props, &|w| w.leaf(tag, &[("xml:space", "preserve")], ","));
+        run(w, &txt, &|w| w.leaf(tag, &[("xml:space", "preserve")], text));
+        run(w, props, &|w| w.leaf(tag, &[("xml:space", "preserve")], ")"));
+        run(w, props, &|w| w.empty("w:fldChar", &[("w:fldCharType", "end")]));
     }
 
     /// A field's begin, instruction and separate runs.
@@ -1093,6 +1209,11 @@ fn xfrm(w: &mut W, (x, y): (f32, f32), cw: f32, ch: f32, spin: wordcraft_geom::S
     w.close("a:xfrm");
 }
 
+/// An `a:xfrm` holding only a rotation and flips.
+fn xfrm_spin_only(w: &mut W, spin: wordcraft_geom::Spin) {
+    w.empty("a:xfrm", &spin_attrs(spin).iter().map(|(k, v)| (*k, v.as_str())).collect::<Vec<_>>());
+}
+
 /// The `a:xfrm` attributes of a rotation and flips (ECMA-376 §20.1.7.6: `rot` in 60000ths of a
 /// degree, clockwise), none for an unturned object.
 pub(super) fn spin_attrs(spin: wordcraft_geom::Spin) -> Vec<(&'static str, String)> {
@@ -1142,4 +1263,16 @@ fn toc_span(bl: &Blocks) -> Option<(usize, usize)> {
         })
         .count();
     (entries > 0).then_some((start, start + entries))
+}
+
+/// A DrawingML `a:solidFill` in `c`, or `a:noFill`.
+fn solid_fill(w: &mut W, c: Option<wordcraft_doc::props::Rgb>) {
+    match c {
+        Some(c) => {
+            w.open("a:solidFill", &[]);
+            w.empty("a:srgbClr", &[("val", &c.hex())]);
+            w.close("a:solidFill");
+        }
+        None => w.empty("a:noFill", &[]),
+    }
 }

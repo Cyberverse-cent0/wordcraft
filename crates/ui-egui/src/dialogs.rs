@@ -1,8 +1,8 @@
 //! Dialogs: Font, Paragraph, Find & Replace, Go To, Insert Table, Page Setup, Link, Bookmark,
 //! Word Count, Zoom, Watermark, New/Modify Style, Manage Styles, New/Modify Table Style, Table
-//! Properties, Command search, Paste Special, About, Save Changes, the password to open a
+//! Properties, Enclose Characters, Command search, Icons, Paste Special, About, Save Changes, the password to open a
 //! document and Encrypt with Password, and the mail-merge Recipient List, Insert Merge Field, Find
-//! Recipient, merge rules, Match Fields and Check for Errors (Customize Keyboard is in
+//! Recipient, merge rules, Match Fields, Check for Errors and Select Table (a workbook's sheet) (Customize Keyboard is in
 //! `dialogs_keyboard`, Customize Ribbon in `dialogs_ribbon`). Every dialog ends by running a
 //! command (or shows one's result), so agents get the same result without the dialog.
 
@@ -89,6 +89,8 @@ pub enum Dialog {
         left: f32,
         right: f32,
         landscape: bool,
+        /// Section direction: right to left (`layout.sectionRtl`).
+        rtl: bool,
     },
     Link {
         url: String,
@@ -106,6 +108,17 @@ pub enum Dialog {
     Watermark {
         text: String,
         diagonal: bool,
+    },
+    /// Home › Font › Phonetic Guide: ruby text over the selected text (`format.phonetic`).
+    Phonetic {
+        base: String,
+        ruby: String,
+        /// OOXML alignment name (`center`, `distributeLetter`…).
+        align: String,
+        size: f32,
+        offset: f32,
+        /// The selection already has a phonetic guide (Remove is offered).
+        existing: bool,
     },
     NewStyle {
         name: String,
@@ -153,6 +166,12 @@ pub enum Dialog {
     },
     /// Columns, Symbol and Field ([`crate::dialogs_insert`], #321).
     Insert(Box<crate::dialogs_insert::InsertDialog>),
+    /// Insert › Icons: the icon library, searchable and filtered by category (empty for all).
+    Icons {
+        query: String,
+        category: String,
+        selected: String,
+    },
     /// Paste Special: the clipboard's formats and the chosen one. The clipboard payload stays out
     /// of the serialized dialog state (it can be megabytes).
     PasteSpecial {
@@ -183,6 +202,17 @@ pub enum Dialog {
         fields: Vec<String>,
         rows: Vec<Vec<String>>,
         message: String,
+    },
+    /// Mailings › Select Recipients › Use an Existing List… picked a workbook with several sheets
+    /// (#334): which sheet holds the recipients, and whether its first row names the fields.
+    /// OK runs `mailings.recipients` with `params` (the file) plus `sheet` and `headers`.
+    SelectTable {
+        sheets: Vec<String>,
+        selected: usize,
+        headers: bool,
+        message: String,
+        #[serde(skip)]
+        params: Value,
     },
     /// Mailings › Insert Merge Field: one of the recipient list's fields (or a typed name).
     InsertMergeField {
@@ -263,6 +293,13 @@ pub enum Dialog {
     CustomizeRibbon {
         form: Box<crate::dialogs_ribbon::RibbonForm>,
     },
+    /// Home › Font › Enclose Characters: the style (`none` takes the enclosure away, `shrink`,
+    /// `enlarge`), the text and the shape (`circle`, `square`, `triangle`, `diamond`).
+    Enclose {
+        style: String,
+        text: String,
+        shape: String,
+    },
 }
 
 /// The Table Properties dialog's fields. Lengths are in the interface unit
@@ -275,6 +312,8 @@ pub struct TableForm {
     /// `left`, `center` or `right`.
     pub align: String,
     pub indent: f32,
+    /// Table direction: right to left (`w:bidiVisual`).
+    pub rtl: bool,
     pub row_height_on: bool,
     pub row_height: f32,
     pub row_exact: bool,
@@ -310,6 +349,7 @@ impl TableForm {
             }
             .into(),
             indent: fin(t.props.indent.unwrap_or(0.0)) / k,
+            rtl: t.props.bidi_visual,
             row_height_on: row.height.is_some() && row.height_rule != HeightRule::Auto,
             row_height: fin(row.height.unwrap_or(18.0)) / k,
             row_exact: row.height_rule == HeightRule::Exact,
@@ -340,6 +380,9 @@ impl TableForm {
         }
         if moved(self.indent, basis.indent) {
             v.insert("indent".into(), json!(self.indent * k));
+        }
+        if self.rtl != basis.rtl {
+            v.insert("rtl".into(), json!(self.rtl));
         }
         if self.row_height_on != basis.row_height_on
             || (self.row_height_on && (moved(self.row_height, basis.row_height) || self.row_exact != basis.row_exact))
@@ -646,6 +689,7 @@ impl Dialog {
             Dialog::WordCount { .. } => "wordCount",
             Dialog::Zoom { .. } => "zoom",
             Dialog::Watermark { .. } => "watermark",
+            Dialog::Phonetic { .. } => "phonetic",
             Dialog::NewStyle { .. } => "newStyle",
             Dialog::ModifyStyle { .. } => "modifyStyle",
             Dialog::ManageStyles { .. } => "manageStyles",
@@ -653,10 +697,12 @@ impl Dialog {
             Dialog::TableStyle { .. } => "modifyTableStyle",
             Dialog::Commands { .. } => "commands",
             Dialog::Insert(d) => d.name(),
+            Dialog::Icons { .. } => "icons",
             Dialog::PasteSpecial { .. } => "pasteSpecial",
             Dialog::About { .. } => "about",
             Dialog::SaveChanges { .. } => "saveChanges",
             Dialog::RecipientList { .. } => "recipientList",
+            Dialog::SelectTable { .. } => "selectTable",
             Dialog::InsertMergeField { .. } => "insertMergeField",
             Dialog::FindRecipient { .. } => "findRecipient",
             Dialog::FieldCode { edit: false, .. } => "fieldCode",
@@ -672,6 +718,7 @@ impl Dialog {
             Dialog::TrackOptions { .. } => "trackChangesOptions",
             Dialog::CustomizeKeyboard { .. } => "customizeKeyboard",
             Dialog::CustomizeRibbon { .. } => "customizeRibbon",
+            Dialog::Enclose { .. } => "enclose",
         }
     }
 
@@ -768,6 +815,7 @@ impl Dialog {
                     left: sp.margin_left / 72.0,
                     right: sp.margin_right / 72.0,
                     landscape: sp.landscape,
+                    rtl: sp.rtl,
                 }
             }
             "link" => Dialog::Link { url: "https://".into(), text: app.session.selected_text() },
@@ -775,6 +823,19 @@ impl Dialog {
             "wordCount" => Dialog::WordCount { stats: app.session.run("review.wordCount", &json!({})).unwrap_or_default() },
             "zoom" => Dialog::Zoom { percent: (app.session.view.zoom * 100.0).round() },
             "watermark" => Dialog::Watermark { text: "CONFIDENTIAL".into(), diagonal: true },
+            "phonetic" => {
+                let v = wordcraft_engine::cmd::phonetic::state(&app.session);
+                let f = |k: &str| v.get(k).and_then(Value::as_f64).unwrap_or(0.0) as f32;
+                let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+                Dialog::Phonetic {
+                    base: s("base"),
+                    ruby: s("ruby"),
+                    align: s("align"),
+                    size: f("size"),
+                    offset: f("offset"),
+                    existing: v.get("existing").and_then(Value::as_bool).unwrap_or(false),
+                }
+            }
             "newStyle" => Dialog::NewStyle { name: "Style1".into(), based_on: "Normal".into(), back: false },
             "manageStyles" => Dialog::ManageStyles { alphabetical: false, selected: s("style") },
             "newTableStyle" => {
@@ -792,9 +853,20 @@ impl Dialog {
                 Dialog::TableStyle { id: Some(id), name, based_on, region: 0, basis: regions.clone(), regions }
             }
             "commands" => Dialog::Commands { query: String::new() },
+            "icons" => Dialog::Icons { query: String::new(), category: String::new(), selected: String::new() },
             "tableProperties" => {
                 let form = Box::new(TableForm::read(app)?);
                 Dialog::TableProperties { basis: form.clone(), form }
+            }
+            "enclose" => {
+                // The selection's text and its enclosure, if it has one.
+                let t = wordcraft_engine::cmd::format::enclose_target(&app.session).ok();
+                let cur = t.as_ref().and_then(|t| t.current.clone());
+                Dialog::Enclose {
+                    style: cur.as_ref().map_or("shrink", |e| e.style.name()).into(),
+                    shape: cur.as_ref().map_or("circle", |e| e.shape.name()).into(),
+                    text: t.map(|t| t.text).unwrap_or_default(),
+                }
             }
             "pasteSpecial" => Dialog::paste_special(app, &json!({})),
             "about" => Dialog::About { tab: 0 },
@@ -979,6 +1051,7 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
         Dialog::WordCount { .. } => "Word Count",
         Dialog::Zoom { .. } => "Zoom",
         Dialog::Watermark { .. } => "Custom Watermark",
+        Dialog::Phonetic { .. } => "Phonetic Guide",
         Dialog::NewStyle { .. } => "Create New Style",
         Dialog::ModifyStyle { .. } => "Modify Style",
         Dialog::ManageStyles { .. } => "Manage Styles",
@@ -986,10 +1059,12 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
         Dialog::TableStyle { .. } => "Modify Table Style",
         Dialog::Commands { .. } => "Search Commands",
         Dialog::Insert(d) => d.title(),
+        Dialog::Icons { .. } => "Icons",
         Dialog::PasteSpecial { .. } => "Paste Special",
         Dialog::About { .. } => "About WordCraft",
         Dialog::SaveChanges { .. } => "WordCraft",
         Dialog::RecipientList { .. } => "Recipient List",
+        Dialog::SelectTable { .. } => "Select Table",
         Dialog::InsertMergeField { .. } => "Insert Merge Field",
         Dialog::FindRecipient { .. } => "Find Recipient",
         Dialog::FieldCode { edit: false, .. } => "Field",
@@ -1005,6 +1080,7 @@ pub fn show(app: &mut WordApp, ctx: &egui::Context) {
         Dialog::TrackOptions { .. } => "Track Changes Options",
         Dialog::CustomizeKeyboard { .. } => "Customize Keyboard",
         Dialog::CustomizeRibbon { .. } => "Customize Ribbon",
+        Dialog::Enclose { .. } => "Enclose Characters",
     };
     let id = egui::Id::new(("dialog", title));
     let shown = place_dialog(ctx, id, egui::Window::new(tl!(title)).id(id).collapsible(false).resizable(false)).open(&mut open).show(ctx, |ui| {
@@ -1305,6 +1381,36 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             }
             ok || cancel
         }
+        Dialog::Enclose { style, text, shape } => {
+            ui.label(egui::RichText::new(tl!("Style")).font(semibold(12.5)));
+            ui.horizontal(|ui| {
+                for (v, l) in [("none", "None"), ("shrink", "Shrink text"), ("enlarge", "Enlarge symbol")] {
+                    ui.radio_value(style, v.to_string(), tl!(l));
+                }
+            });
+            ui.add_space(6.0);
+            ui.horizontal_top(|ui| {
+                ui.vertical(|ui| {
+                    ui.label(tl!("Text:"));
+                    ui.add(egui::TextEdit::singleline(text).desired_width(110.0).char_limit(2));
+                    ui.add_space(6.0);
+                    enclose_preview(ui, style, text, shape);
+                });
+                ui.add_space(12.0);
+                ui.vertical(|ui| {
+                    ui.label(tl!("Enclosure"));
+                    for (v, l) in [("circle", "Circle"), ("square", "Square"), ("triangle", "Triangle"), ("diamond", "Diamond")] {
+                        ui.add_enabled_ui(style != "none", |ui| ui.selectable_value(shape, v.to_string(), tl!(l)));
+                    }
+                });
+            });
+            let (ok, cancel) = buttons(ui, tl!("OK"));
+            if ok {
+                let params = if style == "none" { json!({"shape": null}) } else { json!({"shape": shape, "style": style, "text": text}) };
+                let _ = app.run("format.enclose", params);
+            }
+            ok || cancel
+        }
         Dialog::TableProperties { form, basis } => {
             table_properties(ui, form);
             let (ok, cancel) = buttons(ui, tl!("OK"));
@@ -1331,7 +1437,7 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             }
             ok || cancel
         }
-        Dialog::PageSetup { top, bottom, left, right, landscape } => {
+        Dialog::PageSetup { top, bottom, left, right, landscape, rtl } => {
             ui.label(egui::RichText::new(tl!("Margins")).font(semibold(12.5)));
             egui::Grid::new("ps").num_columns(4).show(ui, |ui| {
                 ui.label(tl!("Top:"));
@@ -1350,11 +1456,19 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
                 ui.radio_value(landscape, false, tl!("Portrait"));
                 ui.radio_value(landscape, true, tl!("Landscape"));
             });
+            ui.horizontal(|ui| {
+                ui.label(tl!("Section direction:"));
+                ui.radio_value(rtl, false, tl!("Left-to-right"));
+                ui.radio_value(rtl, true, tl!("Right-to-left"));
+            });
             let (ok, cancel) = buttons(ui, tl!("OK"));
             if ok {
                 let _ = app.run("layout.orientation", json!({"value": if *landscape { "landscape" } else { "portrait" }}));
                 let _ =
                     app.run("layout.margins", json!({"top": *top * 72.0, "bottom": *bottom * 72.0, "left": *left * 72.0, "right": *right * 72.0}));
+                if *rtl != wordcraft_engine::cmd::page::sect(&app.session).rtl {
+                    let _ = app.run("layout.sectionRtl", json!({"value": *rtl}));
+                }
             }
             ok || cancel
         }
@@ -1458,6 +1572,52 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
                 let _ = app.run("design.watermark", json!({"text": text, "diagonal": *diagonal}));
             }
             ok || cancel
+        }
+        Dialog::Phonetic { base, ruby, align, size, offset, existing } => {
+            // Base and ruby text are usually Chinese or Japanese: fonts for them load from the next frame.
+            app.want_system_cjk = true;
+            const ALIGNS: [(&str, &str); 6] = [
+                ("center", "Center"),
+                ("distributeLetter", "Distribute letters"),
+                ("distributeSpace", "Distribute spacing"),
+                ("left", "Left"),
+                ("right", "Right"),
+                ("rightVertical", "Right (vertical)"),
+            ];
+            egui::Grid::new("phonetic").num_columns(2).spacing(vec2(10.0, 6.0)).show(ui, |ui| {
+                ui.label(tl!("Base text:"));
+                ui.label(egui::RichText::new(base.as_str()).strong());
+                ui.end_row();
+                ui.label(tl!("Ruby text:"));
+                ui.text_edit_singleline(ruby);
+                ui.end_row();
+                ui.label(tl!("Alignment:"));
+                let shown = ALIGNS.iter().find(|(k, _)| k == align).map_or("Center", |(_, l)| l);
+                egui::ComboBox::from_id_salt("phonetic_align").selected_text(tl!(shown)).show_ui(ui, |ui| {
+                    for (k, l) in ALIGNS {
+                        ui.selectable_value(align, k.to_string(), tl!(l));
+                    }
+                });
+                ui.end_row();
+                ui.label(tl!("Offset (pt):"));
+                ui.add(egui::DragValue::new(offset).speed(0.5).range(-100.0..=100.0));
+                ui.end_row();
+                ui.label(tl!("Size (pt):"));
+                ui.add(egui::DragValue::new(size).speed(0.5).range(1.0..=200.0));
+                ui.end_row();
+            });
+            let mut remove = false;
+            if *existing {
+                ui.add_space(4.0);
+                remove = ui.button(tl!("Remove")).clicked();
+            }
+            let (ok, cancel) = buttons(ui, tl!("OK"));
+            if remove {
+                let _ = app.run("format.phonetic", json!({"ruby": null}));
+            } else if ok {
+                let _ = app.run("format.phonetic", json!({"ruby": ruby, "align": align, "size": *size, "offset": *offset}));
+            }
+            ok || cancel || remove
         }
         Dialog::NewStyle { name, based_on, back } => {
             egui::Grid::new("ns").num_columns(2).show(ui, |ui| {
@@ -1642,6 +1802,7 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             }
             close || ui.input(|i| i.key_pressed(egui::Key::Escape))
         }
+        Dialog::Icons { query, category, selected } => icons_body(app, ui, query, category, selected),
         Dialog::PasteSpecial { formats, choice, payload } => {
             ui.label(egui::RichText::new(tl!("Paste as:")).font(semibold(12.5)));
             if formats.is_empty() {
@@ -1871,6 +2032,41 @@ fn body(app: &mut WordApp, ui: &mut Ui, d: &mut Dialog) -> bool {
             }
             cancel
         }
+        Dialog::SelectTable { sheets, selected, headers, message, params } => {
+            ui.label(tl!("Choose the sheet that holds the recipients."));
+            ui.add_space(4.0);
+            // A double-click picks the sheet as OK does.
+            let mut picked = false;
+            egui::Frame::group(ui.style()).show(ui, |ui| {
+                ui.set_min_width(300.0);
+                egui::ScrollArea::vertical().id_salt("select_table").max_height(220.0).show(ui, |ui| {
+                    for (i, name) in sheets.iter().enumerate() {
+                        let r = ui.selectable_label(*selected == i, name.as_str());
+                        if r.clicked() || r.double_clicked() {
+                            *selected = i;
+                        }
+                        picked |= r.double_clicked();
+                    }
+                });
+            });
+            ui.checkbox(headers, tl!("First row of data contains column headers"));
+            if !message.is_empty() {
+                ui.label(egui::RichText::new(message.as_str()).color(Tokens::get(ui.ctx()).red));
+            }
+            let (ok, cancel) = buttons(ui, tl!("OK"));
+            if ok || picked {
+                let mut p = params.clone();
+                if let Some(o) = p.as_object_mut() {
+                    o.insert("sheet".into(), json!(*selected + 1));
+                    o.insert("headers".into(), json!(*headers));
+                }
+                match app.load_recipients(p) {
+                    Ok(_) => return true,
+                    Err(e) => *message = e,
+                }
+            }
+            cancel
+        }
         Dialog::FindRecipient { text, message } => {
             ui.horizontal(|ui| {
                 ui.label(tl!("Find:"));
@@ -2082,6 +2278,12 @@ fn table_properties(ui: &mut Ui, f: &mut TableForm) {
         ui.end_row();
         ui.label(tl!("Indent from left:"));
         ui.add_enabled(f.align == "left", egui::DragValue::new(&mut f.indent).speed(0.01).range(-11.0..=22.0).suffix(unit.suffix()).max_decimals(2));
+        ui.end_row();
+        ui.label(tl!("Table direction:"));
+        ui.horizontal(|ui| {
+            ui.radio_value(&mut f.rtl, false, tl!("Left-to-right"));
+            ui.radio_value(&mut f.rtl, true, tl!("Right-to-left"));
+        });
         ui.end_row();
     });
     heading(ui, "Row");
@@ -2316,6 +2518,111 @@ fn describe(st: &Value) -> String {
         parts.push(crate::i18n::fmt(tl!("Based on: {style}"), &[("style", b)]));
     }
     parts.join(", ")
+}
+
+/// path data; Insert (or a double click) runs `insert.icon`. Returns true to close.
+fn icons_body(app: &mut WordApp, ui: &mut Ui, query: &mut String, category: &mut String, selected: &mut String) -> bool {
+    use wordcraft_render::icon_lib::{self, Category};
+    let t = Tokens::get(ui.ctx());
+    ui.set_width(560.0);
+    // Typing goes to the search box (never to the document behind the dialog).
+    ui.add(egui::TextEdit::singleline(query).hint_text(tl!("Search icons")).desired_width(560.0)).request_focus();
+    ui.add_space(4.0);
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = vec2(4.0, 4.0);
+        if ui.selectable_label(category.is_empty(), tl!("All")).clicked() {
+            category.clear();
+        }
+        for c in Category::ALL {
+            if ui.selectable_label(*category == c.name(), tl!(c.name())).clicked() {
+                *category = c.name().to_string();
+            }
+        }
+    });
+    ui.add_space(4.0);
+    let hits = icon_lib::search(query, Category::parse(category));
+    let mut insert = false;
+    egui::ScrollArea::vertical().max_height(300.0).min_scrolled_height(300.0).auto_shrink([true, false]).show(ui, |ui| {
+        if hits.is_empty() {
+            ui.label(egui::RichText::new(tl!("No icons match your search.")).color(t.text_dim));
+        }
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+            for icon in &hits {
+                let (rect, resp) = ui.allocate_exact_size(vec2(56.0, 56.0), Sense::click());
+                let on = *selected == icon.id;
+                let fill = if on {
+                    t.checked
+                } else if resp.hovered() {
+                    t.hover
+                } else {
+                    egui::Color32::TRANSPARENT
+                };
+                let edge = if on { egui::Stroke::new(1.5, t.accent) } else { egui::Stroke::new(1.0, t.border) };
+                ui.painter().rect(rect, 4.0, fill, edge, egui::StrokeKind::Inside);
+                crate::icons::library(ui.painter(), rect.shrink(12.0), icon, t.text);
+                let resp = resp.on_hover_text(icon.name);
+                if resp.clicked() {
+                    *selected = icon.id.to_string();
+                }
+                if resp.double_clicked() {
+                    *selected = icon.id.to_string();
+                    insert = true;
+                }
+            }
+        });
+    });
+    let name = icon_lib::find(selected).map(|i| i.name).unwrap_or("");
+    ui.add_space(4.0);
+    ui.label(egui::RichText::new(name).color(t.text_dim));
+    let (ok, cancel) = buttons(ui, tl!("Insert"));
+    if (ok || insert) && !selected.is_empty() {
+        let _ = app.run("insert.icon", json!({"id": selected.as_str()}));
+        return true;
+    }
+    cancel
+}
+
+/// Enclose Characters' preview: the text in the chosen shape, shrunk or with the shape enlarged
+/// (drawn, so it doesn't depend on the interface font having ○ □ △ ◇).
+fn enclose_preview(ui: &mut Ui, style: &str, text: &str, shape: &str) {
+    let t = Tokens::get(ui.ctx());
+    let (r, _) = ui.allocate_exact_size(vec2(110.0, 64.0), Sense::hover());
+    let p = ui.painter_at(r);
+    p.rect_filled(r, 2.0, t.input);
+    p.rect_stroke(r, 2.0, egui::Stroke::new(1.0, t.border_strong), egui::StrokeKind::Inside);
+    let ink = ui.visuals().text_color();
+    let c = r.center();
+    let (box_h, text_px) = match style {
+        "none" => (0.0, 26.0),
+        "enlarge" => (48.0, 26.0),
+        _ => (34.0, 20.0),
+    };
+    let h = box_h / 2.0;
+    let stroke = egui::Stroke::new(1.5, ink);
+    match (shape, box_h > 0.0) {
+        (_, false) => {}
+        ("square", _) => {
+            p.rect_stroke(egui::Rect::from_center_size(c, vec2(box_h, box_h)), 0.0, stroke, egui::StrokeKind::Middle);
+        }
+        ("triangle", _) => {
+            let pts = vec![egui::pos2(c.x, c.y - h), egui::pos2(c.x + h * 1.1, c.y + h), egui::pos2(c.x - h * 1.1, c.y + h)];
+            p.add(egui::Shape::closed_line(pts, stroke));
+        }
+        ("diamond", _) => {
+            let pts = vec![egui::pos2(c.x, c.y - h), egui::pos2(c.x + h, c.y), egui::pos2(c.x, c.y + h), egui::pos2(c.x - h, c.y)];
+            p.add(egui::Shape::closed_line(pts, stroke));
+        }
+        _ => {
+            p.circle_stroke(c, h, stroke);
+        }
+    }
+    let px = match (style, shape) {
+        ("shrink", "triangle" | "diamond") => text_px * 0.75,
+        _ => text_px,
+    };
+    let dy = if shape == "triangle" && box_h > 0.0 { h * 0.3 } else { 0.0 };
+    p.text(c + vec2(0.0, dy), egui::Align2::CENTER_CENTER, text, egui::FontId::proportional(px), ink);
 }
 
 #[cfg(test)]

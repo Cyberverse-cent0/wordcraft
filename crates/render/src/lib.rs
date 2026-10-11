@@ -15,6 +15,8 @@ use wordcraft_layout::Page;
 use wordcraft_layout::display::{DisplayOptions, Draw, Stroke, page_display};
 use wordcraft_metafile::{Item, Picture, PlacedItem, Seg};
 
+pub mod icon_lib;
+
 /// Worker threads for rasterising (0 on the web, where there are no threads).
 pub fn default_threads() -> u16 {
     #[cfg(target_arch = "wasm32")]
@@ -716,6 +718,19 @@ fn draw(ctx: &mut RenderContext, doc: &Document, it: &Draw, view: Affine, visibl
                 ctx.set_stroke(kurbo::Stroke::new(stroke_width.max(0.25) as f64));
                 ctx.stroke_path(&path);
             }
+        }
+        Draw::Clip { rect, items } => {
+            let r = kurbo::Rect::new(rect.x as f64, rect.y as f64, rect.right() as f64, rect.bottom() as f64);
+            if !r.is_finite() || !r.overlaps(*visible) {
+                return;
+            }
+            ctx.set_transform(view);
+            ctx.push_clip_layer(&r.to_path(0.1));
+            let local = r.intersect(*visible);
+            for it in items {
+                draw(ctx, doc, it, view, &local, opts);
+            }
+            ctx.pop_layer();
         }
         Draw::Turned { x, y, turn, items } => {
             let m = Affine::new(Draw::turn_matrix(*turn, *x, *y).map(f64::from));

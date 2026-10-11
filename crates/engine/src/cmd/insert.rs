@@ -25,6 +25,8 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("insert.coverPage", "Cover Page", "Insert › Pages", cover_page).params(r#"{"title"?: string, "subtitle"?: string, "author"?: string}"#),
         CommandSpec::new("insert.table", "Table", "Insert › Tables", table).params(r#"{"rows": n, "cols": n, "style"?: string}"#),
         CommandSpec::new("insert.picture", "Pictures", "Insert › Illustrations", picture).params(r#"{"path"?: string, "data"?: base64, "width"?: pt, "alt"?: string}"#),
+        CommandSpec::new("insert.icon", "Icons", "Insert › Illustrations", icon)
+            .params(r#"{"id"?: string (omit to list the library), "color"?: "RRGGBB", "size"?: pt, "query"?: string, "category"?: string}"#),
         CommandSpec::new("insert.shape", "Shapes", "Insert › Illustrations", shape)
             .params(r#"{"kind": "rectangle|roundedRectangle|ellipse|triangle|diamond|line|arrow|star|heart", "width"?: pt, "height"?: pt, "fill"?: "RRGGBB", "stroke"?: "RRGGBB"}"#),
         CommandSpec::new("insert.textBox", "Text Box", "Insert › Text", text_box)
@@ -206,6 +208,12 @@ fn picture(s: &mut Session, v: &Value) -> CmdResult {
         s.ui_requests.push(json!({"open": "insertPicture"}));
         return sel_result(s);
     };
+    place_picture(s, bytes, p::f32(v, "width"), p::str(v, "alt").unwrap_or(""))
+}
+
+/// Insert an encoded image at the selection as an inline picture, `width` points wide (default:
+/// its natural size at 96 ppi), never wider than the text column.
+fn place_picture(s: &mut Session, bytes: Vec<u8>, width: Option<f32>, alt: &str) -> CmdResult {
     if bytes.len() > 200 << 20 {
         return Err(CmdError::Failed("image is larger than 200 MB".into()));
     }
@@ -223,7 +231,7 @@ fn picture(s: &mut Session, v: &Value) -> CmdResult {
     // Natural size at 96 ppi, fitted to the text width.
     let max_w = s.doc.sections().first().map(|(_, sp)| sp.text_width()).unwrap_or(468.0);
     let (mut w, mut h) = (pw as f32 * 0.75, ph as f32 * 0.75);
-    if let Some(want) = p::f32(v, "width") {
+    if let Some(want) = width {
         let k = want.max(4.0) / w.max(1.0);
         w *= k;
         h *= k;
@@ -232,20 +240,48 @@ fn picture(s: &mut Session, v: &Value) -> CmdResult {
         h *= max_w / w;
         w = max_w;
     }
+    let obj = InlineObject::Image { media: key.clone(), w, h, alt: alt.to_string(), float: Float::default(), crop: [0.0; 4], ole: None };
+    // A selected Drawing Canvas takes it in.
+    if let Some(i) = super::canvas::add_member(s, obj.clone())? {
+        return Ok(json!({"media": key, "canvasMember": i}));
+    }
     let props = s.typing_props();
     let at = delete_selection(s)?;
-    let obj = InlineObject::Image {
-        media: key.clone(),
-        w,
-        h,
-        alt: p::str(v, "alt").unwrap_or("").to_string(),
-        float: Float::default(),
-        crop: [0.0; 4],
-        ole: None,
-    };
     let end = s.doc.insert_object(&at, obj, &props)?;
     s.sel = Selection { anchor: at, focus: end };
     Ok(json!({"media": key, "width": w, "height": h}))
+}
+
+/// Insert › Icons: a library icon (original artwork drawn in code, `wordcraft_render::icon_lib`)
+/// rendered to a PNG picture `size` points square (default 1 inch) in `color` (default black).
+/// Without an `id` it lists the library (narrowed by `query` and `category`) and asks a front end
+/// for its icon picker.
+fn icon(s: &mut Session, v: &Value) -> CmdResult {
+    use wordcraft_render::icon_lib;
+    let Some(id) = p::str(v, "id") else {
+        let category = p::str(v, "category").and_then(icon_lib::Category::parse);
+        let icons: Vec<Value> = icon_lib::search(p::str(v, "query").unwrap_or(""), category)
+            .iter()
+            .map(|i| json!({"id": i.id, "name": i.name, "category": i.category.name(), "keywords": i.keywords}))
+            .collect();
+        s.ui_requests.push(json!({"open": "icons"}));
+        return Ok(json!({"icons": icons}));
+    };
+    let icon = icon_lib::find(id).ok_or_else(|| CmdError::Params(format!("no icon {id:?} (insert.icon without an id lists them)")))?;
+    let ink = match p::str(v, "color") {
+        Some(c) => Rgb::parse(c).ok_or_else(|| CmdError::Params(format!("bad color {c:?}: use RRGGBB")))?,
+        None => Rgb::BLACK,
+    };
+    let size = p::f32(v, "size").unwrap_or(72.0).clamp(4.0, 1584.0);
+    // About 300 pixels per inch, so it prints sharply.
+    let px = (size * 300.0 / 72.0).round().clamp(64.0, 1024.0) as u32;
+    let png = icon_lib::render(icon, px, ink).to_png();
+    if png.is_empty() {
+        return Err(CmdError::Failed("couldn't draw the icon".into()));
+    }
+    let mut r = place_picture(s, png, Some(size), icon.name)?;
+    r["icon"] = json!(icon.id);
+    Ok(r)
 }
 
 fn shape(s: &mut Session, v: &Value) -> CmdResult {
@@ -259,8 +295,6 @@ fn shape(s: &mut Session, v: &Value) -> CmdResult {
         None => Some(Rgb(0x15, 0x60, 0x82)),
     };
     let stroke = p::str(v, "stroke").and_then(Rgb::parse).or(Some(Rgb(0x0E, 0x40, 0x5A)));
-    let props = s.typing_props();
-    let at = delete_selection(s)?;
     let obj = InlineObject::Shape {
         kind,
         w,
@@ -273,6 +307,12 @@ fn shape(s: &mut Session, v: &Value) -> CmdResult {
         freeform: None,
         effects: Default::default(),
     };
+    // A selected Drawing Canvas takes it in (and stays selected for the next one).
+    if super::canvas::add_member(s, obj.clone())?.is_some() {
+        return sel_result(s);
+    }
+    let props = s.typing_props();
+    let at = delete_selection(s)?;
     let end = s.doc.insert_object(&at, obj, &props)?;
     s.sel = Selection { anchor: at, focus: end };
     sel_result(s)
@@ -283,8 +323,6 @@ fn text_box(s: &mut Session, v: &Value) -> CmdResult {
     let w = p::f32(v, "width").unwrap_or(144.0).clamp(18.0, 2000.0);
     let h = p::f32(v, "height").unwrap_or(72.0).clamp(18.0, 2000.0);
     let id = s.doc.add_part(PartKind::TextBox, vec![para_block(Paragraph::with_text(&text, CharProps::default()))]);
-    let props = s.typing_props();
-    let at = delete_selection(s)?;
     let obj = InlineObject::Shape {
         kind: ShapeKind::TextBox,
         w,
@@ -297,7 +335,12 @@ fn text_box(s: &mut Session, v: &Value) -> CmdResult {
         freeform: None,
         effects: Default::default(),
     };
-    s.doc.insert_object(&at, obj, &props)?;
+    // A selected Drawing Canvas takes it in; otherwise it goes at the caret.
+    if super::canvas::add_member(s, obj.clone())?.is_none() {
+        let props = s.typing_props();
+        let at = delete_selection(s)?;
+        s.doc.insert_object(&at, obj, &props)?;
+    }
     // Like Word, type straight into the new box.
     s.sel = Selection::caret(s.doc.end_of(StoryRef::Part(id)));
     Ok(json!({"story": id}))

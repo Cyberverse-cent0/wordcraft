@@ -917,6 +917,43 @@ fn table_text_direction_cycles_and_turns_the_text() {
     }
 }
 
+/// Right-to-left tables and sections (#362): `table.rtl` and `layout.sectionRtl` set or toggle
+/// the direction, one Undo step each, and the layout mirrors the table.
+#[test]
+fn table_and_section_direction_commands() {
+    let mut s = s();
+    run(&mut s, "insert.table", json!({"rows": 1, "cols": 3}));
+    let rtl = |s: &Session| s.doc.body.iter().find_map(|b| b.as_table()).unwrap().props.bidi_visual;
+    let first_cell_x = |s: &mut Session| {
+        s.layout().pages[0].items.iter().find_map(|it| match it {
+            wordcraft_layout::Placed::Cell { rect, cell: 0, .. } => Some(rect.x),
+            _ => None,
+        })
+    };
+    let ltr_x = first_cell_x(&mut s).unwrap();
+    run(&mut s, "table.rtl", json!({}));
+    assert!(rtl(&s));
+    assert!(first_cell_x(&mut s).unwrap() > ltr_x + 100.0, "the first column moves to the right");
+    run(&mut s, "table.rtl", json!({"value": true}));
+    assert!(rtl(&s), "an explicit value sets rather than toggles");
+    run(&mut s, "table.properties", json!({"rtl": false}));
+    assert!(!rtl(&s));
+    run(&mut s, "edit.undo", json!({}));
+    assert!(rtl(&s));
+    assert_eq!(s.run("table.properties", &json!({})).unwrap()["bidiVisual"], json!(true));
+    run(&mut s, "layout.sectionRtl", json!({}));
+    assert!(crate::cmd::page::sect(&s).rtl);
+    run(&mut s, "layout.sectionRtl", json!({"value": false}));
+    assert!(!crate::cmd::page::sect(&s).rtl);
+    run(&mut s, "edit.undo", json!({}));
+    assert!(crate::cmd::page::sect(&s).rtl);
+    // Outside a table `table.rtl` is disabled.
+    s.sel = crate::Selection::caret(Pos::body(0, 0));
+    if s.sel.focus.path.cell().is_none() {
+        assert!(s.run("table.rtl", &json!({})).is_err());
+    }
+}
+
 #[test]
 fn table_border_presets_mask_the_sides_they_clear() {
     // On a default (TableGrid) table the "outside"/"inside" presets must write nil over the
@@ -2806,4 +2843,102 @@ fn deleting_the_last_cell_column_never_leaves_a_table_without_rows() {
     assert!(s.doc.body.iter().all(|b| b.as_table().is_none()), "an emptied table is removed");
     run(&mut s, "edit.undo", json!({}));
     assert!(s.doc.body.iter().any(|b| b.as_table().is_some_and(|t| !t.rows.is_empty())));
+}
+
+#[test]
+fn insert_icon_places_a_picture_of_the_requested_size_that_saves_and_recolours() {
+    use wordcraft_doc::para::InlineObject;
+    let mut s = s();
+    // Without an id: the library is listed and a front end is asked for its picker.
+    let r = run(&mut s, "insert.icon", json!({"query": "envelope"}));
+    assert_eq!(r["icons"][0]["id"], "mail");
+    assert_eq!(s.ui_requests.last(), Some(&json!({"open": "icons"})));
+    let all = run(&mut s, "insert.icon", json!({}));
+    assert!(all["icons"].as_array().unwrap().len() >= 40);
+    assert!(s.run("insert.icon", &json!({"id": "no-such-icon"})).is_err());
+    assert!(s.run("insert.icon", &json!({"id": "heart", "color": "red"})).is_err());
+
+    let r = run(&mut s, "insert.icon", json!({"id": "heart", "color": "C00000", "size": 48}));
+    assert_eq!((r["width"].as_f64(), r["height"].as_f64(), r["icon"].as_str()), (Some(48.0), Some(48.0), Some("heart")));
+    let Some((_, InlineObject::Image { media, w, h, alt, .. })) = crate::cmd::objects::selected(&s) else { panic!("no picture") };
+    assert_eq!((w, h, alt.as_str()), (48.0, 48.0, "Heart"));
+    let png = image::load_from_memory(&s.doc.media[&media]).unwrap().to_rgba8();
+    assert_eq!(png.dimensions(), (200, 200), "about 300 pixels per inch");
+    let inked: Vec<_> = png.pixels().filter(|p| p.0[3] == 255).collect();
+    assert!(!inked.is_empty() && inked.iter().all(|p| p.0[..3] == [0xC0, 0, 0]));
+    assert!(png.get_pixel(0, 0).0[3] == 0, "transparent background");
+    // It is an ordinary picture: it saves to .docx.
+    let back = wordcraft_docx::read(&wordcraft_docx::write(&s.doc).unwrap()).unwrap();
+    assert_eq!(back.media.len(), 1);
+
+    // Icon Color repaints it, keeping the transparency.
+    run(&mut s, "picture.iconColor", json!({"color": "1F4E79"}));
+    let Some((_, InlineObject::Image { media: m2, .. })) = crate::cmd::objects::selected(&s) else { panic!("no picture") };
+    let png2 = image::load_from_memory(&s.doc.media[&m2]).unwrap().to_rgba8();
+    assert!(png2.pixels().zip(png.pixels()).all(|(a, b)| a.0[3] == b.0[3] && (a.0[3] == 0 || a.0[..3] == [0x1F, 0x4E, 0x79])));
+    assert!(s.run("picture.iconColor", &json!({})).is_err());
+}
+
+/// Home › Font › Enclose Characters (#297): the selection becomes an `EQ \o\ac` field, saved the
+/// way Word stores it (the style in the code's run sizes) and read back; null takes the text out
+/// again, and each step undoes.
+#[test]
+fn enclose_characters_make_an_eq_field_and_come_back_out() {
+    use wordcraft_doc::InlineObject;
+    let field = |s: &Session| {
+        let p = s.doc.para_at(&Pos::body(0, 0)).unwrap();
+        p.objects.iter().find_map(|o| match o {
+            InlineObject::Field { instr, result, .. } => Some((instr.clone(), result.clone())),
+            _ => None,
+        })
+    };
+    let mut s = s();
+    run(&mut s, "text.insert", json!({"text": "No 12 and 字 here"}));
+    run(&mut s, "select.text", json!({"text": "No 12"}));
+    assert!(s.run("format.enclose", &json!({"shape": "circle"})).is_err(), "five characters don't fit");
+    run(&mut s, "select.text", json!({"text": "字"}));
+    assert!(s.run("format.enclose", &json!({})).is_err(), "a script must say which shape");
+    run(&mut s, "format.enclose", json!({"shape": "circle"}));
+    assert_eq!(field(&s), Some(("eq \\o\\ac(○,字)".to_string(), "字".to_string())));
+    assert_eq!(text(&s), "No 12 and 字 here", "the field's text reads as the character");
+    run(&mut s, "select.text", json!({"text": "12"}));
+    run(&mut s, "format.enclose", json!({"shape": "diamond", "style": "enlarge"}));
+    let p = s.doc.para_at(&Pos::body(0, 0)).unwrap();
+    let codes: Vec<String> =
+        p.objects.iter().filter_map(|o| if let InlineObject::Field { instr, .. } = o { Some(instr.clone()) } else { None }).collect();
+    assert_eq!(codes, ["eq \\o\\ac(◇,12) \\* enlarge", "eq \\o\\ac(○,字)"]);
+
+    // Word's structure in the .docx: no result, the symbol and the text in runs of their own
+    // sizes; reading it back gives the same fields, styles included.
+    let bytes = wordcraft_docx::write(&s.doc).unwrap();
+    let back = wordcraft_docx::read(&bytes).unwrap();
+    let bp = back.para_at(&Pos::body(0, 0)).unwrap();
+    let back_codes: Vec<(String, String)> = bp
+        .objects
+        .iter()
+        .filter_map(|o| if let InlineObject::Field { instr, result, .. } = o { Some((instr.clone(), result.clone())) } else { None })
+        .collect();
+    assert_eq!(back_codes, [("eq \\o\\ac(◇,12) \\* enlarge".to_string(), "12".to_string()), ("eq \\o\\ac(○,字)".to_string(), "字".to_string())]);
+
+    // Change the shape of the enclosed characters at the caret, then remove it.
+    let e = s.doc.para_at(&Pos::body(0, 0)).unwrap().text.find('\u{FFFC}').unwrap();
+    s.sel = crate::Selection::caret(Pos::body(0, e + 3));
+    run(&mut s, "format.enclose", json!({"shape": "square"}));
+    assert!(field(&s).unwrap().0.starts_with("eq \\o\\ac(□,12) \\* enlarge"), "the style stays");
+    run(&mut s, "format.enclose", json!({"shape": null}));
+    assert_eq!(text(&s), "No 12 and 字 here");
+    assert_eq!(s.selected_text(), "12");
+    run(&mut s, "edit.undo", json!({}));
+    run(&mut s, "edit.undo", json!({}));
+    assert!(field(&s).unwrap().0.starts_with("eq \\o\\ac(◇,12)"));
+    run(&mut s, "edit.undo", json!({}));
+    run(&mut s, "edit.undo", json!({}));
+    assert_eq!(field(&s), None, "back to plain text");
+    assert!(s.run("format.enclose", &json!({"shape": null})).is_err(), "nothing to remove");
+    // Text given (the dialog's Text box) goes in at a caret.
+    run(&mut s, "caret.docEnd", json!({}));
+    assert!(s.run("format.enclose", &json!({"shape": "triangle", "text": "ABC"})).is_err());
+    run(&mut s, "format.enclose", json!({"shape": "triangle", "text": "A"}));
+    assert_eq!(text(&s), "No 12 and 字 hereA");
+    assert_eq!(field(&s), Some(("eq \\o\\ac(△,A)".to_string(), "A".to_string())));
 }

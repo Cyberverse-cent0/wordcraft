@@ -1384,8 +1384,21 @@
 	New Group	Yeni Grup
 	Rename…	Yeniden Adlandır…
 	Ribbon and Quick Access Toolbar:	Şerit ve Hızlı Erişim Araç Çubuğu:
-	In Line with Text	Metinle Aynı Hizada
+	Enclose Characters	Karakterleri Çevrele
+	Shrink text	Metni küçült
+	Enlarge symbol	Simgeyi büyüt
+	Enclosure	Çerçeve
+	Circle	Daire
 	Square	Kare
+	Base text:	Ana metin:
+	Distribute letters	Harfleri dağıt
+	Distribute spacing	Aralığı dağıt
+	Offset (pt):	Kaydırma (pt):
+	Phonetic Guide	Fonetik Kılavuz
+	Right (vertical)	Sağ (dikey)
+	Ruby text:	Ruby metni:
+	Size (pt):	Boyut (pt):
+	In Line with Text	Metinle Aynı Hizada
 	Through	Geçişli
 	Top and Bottom	Üst ve Alt
 	Behind Text	Metnin Arkasında
@@ -1395,3 +1408,27 @@
 	Left Only	Yalnızca Sol
 	Right Only	Yalnızca Sağ
 	Largest Only	Yalnızca En Geniş
+	Right-to-Left Table	Sağdan Sola Tablo
+	Right-to-Left Section	Sağdan Sola Bölüm
+	Table direction:	Tablo yönü:
+	Section direction:	Bölüm yönü:
+	Drawing Canvas	Çizim Tuvali
+	New Drawing Canvas	Yeni Çizim Tuvali
+	Fit	Sığdır
+	Expand	Genişlet
+	Scale Drawing	Çizimi Ölçeklendir
+	Canvas Member	Tuval Öğesi
+	Choose the sheet that holds the recipients.	Alıcıları içeren sayfayı seçin.
+	First row of data contains column headers	Verinin ilk satırı sütun başlıklarını içerir
+	Arrows	Oklar
+	Communication	İletişim
+	Office	Ofis
+	People	İnsanlar
+	Nature	Doğa
+	Weather	Hava Durumu
+	Technology	Teknoloji
+	Transport	Ulaşım
+	Icon Color	Simge Rengi
+	Search icons	Simgelerde ara
+	No icons match your search.	Aramanızla eşleşen simge yok.
+	Recolor a one-color picture, such as an icon	Simge gibi tek renkli bir resmi yeniden renklendir

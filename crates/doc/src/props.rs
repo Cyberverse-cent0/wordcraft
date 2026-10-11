@@ -354,6 +354,12 @@ macro_rules! overlay_fields {
     };
 }
 
+macro_rules! drop_same_fields {
+    ($dst:ident, $base:ident; $($f:ident),*) => {
+        $( if $dst.$f == $base.$f { $dst.$f = None; } )*
+    };
+}
+
 impl CharProps {
     /// The same formatting outside a hyperlink: no link target, and no "Hyperlink" character
     /// style that came with it. What a paragraph mark or text typed next to a link gets.
@@ -363,6 +369,15 @@ impl CharProps {
             c.style = None;
         }
         c
+    }
+
+    /// The fields of `self` that differ from `base` (equal ones unset): what `self` adds when
+    /// overlaid on `base`.
+    pub fn minus(mut self, base: &CharProps) -> CharProps {
+        drop_same_fields!(self, base; style, font, size, bold, italic, underline, underline_color, strike, double_strike, color, highlight,
+            shading, border, vert_align, caps, small_caps, hidden, spacing, scale, position, kern, outline, shadow, emboss, engrave, lang, no_proof, rtl,
+            cs, font_cs, size_cs, bold_cs, italic_cs, lang_bidi, link, ins, del);
+        self
     }
 
     /// Apply every `Some` field of `patch` on top of `self`.
@@ -797,6 +812,11 @@ pub struct TableProps {
     /// Tracked formatting change (`w:tblPrChange`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fmt_change: Option<Box<PropChange<TableProps>>>,
+    /// Right-to-left table (`w:bidiVisual`): the first logical column stands at the right edge,
+    /// cell margins and left/right borders mirror, and the alignment and indent are measured from
+    /// the right margin.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub bidi_visual: bool,
 }
 
 /// Where a floating table sits; the text after it wraps around it.

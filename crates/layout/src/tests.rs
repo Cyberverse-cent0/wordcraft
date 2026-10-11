@@ -2865,6 +2865,7 @@ fn rotated_group_turns_its_members_and_their_shadows() {
         ch_w: 120.0,
         ch_h: 40.0,
         children: vec![GroupChild { x: 0.0, y: 0.0, obj: member(false, 0.0) }, GroupChild { x: 60.0, y: 0.0, obj: member(true, 10.0) }],
+        canvas: None,
     };
     let mut d = Document::from_text("Text under the group.");
     d.insert_object(&Pos::body(0, 0), group, &Default::default()).unwrap();
@@ -3079,6 +3080,106 @@ fn contour_wrap_turns_with_the_object() {
     assert_eq!(first_row(Wrap::Square, 0.0, false)[0].0, 209.0);
 }
 
+/// Enclosed characters (#297, an `EQ \o\ac` field): the shape is drawn as a vector around the text,
+/// whatever the font has; "shrink text" draws the text smaller inside a one-em shape, "enlarge
+/// symbol" a bigger shape around text at its own size. Plain `\o` overstrikes its arguments.
+#[test]
+fn enclosed_characters_draw_a_shape_around_the_text() {
+    use wordcraft_doc::eq::{EncloseShape, EncloseStyle, Enclosure};
+    let draw = |shape: EncloseShape, style: EncloseStyle| {
+        let mut d = Document::from_text("a  b");
+        let e = Enclosure { shape, style, text: "A".into() };
+        d.insert_object(
+            &Pos::body(0, 2),
+            InlineObject::Field { instr: e.instr(), result: "A".into(), locked: false, code: false },
+            &Default::default(),
+        )
+        .unwrap();
+        let l = lay(&d);
+        let items = display::page_display(&d, &l.pages[0], &Default::default());
+        let shape = items
+            .iter()
+            .find_map(|i| if let display::Draw::Shape { rect, kind, stroke, .. } = i { Some((*rect, *kind, stroke.is_some())) } else { None });
+        // Each glyph's character, size and x.
+        let mut chars = Vec::new();
+        for i in &items {
+            if let display::Draw::Glyphs { text, size, glyphs, ranges, .. } = i {
+                for (g, r) in glyphs.iter().zip(ranges) {
+                    chars.push((text.get(r.clone()).unwrap_or("").to_string(), *size, g.1));
+                }
+            }
+        }
+        let at = |c: &str| chars.iter().find(|x| x.0 == c).map(|x| (x.1, x.2)).unwrap_or_else(|| panic!("{c}: {items:?}"));
+        (shape.expect("a shape"), at("A"), at("b"))
+    };
+    let ((rect, kind, stroked), (size, gx), (base, bx)) = draw(EncloseShape::Circle, EncloseStyle::Shrink);
+    assert_eq!(kind, wordcraft_doc::para::ShapeKind::Ellipse);
+    assert!(stroked);
+    assert!(size < base * 0.8, "the text shrinks: {size} vs {base}");
+    assert!((rect.h - base * 1.05).abs() < 0.1 && (rect.w - rect.h).abs() < 0.1, "{rect:?}");
+    assert!(gx > rect.x && gx < rect.x + rect.w, "the text is inside: {gx} {rect:?}");
+    assert!(bx >= rect.x + rect.w, "the next text follows the shape: {bx} {rect:?}");
+    let ((rect, kind, _), (size, _), (base, _)) = draw(EncloseShape::Diamond, EncloseStyle::Enlarge);
+    assert_eq!(kind, wordcraft_doc::para::ShapeKind::Diamond);
+    assert!((size - base).abs() < 0.01 && rect.h > base * 1.5, "the shape grows: {rect:?}");
+
+    // A general overstrike: both arguments at the same place, no shape.
+    let mut d = Document::from_text("x");
+    d.insert_object(
+        &Pos::body(0, 1),
+        InlineObject::Field { instr: "eq \\o(=,/)".into(), result: String::new(), locked: false, code: false },
+        &Default::default(),
+    )
+    .unwrap();
+    let l = lay(&d);
+    let items = display::page_display(&d, &l.pages[0], &Default::default());
+    assert!(!items.iter().any(|i| matches!(i, display::Draw::Shape { .. })));
+    assert!(items.iter().any(|i| matches!(i, display::Draw::Glyphs { text, .. } if text.contains("=/"))), "{items:?}");
+}
+
+#[test]
+fn ruby_text_sits_over_its_base_and_the_line_grows_to_fit() {
+    use wordcraft_doc::para::RubyAlign;
+    let plain = Document::from_text("Plain words here");
+    let mut d = Document::from_text("Plain  here");
+    let ruby = InlineObject::Ruby {
+        base: "words".into(),
+        ruby: "a much longer reading".into(),
+        align: RubyAlign::Center,
+        size: 6.0,
+        raise: 12.0,
+        base_size: 12.0,
+        lang: String::new(),
+        props: Default::default(),
+    };
+    d.insert_object(&Pos::body(0, 6), ruby, &Default::default()).unwrap();
+    let height = |l: &DocLayout| {
+        l.pages[0].items.iter().find_map(|it| if let Placed::Lines { para, .. } = it { para.lines.first().map(|x| x.height) } else { None }).unwrap()
+    };
+    let (lp, lr) = (lay(&plain), lay(&d));
+    assert!(height(&lr) > height(&lp) + 3.0, "ruby line {} vs plain {}", height(&lr), height(&lp));
+    let items = display::page_display(&d, &lr.pages[0], &Default::default());
+    let glyphs_of = |want: &str| {
+        items.iter().find_map(|i| match i {
+            display::Draw::Glyphs { text, glyphs, size, .. } if text.contains(want) => Some((*size, glyphs.clone())),
+            _ => None,
+        })
+    };
+    let (_, line) = glyphs_of("Plain words").expect("base text drawn");
+    let (size, over) = glyphs_of("a much longer reading").expect("ruby text drawn");
+    let w = line[6]; // "Plain " then the base's first letter
+    // Smaller, 12 pt above the base text's baseline, and (being wider) centred over it: it starts
+    // at the base's slot, the base letters move in.
+    assert_eq!(size, 6.0);
+    assert!((w.2 - over[0].2 - 12.0).abs() < 0.01, "{w:?} {over:?}");
+    let slot = lr.caret(&Pos::body(0, 6)).unwrap().x;
+    assert!((over[0].1 - slot).abs() < 0.5 && w.1 > slot + 1.0, "{slot} {w:?} {over:?}");
+    // The plain text reads the base, and the caret steps over the ruby as one character.
+    assert_eq!(d.body[0].as_para().unwrap().plain_text(), "Plain words here");
+    let (a, b) = (lr.caret(&Pos::body(0, 6)).unwrap(), lr.caret(&Pos::body(0, 9)).unwrap());
+    assert!(b.x - a.x > 30.0, "{a:?} {b:?}");
+}
+
 /// #354: `wrapText`. Left: text only to the left of a centred object (Square or Tight); Right:
 /// only to its right; Largest: only on its wider side.
 #[test]
@@ -3105,4 +3206,221 @@ fn wrap_text_keeps_text_on_one_side() {
     assert!(!near_left.is_empty() && near_left.iter().all(|l| l.2 >= 209.0 - 0.01), "{near_left:?}");
     let near_right = beside(ShapeKind::Rectangle, Wrap::Square, 268.0, WrapText::Largest);
     assert!(!near_right.is_empty() && near_right.iter().all(|l| l.2 < 1.0 && l.3 <= 259.0 + 0.01), "{near_right:?}");
+}
+
+#[test]
+fn document_note_separators_and_continuation_notice() {
+    let mut d = Document::from_text(&"Body text line.\n".repeat(16));
+    let long = footnote(&mut d, &Pos::body(4, 4), &"A long footnote that runs on and on. ".repeat(100));
+    let sep = |cont: bool| {
+        let mut p = wordcraft_doc::Paragraph::new();
+        p.props.space_after = Some(0.0);
+        p.insert_object(0, InlineObject::note_separator(cont), &Default::default()).unwrap();
+        Some(vec![wordcraft_doc::para_block(p)])
+    };
+    let mut notice = wordcraft_doc::Paragraph::with_text("(continued)", Default::default());
+    notice.props.space_after = Some(0.0);
+    d.footnote_separators = wordcraft_doc::NoteSeparators {
+        separator: sep(false),
+        continuation_separator: sep(true),
+        continuation_notice: Some(vec![wordcraft_doc::para_block(notice)]),
+    };
+    let l = lay(&d);
+    let pieces = note_pieces(&l, long);
+    assert!(pieces.len() >= 2 && (pieces[0].0, pieces[1].0) == (0, 1), "{pieces:?}");
+    // The document's separators are paragraphs: their lines are drawn across the separator's
+    // place, short on page 1 and across the text on page 2.
+    let decor = |pi: usize| -> Vec<(f32, f32)> {
+        l.pages[pi]
+            .items
+            .iter()
+            .filter_map(|it| match it {
+                Placed::Lines { story, y, para, l0, l1, .. } if *story == DECOR_STORY => Some((*y, item_bottom(*y, para, *l0, *l1).unwrap())),
+                _ => None,
+            })
+            .collect()
+    };
+    let (d0, d1) = (decor(0), decor(1));
+    assert_eq!((d0.len(), d1.len()), (2, 1), "separator and notice on page 1, continuation separator on page 2");
+    assert_eq!(rules_below(&l, 0, 0.0), vec![144.0]);
+    assert_eq!(rules_below(&l, 1, 0.0), vec![468.0]);
+    // The notice sits right under the part of the note on page 1, inside the page.
+    let note_bottom = l.pages[0]
+        .items
+        .iter()
+        .filter_map(|it| match it {
+            Placed::Lines { story: StoryRef::Part(s), y, para, l0, l1, .. } if *s == long => item_bottom(*y, para, *l0, *l1),
+            _ => None,
+        })
+        .fold(0.0f32, f32::max);
+    let (ny, nb) = d0[1];
+    assert!((ny - note_bottom).abs() < 0.01, "notice at {ny}, note ends at {note_bottom}");
+    assert!(nb <= 720.01, "notice inside the page: {nb}");
+    // The separators and notice aren't text anyone clicks into.
+    assert_ne!(l.story_at(0, 80.0, ny + 2.0), Some(DECOR_STORY));
+}
+
+/// #344 with #332: a Drawing Canvas turns as a whole, like a group: its background and outline,
+/// then its members clipped to its frame, all drawn inside its turn (the clip in the unturned
+/// frame, so the clip turns too); floating or inline. Hit testing follows the turned canvas.
+#[test]
+fn rotated_canvas_draws_its_clipped_members_inside_the_turn() {
+    use crate::display::Draw;
+    use wordcraft_doc::para::{Anchor, CanvasStyle, Float, GroupChild, ShapeKind, Wrap};
+    let member = InlineObject::Shape {
+        kind: ShapeKind::Rectangle,
+        w: 60.0,
+        h: 40.0,
+        fill: Some(wordcraft_doc::props::Rgb(1, 2, 3)),
+        stroke: None,
+        stroke_width: 0.0,
+        float: Float { rot: 10.0, ..Default::default() },
+        story: None,
+        effects: Default::default(),
+        freeform: None,
+    };
+    let canvas = |float: Float| InlineObject::Group {
+        w: 200.0,
+        h: 100.0,
+        float,
+        ch_w: 200.0,
+        ch_h: 100.0,
+        children: vec![GroupChild { x: 20.0, y: 30.0, obj: member.clone() }],
+        canvas: Some(CanvasStyle { fill: Some(wordcraft_doc::props::Rgb(0xF0, 0xF4, 0xFF)), stroke: None, stroke_width: 0.0 }),
+    };
+    // Turned draws: (turn, background rect, clip rect, member rect and its own turn).
+    let turned = |draws: &[Draw]| -> (Vec<f32>, Vec<Rect>, Vec<(Rect, Vec<(Rect, f32)>)>) {
+        let (mut turns, mut bgs, mut clips) = (Vec::new(), Vec::new(), Vec::new());
+        for d in draws {
+            let Draw::Rotated { spin, items, .. } = d else { continue };
+            turns.push(spin.deg);
+            for i in items {
+                match i {
+                    Draw::Shape { rect, fill: Some(c), .. } if c.0 == 0xF0 => bgs.push(*rect),
+                    Draw::Clip { rect, items } => {
+                        let members = items
+                            .iter()
+                            .map(|m| match m {
+                                Draw::Rotated { spin, items, .. } => match items.first() {
+                                    Some(Draw::Shape { rect, .. }) => (*rect, spin.deg),
+                                    o => panic!("{o:?}"),
+                                },
+                                o => panic!("{o:?}"),
+                            })
+                            .collect();
+                        clips.push((*rect, members));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        (turns, bgs, clips)
+    };
+    for floating in [true, false] {
+        let float = if floating {
+            Float { wrap: Wrap::InFrontOfText, h_rel: Anchor::Column, v_rel: Anchor::Paragraph, x: 100.0, y: 100.0, rot: 90.0, ..Default::default() }
+        } else {
+            Float { rot: 90.0, ..Default::default() }
+        };
+        let mut d = Document::from_text("Text by the canvas.");
+        d.insert_object(&Pos::body(0, 0), canvas(float), &Default::default()).unwrap();
+        let l = lay(&d);
+        let p = &l.pages[0];
+        let hit = l.object(&Pos::body(0, 0), 0).unwrap();
+        assert_eq!(hit.spin.deg, 90.0);
+        let f = hit.rect;
+        let (turns, bgs, clips) = turned(&crate::display::page_display(&d, p, &Default::default()));
+        assert!(turns.contains(&90.0), "floating {floating}: {turns:?}");
+        // Background and clip are the canvas's unturned frame; the member sits in it, unturned
+        // but for its own 10°.
+        assert_eq!(bgs.len(), 1, "floating {floating}");
+        assert!((bgs[0].x - f.x).abs() < 0.01 && (bgs[0].w - 200.0).abs() < 0.01, "{bgs:?} vs {f:?}");
+        assert_eq!(clips.len(), 1, "floating {floating}");
+        let (clip, members) = &clips[0];
+        assert!((clip.x - bgs[0].x).abs() < 0.01 && (clip.y - bgs[0].y).abs() < 0.01 && (clip.h - 100.0).abs() < 0.01, "{clip:?}");
+        assert_eq!(members.len(), 1, "{members:?}");
+        let (m, own) = members[0];
+        assert!((m.x - (clip.x + 20.0)).abs() < 0.01 && (m.y - (clip.y + 30.0)).abs() < 0.01, "{m:?} in {clip:?}");
+        assert_eq!(own, 10.0);
+        if floating {
+            // Turned a quarter, the canvas's frame's left end is empty; above its centre isn't.
+            let (cx, cy) = (f.x + f.w / 2.0, f.y + f.h / 2.0);
+            assert!(l.object_at(0, f.x + 5.0, cy, 0.0).is_none());
+            assert!(l.object_at(0, cx, cy - 80.0, 0.0).is_some());
+        }
+    }
+}
+
+/// Ten short paragraphs in a two-column section (`widths`: unequal columns), then one paragraph
+/// in a one-column section starting `start`.
+fn two_column_section(start: wordcraft_doc::section::SectionStart, widths: Vec<(f32, f32)>) -> Document {
+    use wordcraft_doc::section::SectionProps;
+    let text: Vec<String> = (0..10).map(|i| format!("Short paragraph {i}")).chain(["After the break".to_string()]).collect();
+    let mut d = Document::from_text(&text.join("\n"));
+    let mut s = SectionProps::default();
+    s.columns.count = 2;
+    s.columns.widths = widths;
+    d.para_mut(StoryRef::Body, &Path::top(9)).unwrap().section = Some(Box::new(s));
+    d.last_section.start = start;
+    d
+}
+
+/// Each top-level paragraph's first piece: (page, x, top, bottom).
+fn para_boxes(l: &DocLayout) -> Vec<(usize, f32, f32, f32)> {
+    let mut v: Vec<(usize, usize, f32, f32, f32)> = Vec::new();
+    for (pi, p) in l.pages.iter().enumerate() {
+        for it in &p.items {
+            if let Placed::Lines { story: StoryRef::Body, path, para, l0, l1, x, y, .. } = it
+                && let [b] = path.0[..]
+                && !v.iter().any(|e| e.0 == b as usize)
+            {
+                v.push((b as usize, pi, *x, *y, item_bottom(*y, para, *l0, *l1).unwrap()));
+            }
+        }
+    }
+    v.sort_by_key(|e| e.0);
+    v.into_iter().map(|(_, pi, x, t, b)| (pi, x, t, b)).collect()
+}
+
+/// Bottoms of the two columns (paragraphs 0–9 by their x) and the top of paragraph 10.
+fn column_bottoms(l: &DocLayout) -> (usize, f32, usize, f32, (usize, f32)) {
+    let b = para_boxes(l);
+    let x0 = b[0].1;
+    let (left, right): (Vec<_>, Vec<_>) = b[..10].iter().partition(|e| (e.1 - x0).abs() < 1.0);
+    let bottom = |v: &[&(usize, f32, f32, f32)]| v.iter().map(|e| e.3).fold(0.0f32, f32::max);
+    (left.len(), bottom(&left), right.len(), bottom(&right), (b[10].0, b[10].2))
+}
+
+#[test]
+fn columns_before_a_continuous_break_are_balanced() {
+    use wordcraft_doc::section::SectionStart;
+    for widths in [vec![], vec![(150.0, 36.0), (282.0, 0.0)]] {
+        let l = lay(&two_column_section(SectionStart::Continuous, widths.clone()));
+        let (nl, bl, nr, br, (page, after)) = column_bottoms(&l);
+        // Filled left to right, level: five paragraphs each (the left one may hold one more).
+        assert!(nl == 5 || nl == 6, "{widths:?}: {nl} left, {nr} right");
+        assert!(bl >= br - 0.5 && bl - br < 20.0, "{widths:?}: columns end at {bl} and {br}");
+        // The next section starts right below, on the same page.
+        assert_eq!(page, 0);
+        assert!(after >= bl - 0.5 && after < bl + 30.0, "{widths:?}: next section at {after}, columns end at {bl}");
+    }
+}
+
+#[test]
+fn columns_before_a_page_break_or_a_column_break_are_not_balanced() {
+    use wordcraft_doc::section::SectionStart;
+    // Next-page break: the ten paragraphs fill the first column; the next section is on page 2.
+    let l = lay(&two_column_section(SectionStart::NextPage, vec![]));
+    let (nl, _, nr, _, (page, _)) = column_bottoms(&l);
+    assert_eq!((nl, nr, page), (10, 0, 1));
+    // An explicit column break after paragraph 1 decides where the first column ends.
+    let mut d = two_column_section(SectionStart::Continuous, vec![]);
+    let p = d.para_mut(StoryRef::Body, &Path::top(1)).unwrap();
+    let end = p.text.len();
+    p.insert_text(end, &wordcraft_doc::para::COLUMN_BREAK.to_string(), &Default::default()).unwrap();
+    let l = lay(&d);
+    let (nl, bl, nr, br, (page, after)) = column_bottoms(&l);
+    assert_eq!((nl, nr, page), (2, 8, 0));
+    // The next section starts below the taller column.
+    assert!(br > bl + 50.0 && after >= br - 0.5, "columns end at {bl} and {br}, next section at {after}");
 }
