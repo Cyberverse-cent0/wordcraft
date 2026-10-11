@@ -529,6 +529,44 @@ fn notes_round_trip() {
     assert_eq!(r.settings.endnote_format, NumFormat::UpperRoman);
 }
 
+/// #385: footnote and endnote options round-trip for the document (settings) and per section
+/// (`w:sectPr`), in schema order: `w:footnotePr` and `w:endnotePr` before `w:type`.
+#[test]
+fn note_options_round_trip_per_section() {
+    use wordcraft_doc::section::{NotePos, NoteProps, NoteRestart};
+    let mut d = Document::new();
+    d.settings.footnote_format = NumFormat::UpperLetter;
+    d.settings.footnote_pr =
+        NoteProps { pos: Some(NotePos::BeneathText), num_start: Some(4), num_restart: Some(NoteRestart::EachPage), ..Default::default() };
+    d.settings.endnote_pr = NoteProps { pos: Some(NotePos::SectEnd), ..Default::default() };
+    let mut first = Paragraph::with_text("Section one", CharProps::default());
+    let own = NoteProps { num_fmt: Some(NumFormat::LowerRoman), num_start: Some(7), num_restart: Some(NoteRestart::EachSect), ..Default::default() };
+    first.section = Some(Box::new(SectionProps {
+        footnote_pr: own,
+        endnote_pr: NoteProps { num_fmt: Some(NumFormat::Decimal), ..Default::default() },
+        ..Default::default()
+    }));
+    d.body = vec![para_block(first), para_block(Paragraph::with_text("Section two", CharProps::default()))];
+    let bytes = wordcraft_docx::write(&d).unwrap();
+    let r = wordcraft_docx::read(&bytes).unwrap();
+    assert_eq!(r.settings.footnote_format, NumFormat::UpperLetter);
+    assert_eq!((r.settings.footnote_pr, r.settings.endnote_pr), (d.settings.footnote_pr, d.settings.endnote_pr));
+    let sections = r.sections();
+    assert_eq!(sections[0].1.footnote_pr, own);
+    assert_eq!(sections[0].1.endnote_pr.num_fmt, Some(NumFormat::Decimal));
+    assert!(sections[1].1.footnote_pr.is_empty() && sections[1].1.endnote_pr.is_empty());
+    assert_eq!(r.note_options(sections[0].1, false).num_start, 7);
+    assert_eq!(r.note_options(sections[1].1, false).num_start, 4);
+    let mut z = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+    let mut xml = String::new();
+    std::io::Read::read_to_string(&mut z.by_name("word/document.xml").unwrap(), &mut xml).unwrap();
+    let at = |s: &str| xml.find(s).unwrap_or_else(|| panic!("{s} missing"));
+    assert!(
+        at("<w:footnotePr><w:numFmt w:val=\"lowerRoman\"/><w:numStart w:val=\"7\"/><w:numRestart w:val=\"eachSect\"/></w:footnotePr>")
+            < at("<w:type")
+    );
+}
+
 /// `references.footnote` starts the note's own text with a reference to the note, so the editor shows
 /// its number. In the file that is the `w:footnoteRef` mark; a `w:footnoteReference` there would make
 /// the note cite itself, which LibreOffice refuses to open.
@@ -731,8 +769,8 @@ fn toc_field_skips_nested_stories() {
 #[test]
 fn tracked_changes_round_trip() {
     let mut d = Document::new();
-    d.revisions.push(Revision { kind: RevisionKind::Insert, author: "Alice".into(), date: "2026-05-01T10:00:00Z".into() });
-    d.revisions.push(Revision { kind: RevisionKind::Delete, author: "Bob".into(), date: "2026-05-02T10:00:00Z".into() });
+    d.revisions.push(Revision { kind: RevisionKind::Insert, author: "Alice".into(), date: "2026-05-01T10:00:00Z".into(), move_name: None });
+    d.revisions.push(Revision { kind: RevisionKind::Delete, author: "Bob".into(), date: "2026-05-02T10:00:00Z".into(), move_name: None });
     d.settings.track_changes = true;
     let ins = CharProps { ins: Some(0), ..Default::default() };
     let del = CharProps { del: Some(1), bold: Some(true), ..Default::default() };
@@ -756,8 +794,8 @@ fn tracked_paragraph_marks_round_trip() {
     // Issue #229: an inserted / deleted paragraph mark is `w:ins` / `w:del` in the mark's
     // `w:rPr` (ECMA-376 §17.13.5.16, §17.13.5.15), alone or with mark formatting.
     let mut d = Document::new();
-    d.revisions.push(Revision { kind: RevisionKind::Insert, author: "Alice".into(), date: "2026-05-01T10:00:00Z".into() });
-    d.revisions.push(Revision { kind: RevisionKind::Delete, author: "Bob".into(), date: "2026-05-02T10:00:00Z".into() });
+    d.revisions.push(Revision { kind: RevisionKind::Insert, author: "Alice".into(), date: "2026-05-01T10:00:00Z".into(), move_name: None });
+    d.revisions.push(Revision { kind: RevisionKind::Delete, author: "Bob".into(), date: "2026-05-02T10:00:00Z".into(), move_name: None });
     let mut split = Paragraph::with_text("Owned ALPHA ", CharProps::default());
     split.mark.ins = Some(0);
     let mut joined = Paragraph::with_text("Owned BETA", CharProps::default());
@@ -1118,7 +1156,7 @@ fn kitchen_sink() -> Document {
     let f = d.add_part(PartKind::Footnote, vec![para_block(Paragraph::with_text("Note", CharProps::default()))]);
     let c = d.add_part(PartKind::Comment, vec![para_block(Paragraph::with_text("Comment", CharProps::default()))]);
     d.comments.insert(3, Comment { author: "X".into(), part: c, ..Default::default() });
-    d.revisions.push(Revision { kind: RevisionKind::Insert, author: "A".into(), date: String::new() });
+    d.revisions.push(Revision { kind: RevisionKind::Insert, author: "A".into(), date: String::new(), move_name: None });
     d.last_section.headers.default = Some(h);
     let mut blocks: Blocks = Vec::new();
     let mut p = para_runs(&[

@@ -1410,6 +1410,8 @@
 	New Group	Нова група
 	Rename…	Преименуј…
 	Ribbon and Quick Access Toolbar:	Трака и трака са алаткама за брзи приступ:
+	Moved from	Премештено одавде
+	Moved to	Премештено овде
 	Right-to-Left Table	Табела са десна на лево
 	Right-to-Left Section	Одељак са десна на лево
 	Table direction:	Смер табеле:
@@ -1446,3 +1448,15 @@
 	Middle	Средина
 	Click the empty text box the text should continue in (Esc cancels)	Кликните празно поље за текст у ком текст треба да се настави (Esc отказује)
 	Not linked: click a text box	Није повезано: кликните поље за текст
+	Location	Локација
+	Endnotes	Ендноте
+	Below text	Испод текста
+	End of section	Крај одељка
+	End of document	Крај документа
+	Footnotes to endnotes	Фусноте у ендноте
+	Endnotes to footnotes	Ендноте у фусноте
+	Swap footnotes and endnotes	Замени фусноте и ендноте
+	Custom mark:	Посебна ознака:
+	Continuous numbering	Непрекидна нумерација
+	Apply	Примени
+	Convert Notes	Претвори напомене

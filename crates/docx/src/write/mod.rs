@@ -68,6 +68,8 @@ pub(crate) struct Writer<'d> {
     media_files: BTreeMap<String, String>,
     bookmarks: HashMap<String, u32>,
     next_rev_id: u32,
+    /// Move ranges open in the output: (revision, range `w:id`, destination?).
+    open_moves: Vec<(u32, String, bool)>,
     docpr: u32,
     z: u32,
     /// Note part id → file note id, in first-reference order.
@@ -125,6 +127,7 @@ pub fn write_as(doc: &Document, flavor: Flavor) -> Result<Vec<u8>, DocxError> {
         media_files: BTreeMap::new(),
         bookmarks: HashMap::new(),
         next_rev_id: 0,
+        open_moves: Vec::new(),
         docpr: 0,
         z: 251_658_240,
         footnotes: Vec::new(),
@@ -858,11 +861,12 @@ fn settings_xml(doc: &Document, footnotes: bool, endnotes: bool) -> Vec<u8> {
         }
     }
     w.val("w:characterSpacingControl", "doNotCompress");
-    for (tag, fmt, used, el) in
-        [("w:footnotePr", s.footnote_format, footnotes, "w:footnote"), ("w:endnotePr", s.endnote_format, endnotes, "w:endnote")]
-    {
+    for (tag, fmt, pr, used, el) in [
+        ("w:footnotePr", s.footnote_format, &s.footnote_pr, footnotes, "w:footnote"),
+        ("w:endnotePr", s.endnote_format, &s.endnote_pr, endnotes, "w:endnote"),
+    ] {
         w.open(tag, &[]);
-        w.val("w:numFmt", fmt.ooxml());
+        story::note_pr_inner(&mut w, &wordcraft_doc::section::NoteProps { num_fmt: Some(fmt), ..*pr });
         if used {
             w.empty(el, &[("w:id", "-1")]);
             w.empty(el, &[("w:id", "0")]);
