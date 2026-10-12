@@ -120,7 +120,7 @@ fn new_comment(s: &mut Session, v: &Value) -> CmdResult {
     };
     let part = s.doc.add_part(PartKind::Comment, vec![para_block(Paragraph::with_text(&text, Default::default()))]);
     let id = s.doc.comments.keys().next_back().map(|k| k + 1).unwrap_or(0);
-    let initials: String = s.author.split_whitespace().filter_map(|w| w.chars().next()).collect();
+    let initials = s.user_initials();
     s.doc.comments.insert(id, Comment { author: s.author.clone(), initials, date: now_iso(), parent: None, resolved: false, part });
     let props = Default::default();
     s.doc.insert_object(&b, InlineObject::CommentEnd { id }, &props)?;
@@ -137,7 +137,7 @@ fn reply(s: &mut Session, v: &Value) -> CmdResult {
     let text = p::req_str(v, "text")?;
     let part = s.doc.add_part(PartKind::Comment, vec![para_block(Paragraph::with_text(text, Default::default()))]);
     let id = s.doc.comments.keys().next_back().map(|k| k + 1).unwrap_or(0);
-    let initials: String = s.author.split_whitespace().filter_map(|w| w.chars().next()).collect();
+    let initials = s.user_initials();
     s.doc.comments.insert(id, Comment { author: s.author.clone(), initials, date: now_iso(), parent: Some(parent), resolved: false, part });
     Ok(json!({"id": id}))
 }
@@ -576,6 +576,90 @@ pub fn has_format_changes(doc: &wordcraft_doc::Document) -> bool {
     })
 }
 
+/// A tracked deletion in the body shown in a balloon (Show revisions in balloons).
+#[derive(Clone, Debug, PartialEq)]
+pub struct DeletionBalloon {
+    /// Where the deleted text was: the balloon's anchor.
+    pub at: Pos,
+    pub author: String,
+    /// The deleted text, a deleted paragraph mark as ¶, shortened to [`DELETION_TEXT_CHARS`].
+    pub text: String,
+}
+
+/// At most this many characters of deleted text show in a balloon (a deleted page shows its start).
+pub const DELETION_TEXT_CHARS: usize = 200;
+/// At most this many deletion balloons (a document of many small deletions can't flood the area).
+const MAX_DELETION_BALLOONS: usize = 500;
+
+/// The tracked deletions in the body, for balloons, in document order. Deleted text running on
+/// across runs, revisions and paragraph marks by the same author is one balloon. The source of a
+/// move is left out: it has its "Moved from" balloon ([`move_changes`]).
+pub fn deletion_balloons(s: &Session) -> Vec<DeletionBalloon> {
+    let doc = &s.doc;
+    let author = |rev: u32| doc.revisions.get(rev as usize).map(|r| r.author.clone()).unwrap_or_default();
+    let mk = |path: &wordcraft_doc::Path, off| Pos { story: StoryRef::Body, path: path.clone(), off };
+    let mut out = Vec::new();
+    for path in doc.para_paths(StoryRef::Body) {
+        let Some(p) = doc.para(StoryRef::Body, &path) else { continue };
+        for (r, c) in p.run_ranges() {
+            // Inserted and then deleted text is a deletion (it's drawn and left out as one).
+            let Some(rev) = plain_deletion(doc, c.del) else { continue };
+            push_deletion(&mut out, mk(&path, r.start), mk(&path, r.end), author(rev), p.text.get(r).unwrap_or(""));
+        }
+        if let Some(rev) = plain_deletion(doc, p.mark.del) {
+            let at = mk(&path, p.len());
+            let next = path.with_last(path.last().saturating_add(1));
+            let end = if super::has_next_para(s, StoryRef::Body, &path) { mk(&next, 0) } else { at.clone() };
+            push_deletion(&mut out, at, end, author(rev), "¶");
+        }
+    }
+    out.into_iter().map(|(d, _, _)| d).collect()
+}
+
+/// Add `author`'s deleted `text` (from `at` to `end`) to `out`: to the last balloon when that
+/// deletion ends at `at` and is theirs, else as a new one. Each balloon carries where its deletion
+/// ends and how many characters its text has.
+fn push_deletion(out: &mut Vec<(DeletionBalloon, Pos, usize)>, at: Pos, end: Pos, author: String, text: &str) {
+    let joins = out.last().is_some_and(|(d, e, _)| *e == at && d.author == author);
+    if !joins {
+        if out.len() >= MAX_DELETION_BALLOONS {
+            return;
+        }
+        out.push((DeletionBalloon { at, author, text: String::new() }, end.clone(), 0));
+    }
+    let Some((d, e, chars)) = out.last_mut() else { return };
+    *e = end;
+    for c in text.chars() {
+        if *chars > DELETION_TEXT_CHARS {
+            break;
+        }
+        let c = match c {
+            // Pictures, fields and other objects show no text of their own.
+            wordcraft_doc::para::OBJ => continue,
+            '\t' | wordcraft_doc::para::LINE_BREAK | wordcraft_doc::para::PAGE_BREAK | wordcraft_doc::para::COLUMN_BREAK => ' ',
+            c if c.is_control() => continue,
+            c => c,
+        };
+        *chars += 1;
+        d.text.push(if *chars > DELETION_TEXT_CHARS { '…' } else { c });
+    }
+}
+
+/// A deletion revision that is not the source of a move (`w:moveFrom` is a deletion revision
+/// with a move name).
+fn plain_deletion(doc: &wordcraft_doc::Document, del: Option<u32>) -> Option<u32> {
+    del.filter(|_| doc.move_name(del).is_none())
+}
+
+/// Whether the body has any tracked deletion other than a move's source (cheap: stops at the
+/// first).
+pub fn has_deletions(doc: &wordcraft_doc::Document) -> bool {
+    doc.para_paths(StoryRef::Body).iter().any(|path| {
+        doc.para(StoryRef::Body, path)
+            .is_some_and(|p| plain_deletion(doc, p.mark.del).is_some() || p.runs.iter().any(|r| plain_deletion(doc, r.props.del).is_some()))
+    })
+}
+
 fn nav_change(s: &mut Session, dir: i32) -> CmdResult {
     let list = changes(s);
     let caret = s.sel.ordered();
@@ -654,15 +738,13 @@ fn word_count(s: &mut Session, v: &Value) -> CmdResult {
     }))
 }
 
-/// Issues (spelling + grammar) in one paragraph as positions.
+/// Issues (spelling + grammar) in one paragraph as positions, each in its run's language and
+/// skipping text left unchecked — the same issues the layout underlines.
 fn para_issues(s: &Session, story: StoryRef, path: &wordcraft_doc::Path) -> Vec<(Pos, Pos, wordcraft_proof::Issue)> {
     let Some(p) = s.doc.para(story, path) else { return Vec::new() };
-    let text = wordcraft_layout::para::proof_text(p);
-    let mut v: Vec<wordcraft_proof::Issue> = wordcraft_proof::check_spelling(&text);
-    v.extend(wordcraft_proof::check_grammar(&text));
-    v.sort_by_key(|i| i.start);
-    v.into_iter()
-        .filter(|i| !p.run_ranges().any(|(r, c)| r.start < i.end && i.start < r.end && (c.no_proof == Some(true) || c.link.is_some())))
+    let runs = wordcraft_layout::para::proof_runs(&s.doc, p, None);
+    wordcraft_layout::para::paragraph_issues(p, &runs, &s.prefs.spelling(), true)
+        .into_iter()
         .map(|i| (Pos { story, path: path.clone(), off: i.start }, Pos { story, path: path.clone(), off: i.end }, i))
         .collect()
 }
@@ -674,8 +756,12 @@ fn issue_at(s: &Session, at: &Pos) -> Option<(Pos, Pos, wordcraft_proof::Issue)>
 
 fn issue_json(s: &Session, a: &Pos, b: &Pos, i: &wordcraft_proof::Issue) -> Value {
     let word = s.doc.para_at(a).and_then(|p| p.text.get(a.off..b.off)).unwrap_or("").to_string();
-    let sugg = if i.kind == wordcraft_proof::IssueKind::Spelling { wordcraft_proof::suggest(&word, 6) } else { i.suggestions.clone() };
-    json!({"start": pos_json(a), "end": pos_json(b), "text": word, "kind": if i.kind == wordcraft_proof::IssueKind::Spelling { "spelling" } else { "grammar" }, "message": i.message, "suggestions": sugg})
+    let sugg = if i.kind == wordcraft_proof::IssueKind::Spelling { wordcraft_proof::suggest_in(&word, 6, i.lang) } else { i.suggestions.clone() };
+    json!({
+        "start": pos_json(a), "end": pos_json(b), "text": word,
+        "kind": if i.kind == wordcraft_proof::IssueKind::Spelling { "spelling" } else { "grammar" },
+        "message": i.message, "suggestions": sugg, "lang": i.lang.code(),
+    })
 }
 
 /// F7: select the next issue after the caret and return it with suggestions.
@@ -899,6 +985,183 @@ mod tests {
         assert_eq!(s.run("review.trackingOptions", &json!({})).unwrap()["insertColor"], "00AA00");
     }
 
+    fn glyph_text(d: &[Draw]) -> String {
+        d.iter().filter_map(|x| if let Draw::Glyphs { text, .. } = x { Some(text.as_str()) } else { None }).collect()
+    }
+
+    /// Show revisions in balloons: a tracked deletion leaves the text for a balloon at its place
+    /// and keeps its change bar; it comes back inline in the other modes and wherever no balloons
+    /// are shown (here the Comments pane, which changes the view without a relayout call).
+    #[test]
+    fn revisions_in_balloons_take_deletions_out_of_the_text() {
+        use super::{DeletionBalloon, deletion_balloons};
+        let mut s = Session::new(Document::new());
+        s.view.proofing = false;
+        s.author = "Ana".into();
+        s.run("document.setText", &json!({"text": "keep gone stay"})).unwrap();
+        s.run("review.trackChanges", &json!({"value": true})).unwrap();
+        s.run("select.range", &json!({"anchor": {"block": 0, "off": 5}, "focus": {"block": 0, "off": 10}})).unwrap();
+        s.run("text.delete", &json!({})).unwrap();
+
+        // The default (only comments and formatting in balloons): struck through inline.
+        assert!(!s.revisions_in_balloons());
+        let (d, _) = draws(&mut s);
+        assert!(glyph_text(&d).contains("gone"), "{:?}", glyph_text(&d));
+
+        s.run("review.trackingOptions", &json!({"balloons": "revisions"})).unwrap();
+        assert!(s.revisions_in_balloons());
+        let (d, body_x) = draws(&mut s);
+        assert!(!glyph_text(&d).contains("gone"), "the deletion left the text: {:?}", glyph_text(&d));
+        let horizontal = lines(&d).into_iter().filter(|(_, y0, _, y1)| y0 == y1).count();
+        assert_eq!(horizontal, 0, "no strikethrough left behind: {:?}", lines(&d));
+        assert_eq!(lines(&d).into_iter().filter(|(x0, _, x1, _)| x0 == x1 && *x0 < body_x).count(), 1, "the changed line keeps its bar");
+        let at = wordcraft_doc::Pos::body(0, 5);
+        assert_eq!(deletion_balloons(&s), vec![DeletionBalloon { at: at.clone(), author: "Ana".into(), text: "gone ".into() }]);
+        // The balloon's anchor is where the deletion was: between "keep " and "stay".
+        let l = s.layout();
+        let (anchor, stay) = (l.caret(&at).unwrap().x, l.caret(&wordcraft_doc::Pos::body(0, 10)).unwrap().x);
+        assert!((anchor - stay).abs() < 0.01, "the deletion takes no room: {anchor} vs {stay}");
+
+        // No balloons beside the page while the Comments pane lists comments: inline again.
+        s.run("view.commentsPane", &json!({"value": true})).unwrap();
+        assert!(!s.revisions_in_balloons());
+        assert!(glyph_text(&draws(&mut s).0).contains("gone"));
+        s.run("view.commentsPane", &json!({"value": false})).unwrap();
+        assert!(!glyph_text(&draws(&mut s).0).contains("gone"));
+        s.run("review.trackingOptions", &json!({"balloons": "inline"})).unwrap();
+        assert!(!s.revisions_in_balloons());
+        assert!(glyph_text(&draws(&mut s).0).contains("gone"));
+    }
+
+    /// Deleted text running on across runs, separate deletions and a paragraph mark is one balloon
+    /// per author; a long deletion shows its start.
+    #[test]
+    fn deletion_balloons_join_runs_and_paragraph_marks_and_stay_short() {
+        use super::{DELETION_TEXT_CHARS, deletion_balloons};
+        let mut s = Session::new(Document::new());
+        s.author = "Ana".into();
+        s.run("document.setText", &json!({"text": "one two\nthree four"})).unwrap();
+        s.run("review.trackChanges", &json!({"value": true})).unwrap();
+        // "two", then the paragraph mark and "three" in a second deletion: one balloon.
+        s.run("select.range", &json!({"anchor": {"block": 0, "off": 4}, "focus": {"block": 0, "off": 7}})).unwrap();
+        s.run("text.delete", &json!({})).unwrap();
+        s.run("select.range", &json!({"anchor": {"block": 0, "off": 7}, "focus": {"block": 1, "off": 5}})).unwrap();
+        s.run("text.delete", &json!({})).unwrap();
+        // Bo's deletion right after Ana's is a balloon of its own.
+        s.author = "Bo".into();
+        s.run("select.range", &json!({"anchor": {"block": 1, "off": 5}, "focus": {"block": 1, "off": 10}})).unwrap();
+        s.run("text.delete", &json!({})).unwrap();
+        let b = deletion_balloons(&s);
+        let got: Vec<(&str, &str)> = b.iter().map(|d| (d.author.as_str(), d.text.as_str())).collect();
+        assert_eq!(got, vec![("Ana", "two¶three"), ("Bo", " four")]);
+        assert_eq!(b[0].at, wordcraft_doc::Pos::body(0, 4));
+
+        // A deletion far longer than a balloon shows: its first characters and an ellipsis.
+        let mut s = Session::new(Document::new());
+        let long = "word ".repeat(400);
+        s.run("document.setText", &json!({"text": long})).unwrap();
+        s.run("review.trackChanges", &json!({"value": true})).unwrap();
+        s.run("select.all", &json!({})).unwrap();
+        s.run("text.delete", &json!({})).unwrap();
+        let b = deletion_balloons(&s);
+        assert_eq!(b.len(), 1);
+        assert_eq!(b[0].text.chars().count(), DELETION_TEXT_CHARS + 1);
+        assert!(b[0].text.starts_with("word word") && b[0].text.ends_with('…'));
+    }
+
+    /// #404: the source of a move is a deletion revision with a move name. With revisions in
+    /// balloons it leaves the text like a deletion but has only its "Moved from" balloon, not a
+    /// "Deleted: …" one as well; a plain deletion right after it is a balloon of its own.
+    #[test]
+    fn a_moves_source_gets_no_deletion_balloon() {
+        use super::{DeletionBalloon, deletion_balloons, has_deletions, move_changes};
+        use wordcraft_doc::Pos;
+        let mut s = Session::new(Document::new());
+        s.run("document.setText", &json!({"text": "First one.\nSecond one.\nThird one."})).unwrap();
+        s.run("file.setAuthor", &json!({"name": "Ana"})).unwrap();
+        s.run("review.trackChanges", &json!({"value": true})).unwrap();
+        // The second paragraph, with its mark, cut and pasted before the first: a move.
+        s.run("select.range", &json!({"anchor": {"block": 1, "off": 0}, "focus": {"block": 2, "off": 0}})).unwrap();
+        s.run("edit.cut", &json!({})).unwrap();
+        s.run("caret.set", &json!({"pos": {"block": 0, "off": 0}})).unwrap();
+        s.run("edit.paste", &json!({})).unwrap();
+        s.run("review.trackingOptions", &json!({"balloons": "revisions"})).unwrap();
+        assert!(s.revisions_in_balloons());
+
+        let ends: Vec<(Pos, bool)> = move_changes(&s).into_iter().map(|(at, _, from)| (at, from)).collect();
+        assert_eq!(ends, vec![(Pos::body(0, 0), false), (Pos::body(2, 0), true)]);
+        assert!(deletion_balloons(&s).is_empty(), "the move's source has its \"Moved from\" balloon only: {:?}", deletion_balloons(&s));
+        assert!(!has_deletions(&s.doc), "a move alone needs no deletion balloons");
+        assert_eq!(glyph_text(&draws(&mut s).0), "Second one.First one.Third one.", "the moved-away text left the text");
+
+        // "Third " deleted right where the moved-away paragraph ends: not joined to it.
+        s.run("select.range", &json!({"anchor": {"block": 3, "off": 0}, "focus": {"block": 3, "off": 6}})).unwrap();
+        s.run("text.delete", &json!({})).unwrap();
+        assert!(has_deletions(&s.doc));
+        assert_eq!(deletion_balloons(&s), vec![DeletionBalloon { at: Pos::body(3, 0), author: "Ana".into(), text: "Third ".into() }]);
+        assert_eq!(move_changes(&s).len(), 2, "the move keeps both its balloons");
+    }
+
+    /// Revisions in balloons take deletions out of the body only, where their balloons are:
+    /// headers, footers, footnotes, endnotes and text boxes get no balloons, so their deletions
+    /// stay in the text, struck through, as in the other modes.
+    #[test]
+    fn deletions_outside_the_body_stay_inline_when_revisions_go_in_balloons() {
+        use super::{DeletionBalloon, deletion_balloons};
+        use wordcraft_doc::{Path, Pos, StoryRef};
+        let mut s = Session::new(Document::new());
+        s.view.proofing = false;
+        s.author = "Ana".into();
+        s.run("document.setText", &json!({"text": "Body zeta keep"})).unwrap();
+        let part = |v: serde_json::Value, key: &str| StoryRef::Part(v[key].as_u64().unwrap() as u32);
+        let header = part(s.run("insert.header", &json!({"text": "Head alpha"})).unwrap(), "story");
+        s.run("insert.closeHeader", &json!({})).unwrap();
+        let footer = part(s.run("insert.footer", &json!({"text": "Foot beta"})).unwrap(), "story");
+        s.run("insert.closeHeader", &json!({})).unwrap();
+        let in_body = json!({"pos": {"block": 0, "off": 4}});
+        s.run("caret.set", &in_body).unwrap();
+        let footnote = part(s.run("references.footnote", &json!({"text": "Note gamma"})).unwrap(), "id");
+        s.run("caret.set", &in_body).unwrap();
+        let endnote = part(s.run("references.endnote", &json!({"text": "End delta"})).unwrap(), "id");
+        s.run("caret.set", &in_body).unwrap();
+        let text_box = part(s.run("insert.textBox", &json!({"text": "Box epsilon"})).unwrap(), "story");
+
+        // With Track Changes on, a word deleted in each story.
+        s.run("review.trackChanges", &json!({"value": true})).unwrap();
+        let words = [(StoryRef::Body, "zeta"), (header, "alpha"), (footer, "beta"), (footnote, "gamma"), (endnote, "delta"), (text_box, "epsilon")];
+        for (story, word) in words {
+            let at = s.doc.para(story, &Path::top(0)).and_then(|p| p.text.find(word)).unwrap();
+            let pos = |off: usize| json!({"story": story, "path": [0], "off": off});
+            s.run("select.range", &json!({"anchor": pos(at), "focus": pos(at + word.len())})).unwrap();
+            s.run("text.delete", &json!({})).unwrap();
+            let p = s.doc.para(story, &Path::top(0)).unwrap();
+            assert!(p.run_ranges().any(|(r, c)| c.del.is_some() && p.text.get(r) == Some(word)), "{word} is a tracked deletion");
+        }
+        let struck = |d: &[Draw]| lines(d).into_iter().filter(|(_, y0, _, y1)| y0 == y1).count();
+
+        // Comments and formatting in balloons: every deletion struck through where it was.
+        let (d, _) = draws(&mut s);
+        let text = glyph_text(&d);
+        for (_, word) in words {
+            assert!(text.contains(word), "{word} in {text:?}");
+        }
+        let all_struck = struck(&d);
+
+        // Revisions in balloons: only the body's deletion leaves the text, for its balloon.
+        s.run("review.trackingOptions", &json!({"balloons": "revisions"})).unwrap();
+        assert!(s.revisions_in_balloons());
+        let (d, _) = draws(&mut s);
+        let text = glyph_text(&d);
+        assert!(!text.contains("zeta"), "the body's deletion left the text: {text:?}");
+        for (_, word) in &words[1..] {
+            assert!(text.contains(word), "{word} stays inline: {text:?}");
+        }
+        assert_eq!(struck(&d), all_struck - 1, "the other deletions stay struck through");
+        // Its balloon is the only one: the notes' and text box's objects sit before "zeta".
+        let at = s.doc.para(StoryRef::Body, &Path::top(0)).and_then(|p| p.text.find("zeta")).unwrap();
+        assert_eq!(deletion_balloons(&s), vec![DeletionBalloon { at: Pos::body(0, at), author: "Ana".into(), text: "zeta".into() }]);
+    }
+
     fn body_para(s: &Session) -> &wordcraft_doc::Paragraph {
         s.doc.para(wordcraft_doc::StoryRef::Body, &wordcraft_doc::Path::top(0)).unwrap()
     }
@@ -937,7 +1200,7 @@ mod tests {
 
         let list = s.run("review.changes", &json!({})).unwrap();
         let desc: Vec<&str> = list.as_array().unwrap().iter().filter(|c| c["kind"] == "format").filter_map(|c| c["description"].as_str()).collect();
-        assert_eq!(desc, ["Formatted: Align: center", "Formatted: Bold, Size: 14"], "{list:#}");
+        assert_eq!(desc, ["Formatted: Align: center", "Formatted: Bold, Bold cs, Size: 14, Size cs: 14"], "{list:#}");
 
         let (d, body_x) = draws(&mut s);
         let bars = lines(&d).into_iter().filter(|(x0, _, x1, _)| x0 == x1 && *x0 < body_x).count();

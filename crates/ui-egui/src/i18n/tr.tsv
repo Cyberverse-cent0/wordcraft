@@ -252,6 +252,7 @@
 	Export a copy to share (PDF, Word document)	Paylaşmak için bir kopya dışa aktarın (PDF, Word belgesi)
 	Exported {path}	Dışa aktarıldı: {path}
 	Extend Selection	Seçimi Genişlet
+	Extend Selection by Units	Seçimi Birimlere Göre Genişlet
 	Field	Alan
 	File	Dosya
 	Find	Bul
@@ -662,6 +663,9 @@
 	Show Notes	Notları Göster
 	Show all formatting marks	Tüm biçimlendirme işaretlerini göster
 	Show rulers	Cetvelleri göster
+	Animate the caret (it glides and fades)	İmleci canlandır (kayarak ilerler ve solarak yanıp söner)
+	Animation	Animasyon
+	On: the caret glides to its new place when you type or use the arrow keys, and its blink fades. Off: it jumps and blinks on and off.	Açık: yazarken veya ok tuşlarını kullanırken imleç yeni yerine kayarak gider ve yanıp sönerken solar. Kapalı: imleç yeni yerine atlar, keskin biçimde yanıp söner.
 	Show the community button in the title bar	Başlık çubuğunda topluluk düğmesini göster
 	Show/Hide ¶	Göster/Gizle ¶
 	Show\nComments	Yorumları\nGöster
@@ -798,7 +802,6 @@
 	Wide	Geniş
 	Widow/Orphan Control	Tek Kalan Satır Denetimi
 	Widow/Orphan control	Tek kalan satır denetimi
-	Wildcards (regex)	Joker karakterler (regex)
 	Window	Pencere
 	Word Count	Sözcük Sayısı
 	Word Left	Önceki Sözcük
@@ -1322,11 +1325,15 @@
 	Flip Vertical	Dikey Çevir
 	Flip Horizontal	Yatay Çevir
 	Formatted	Biçimlendirildi
+	Deleted	Silindi
 	Copyright Sign	Telif Hakkı İşareti
 	Demote	Düzey Düşür
 	Edit Field Code	Alan Kodunu Düzenle
 	Edit Field…	Alanı Düzenle…
 	Go Back	Geri Git
+	Do Not Check Spelling or Grammar	Yazım veya dilbilgisini denetleme
+	English (United Kingdom)	İngilizce (Birleşik Krallık)
+	Polish	Lehçe
 	Insert Date Field	Tarih Alanı Ekle
 	Insert Page Field	Sayfa Alanı Ekle
 	Insert Time Field	Saat Alanı Ekle
@@ -1408,12 +1415,194 @@
 	Left Only	Yalnızca Sol
 	Right Only	Yalnızca Sağ
 	Largest Only	Yalnızca En Geniş
+	Resize Table by Dragging	Tabloyu Sürükleyerek Yeniden Boyutlandır
+	Add Font…	Yazı Tipi Ekle…
+	Added Fonts	Eklenen Yazı Tipleri
+	Remove Added Font	Eklenen Yazı Tipini Kaldır
+	Print Markup	İşaretlemeyi Yazdır
+	Comments beside each page and tracked changes in PDFs, prints and images; a comment list at the end of web pages, Markdown and text.	PDF'lerde, baskılarda ve görüntülerde her sayfanın yanında açıklamalar ve izlenen değişiklikler; web sayfalarının, Markdown ve metnin sonunda açıklama listesi.
+	Recent Colors	Son Kullanılan Renkler
+	More Colors…	Diğer Renkler…
+	Standard	Standart
+	Current	Geçerli
+	Colors:	Renkler:
+	Color model:	Renk modeli:
+	Red:	Kırmızı:
+	Green:	Yeşil:
+	Blue:	Mavi:
+	Hue:	Ton:
+	Sat:	Doygunluk:
+	Lum:	Parlaklık:
+	Hex:	Onaltılık:
+	Accessibility Pane	Erişilebilirlik Bölmesi
+	Alt Text Pane	Alternatif Metin Bölmesi
+	Alt\nText	Alternatif\nMetin
+	View Alt Text…	Alternatif Metni Görüntüle…
+	Mark as decorative	Dekoratif olarak işaretle
+	Title:	Başlık:
+	Errors ({n})	Hatalar ({n})
+	Warnings ({n})	Uyarılar ({n})
+	Tips ({n})	İpuçları ({n})
+	No accessibility issues found.	Erişilebilirlik sorunu bulunamadı.
+	Describe what this object shows, for people who can't see it.	Bu nesnenin neyi gösterdiğini, göremeyenler için açıklayın.
+	Decorative objects only add visual interest: screen readers skip them.	Dekoratif nesneler yalnızca görsel çekicilik katar: ekran okuyucular bunları atlar.
+	Describe what this table shows, for people who can't see it.	Bu tablonun neyi gösterdiğini, göremeyenler için açıklayın.
+	Select a picture, shape, chart or table to describe it.	Açıklamak için bir resim, şekil, grafik veya tablo seçin.
+	Document Grid	Belge Kılavuzu
+	No grid	Kılavuz yok
+	Lines only	Yalnızca satırlar
+	Lines and characters	Satırlar ve karakterler
+	Text snaps to characters	Metin karakterlere yapışır
+	Characters per line:	Satır başına karakter:
+	Lines per page:	Sayfa başına satır:
 	Moved from	Taşındı (kaynak)
 	Moved to	Taşındı (hedef)
+	Developer	Geliştirici
+	Controls	Denetimler
+	Rich Text Content Control	Zengin Metin İçerik Denetimi
+	Plain Text Content Control	Düz Metin İçerik Denetimi
+	Picture Content Control	Resim İçerik Denetimi
+	Building Block Gallery Content Control	Yapı Bloğu Galerisi İçerik Denetimi
+	Check Box Content Control	Onay Kutusu İçerik Denetimi
+	Combo Box Content Control	Açılan Kutu İçerik Denetimi
+	Drop-Down List Content Control	Açılır Liste İçerik Denetimi
+	Date Picker Content Control	Tarih Seçici İçerik Denetimi
+	Repeating Section Content Control	Yinelenen Bölüm İçerik Denetimi
+	Design Mode	Tasarım Modu
+	Content Control at Selection	Seçimdeki İçerik Denetimi
+	Toggle Check Box	Onay Kutusunu Değiştir
+	Choose List Item	Liste Öğesi Seç
+	Set Date	Tarihi Ayarla
+	Remove Content Control	İçerik Denetimini Kaldır
+	Content Control Properties	İçerik Denetimi Özellikleri
+	Title	Başlık
+	Tag	Etiket
+	Placeholder text	Yer tutucu metin
+	Can't be deleted	Silinemez
+	Contents can't be edited	İçerik düzenlenemez
+	Remove the control once edited	Düzenlendikten sonra denetimi kaldır
+	Allow line breaks	Satır sonlarına izin ver
+	Date format	Tarih biçimi
+	Checked symbol	Seçili simge
+	Unchecked symbol	Seçili olmayan simge
+	List entries	Liste girdileri
+	Display text	Görünen metin
+	Value	Değer
+	Today	Bugün
+	Put the caret in a content control first.	Önce imleci bir içerik denetiminin içine koyun.
 	Right-to-Left Table	Sağdan Sola Tablo
 	Right-to-Left Section	Sağdan Sola Bölüm
 	Table direction:	Tablo yönü:
 	Section direction:	Bölüm yönü:
+	A, B, C, …	A, B, C, …
+	Above the item	Öğenin üstünde
+	Accessed on	Erişim tarihi
+	Add New Source…	Yeni Kaynak Ekle…
+	Add the chapter number	Bölüm numarasını ekle
+	Atmosphere	Atmosfer
+	Below the item	Öğenin altında
+	Book	Kitap
+	Book title	Kitap başlığı
+	Caption	Başlık
+	Caption Numbering	Başlık Numaralandırma
+	Caption text	Başlık metni
+	Caption:	Başlık:
+	Chapter in a book	Kitapta bölüm
+	Chapters begin at:	Bölümler şunla başlar:
+	Collect entries from:	Girdileri şuradan topla:
+	Columns:	Sütunlar:
+	Conference	Konferans
+	Conference paper	Konferans bildirisi
+	Container Title	Kapsayıcı Başlığı
+	Create Source	Kaynak Oluştur
+	Cross-reference:	Çapraz başvuru:
+	Custom Table of Contents…	Özel İçindekiler Tablosu…
+	DOI	DOI
+	Day	Gün
+	Delete Label	Etiketi Sil
+	Edit Source	Kaynağı Düzenle
+	Edition	Baskı
+	Edit…	Düzenle…
+	Entry marked.	Girdi işaretlendi.
+	Example: {sample}	Örnek: {sample}
+	Figure	Şekil
+	Film	Film
+	Heading styles (levels 1–{n})	Başlık stilleri (1–{n}. düzeyler)
+	Heading {n}	Başlık {n}
+	I, II, III, …	I, II, III, …
+	Include page numbers	Sayfa numaralarını ekle
+	Indented	Girintili
+	Institution	Kurum
+	Ionosphere	İyonosfer
+	Issue	Sayı
+	Journal	Dergi
+	Label:	Etiket:
+	Last, First; Last, First	Soyadı, Adı; Soyadı, Adı
+	Leave the label out of the caption	Etiketi başlıktan çıkar
+	Letter headings	Harf başlıkları
+	Levels:	Düzeyler:
+	Link entries to their headings	Girdileri başlıklarına bağla
+	Made from the author and year when empty	Boşsa yazardan ve yıldan oluşturulur
+	Magazine or newspaper article	Dergi veya gazete makalesi
+	Main entry:	Ana girdi:
+	Mark	İşaretle
+	Mark All	Tümünü İşaretle
+	Mark Entry…	Girdiyi İşaretle…
+	Mark Index Entry	Dizin Girdisini İşaretle
+	Mesosphere	Mezosfer
+	Month	Ay
+	New Label	Yeni Etiket
+	New Label…	Yeni Etiket…
+	New…	Yeni…
+	No sources yet.	Henüz kaynak yok.
+	Numbering…	Numaralandırma…
+	Options…	Seçenekler…
+	Other	Diğer
+	Other styles and their TOC level:	Diğer stiller ve İçindekiler düzeyleri:
+	Outline levels	Anahat düzeyleri
+	Page number style	Sayfa numarası stili
+	Page numbers at the right margin	Sayfa numaraları sağ kenar boşluğunda
+	Page title	Sayfa başlığı
+	Pages of bookmark:	Yer işaretinin sayfaları:
+	Periodical	Süreli yayın
+	Position:	Konum:
+	Publisher	Yayıncı
+	Run-in	Yan yana
+	See	Bkz.
+	Separator:	Ayırıcı:
+	Show every bibliography field	Tüm kaynakça alanlarını göster
+	Site name	Site adı
+	Source Manager	Kaynak Yöneticisi
+	Source type:	Kaynak türü:
+	Sources in this document:	Bu belgedeki kaynaklar:
+	Styles:	Stiller:
+	Subentry:	Alt girdi:
+	TC entry fields	TC girdi alanları
+	Tab leader:	Sekme öncülü:
+	Table of Contents Options	İçindekiler Tablosu Seçenekleri
+	Table of Contents Styles	İçindekiler Tablosu Stilleri
+	This page	Bu sayfa
+	Type:	Tür:
+	URL	URL
+	Volume	Cilt
+	Website	Web sitesi
+	Year	Yıl
+	a, b, c, …	a, b, c, …
+	i, ii, iii, …	i, ii, iii, …
+	{n} entries marked.	{n} girdi işaretlendi.
+	Lasso Select	Kement Seçimi
+	Move Selected Ink	Seçili Mürekkebi Taşı
+	Delete Selected Ink	Seçili Mürekkebi Sil
+	Recolor Selected Ink	Seçili Mürekkebi Yeniden Renklendir
+	Add Pen	Kalem Ekle
+	Remove Pen	Kalemi Kaldır
+	Ink to Shape	Mürekkepten Şekle
+	Convert to Shapes	Şekillere Dönüştür
+	Ink Replay	Mürekkep Yeniden Oynatma
+	Add\nPen	Kalem\nEkle
+	Rewind	Geri Sar
+	Forward	İleri
+	Stroke {n} of {total}	Vuruş {n} / {total}
 	Drawing Canvas	Çizim Tuvali
 	New Drawing Canvas	Yeni Çizim Tuvali
 	Fit	Sığdır
@@ -1434,6 +1623,135 @@
 	Search icons	Simgelerde ara
 	No icons match your search.	Aramanızla eşleşen simge yok.
 	Recolor a one-color picture, such as an icon	Simge gibi tek renkli bir resmi yeniden renklendir
+	Numerals:	Rakamlar:
+	Numerals	Rakamlar
+	Arabic	Arapça
+	Hindi	Hintçe
+	Context	Bağlam
+	System	Sistem
+	Couldn't make WordCraft the default: {error}	WordCraft varsayılan yapılamadı: {error}
+	In Default apps, choose WordCraft for the document types you want it to open.	Varsayılan uygulamalar bölümünde, WordCraft'ın açmasını istediğiniz belge türlerini seçin.
+	Make WordCraft the default for Word documents…	WordCraft'ı Word belgeleri için varsayılan yap…
+	Opens .docx, .doc, .rtf and .odt files and Word templates with WordCraft from now on.	Bundan sonra .docx, .doc, .rtf ve .odt dosyalarını ve Word şablonlarını WordCraft ile açar.
+	Opens Settings › Default apps, where you choose WordCraft for .docx and the other document types.	Ayarlar › Varsayılan uygulamalar bölümünü açar; burada .docx ve diğer belge türleri için WordCraft'ı seçersiniz.
+	To open Word documents with WordCraft by default: select one in Finder, choose File › Get Info, pick WordCraft under Open with, then click Change All.	Word belgelerini varsayılan olarak WordCraft ile açmak için: Finder'da bir belge seçin, Dosya › Bilgi Al'ı seçin, Birlikte aç altında WordCraft'ı seçin ve Tümünü Değiştir'e tıklayın.
+	WordCraft is now the default app for Word documents.	WordCraft artık Word belgeleri için varsayılan uygulama.
+	Templates	Şablonlar
+	Templates and Add-ins	Şablonlar ve Eklentiler
+	Attach Template	Şablonu Ekle
+	Detach Template	Şablonu Ayır
+	Automatically Update Document Styles	Belge Stillerini Otomatik Güncelle
+	Update Styles from Template	Stilleri Şablondan Güncelle
+	Organizer	Düzenleyici
+	Copy Styles	Stilleri Kopyala
+	Rename Style	Stili Yeniden Adlandır
+	Document template:	Belge şablonu:
+	Attach…	Ekle…
+	Automatically update document styles	Belge stillerini otomatik güncelle
+	Organizer…	Düzenleyici…
+	1. Formatting restrictions	1. Biçimlendirme kısıtlamaları
+	2. Editing restrictions	2. Düzenleme kısıtlamaları
+	3. Start enforcement	3. Korumayı başlat
+	<< Less	<< Daha az
+	Another file	Başka bir dosya
+	Apply as you type	Yazarken uygula
+	AutoCorrect	Otomatik Düzelt
+	AutoFormat As You Type	Yazarken Otomatik Biçimlendir
+	Automatic bulleted lists	Otomatik madde işaretli listeler
+	Automatic numbered lists	Otomatik numaralı listeler
+	Border lines	Kenarlık çizgileri
+	Capitalize first letter of sentences	Cümlelerin ilk harfini büyük yap
+	Capitalize first letter of table cells	Tablo hücrelerinin ilk harfini büyük yap
+	Capitalize names of days	Gün adlarını büyük harfle başlat
+	Case changes	Büyük/küçük harf değişiklikleri
+	Character level	Karakter düzeyi
+	Checked styles are allowed:	İşaretli stillere izin verilir:
+	Combine Documents	Belgeleri Birleştir
+	Compare Documents	Belgeleri Karşılaştır
+	Compared: {changes} changes	Karşılaştırıldı: {changes} değişiklik
+	Comparing with another file needs the desktop app.	Başka bir dosyayla karşılaştırma için masaüstü uygulaması gerekir.
+	Comparison settings	Karşılaştırma ayarları
+	Don't capitalize after:	Şundan sonra büyük harf yapma:
+	Editing in this document is restricted.	Bu belgede düzenleme kısıtlanmıştır.
+	Every change is recorded as a tracked change.	Her değişiklik izlenen değişiklik olarak kaydedilir.
+	Everyone	Herkes
+	Exceptions (optional)	Özel durumlar (isteğe bağlı)
+	Exceptions…	Özel durumlar…
+	Fields	Alanlar
+	Filling in forms	Form doldurma
+	Find Next Editable Region	Sonraki Düzenlenebilir Bölgeyi Bul
+	Footnotes and endnotes	Dipnotlar ve sonnotlar
+	Formatting, case changes, white space and tables are compared; the other settings are kept for later.	Biçimlendirme, harf büyüklüğü, boşluklar ve tablolar karşılaştırılır; diğer ayarlar daha sonra için saklanır.
+	Fractions (1/2) as fraction characters (½)	Kesirleri (1/2) kesir karakteri (½) olarak yaz
+	Headers and footers	Üst bilgiler ve alt bilgiler
+	Hyphens (--) as dashes (—)	Kısa çizgileri (--) uzun çizgi (—) olarak yaz
+	In equations, typing a name after a backslash replaces it with its symbol.	Denklemlerde ters eğik çizgiden sonra yazılan ad, simgesiyle değiştirilir.
+	Internet addresses as links	İnternet adreslerini bağlantı yap
+	Label changes with:	Değişiklikleri şununla etiketle:
+	Limit formatting to a selection of styles	Biçimlendirmeyi seçili stillerle sınırla
+	Math AutoCorrect	Matematik Otomatik Düzelt
+	More >>	Daha fazla >>
+	Moves	Taşımalar
+	New document	Yeni belge
+	No changes (read only)	Değişiklik yok (salt okunur)
+	Only allow this kind of editing:	Yalnızca bu tür düzenlemeye izin ver:
+	Only comments can be added, except in regions marked editable.	Düzenlenebilir işaretli bölgeler dışında yalnızca yorum eklenebilir.
+	Only form fields can be filled in.	Yalnızca form alanları doldurulabilir.
+	Only the allowed styles can be applied.	Yalnızca izin verilen stiller uygulanabilir.
+	Ordinals (1st) as superscript	Sıra sayılarını (1st) üst simge yap
+	Original document	Özgün belge
+	This password type isn't supported.	Bu parola türü desteklenmiyor.
+	Replace as you type	Yazarken değiştir
+	Replace text as you type	Yazarken metni değiştir
+	Replace:	Değiştirilecek:
+	Revised document	Düzeltilmiş belge
+	Select text, then tick who can still edit it.	Metni seçin, sonra kimlerin düzenleyebileceğini işaretleyin.
+	Settings…	Ayarlar…
+	Show changes at:	Değişiklikleri göster:
+	Show changes in:	Değişiklikleri şurada göster:
+	Smart quotes instead of straight quotes	Düz tırnak yerine akıllı tırnak
+	Start Enforcing Protection	Korumayı Başlat
+	Stop Protection	Korumayı Durdur
+	Text boxes	Metin kutuları
+	The document is read only, except for regions marked editable.	Düzenlenebilir işaretli bölgeler dışında belge salt okunurdur.
+	The password is optional; without it anyone can stop the protection.	Parola isteğe bağlıdır; olmadan herkes korumayı durdurabilir.
+	This document	Bu belge
+	Tracked changes	İzlenen değişiklikler
+	Type the password to stop the protection.	Korumayı durdurmak için parolayı yazın.
+	White space	Boşluk
+	With:	Yeni:
+	Word level	Sözcük düzeyi
+	Change Chart Type	Grafik Türünü Değiştir
+	Chart Design	Grafik Tasarımı
+	Type	Tür
+	Edit Data	Verileri Düzenle
+	Chart Title	Grafik Başlığı
+	Chart Layouts	Grafik Düzenleri
+	Add Chart Element	Grafik Öğesi Ekle
+	Legend	Gösterge
+	Data Labels	Veri Etiketleri
+	Above Chart	Grafiğin Üstünde
+	Insert Chart	Grafik Ekle
+	Clustered Column	Kümelenmiş Sütun
+	Stacked Column	Yığılmış Sütun
+	Clustered Bar	Kümelenmiş Çubuk
+	Stacked Bar	Yığılmış Çubuk
+	Area	Alan
+	Pie	Pasta
+	Doughnut	Halka
+	Scatter	Dağılım
+	“{text}” ({row}, {series}) isn't a number.	“{text}” ({row}, {series}) bir sayı değil.
+	Category {n}	Kategori {n}
+	Series {n}	Seri {n}
+	Type the categories down the side and a column of values per series.	Kategorileri yan tarafa, her seri için bir değer sütunu yazın.
+	Categories	Kategoriler
+	Series name	Seri adı
+	Remove series	Seriyi kaldır
+	Remove row	Satırı kaldır
+	Add Row	Satır Ekle
+	Add Series	Seri Ekle
+	Edit\nData	Verileri\nDüzenle
+	Change\nChart Type	Grafik Türünü\nDeğiştir
 	Align Text	Metni Hizala
 	Create Link	Bağlantı Oluştur
 	Break Link	Bağlantıyı Kes
@@ -1455,3 +1773,292 @@
 	Continuous numbering	Sürekli numaralandırma
 	Apply	Uygula
 	Convert Notes	Notları Dönüştür
+
+# Built-in file browser (#576).
+	Documents	Belgeler
+	Word document	Word belgesi
+	All files	Tüm dosyalar
+	Recipient lists	Alıcı listeleri
+	The system file dialog isn't available, so WordCraft shows its own. To get the system dialog, install a file chooser portal (such as xdg-desktop-portal-gtk) or zenity.	Sistemin dosya iletişim kutusu kullanılamadığı için WordCraft kendi iletişim kutusunu gösteriyor. Sistem iletişim kutusunu kullanmak için bir dosya seçici portalı (örneğin xdg-desktop-portal-gtk) ya da zenity yükleyin.
+	Up one level	Bir düzey yukarı
+	Home folder	Ana klasör
+	{name} wasn't found.	{name} bulunamadı.
+	{name} already exists. Choose Save again to replace it.	{name} zaten var. Değiştirmek için Kaydet'i yeniden seçin.
+	This folder can't be read: {error}	Bu klasör okunamıyor: {error}
+	Showing the first {count} items.	İlk {count} öğe gösteriliyor.
+	File name:	Dosya adı:
+	Browse in WordCraft…	WordCraft'ta Gözat…
+	Open a file with WordCraft's own browser when the system file dialog doesn't appear.	Sistemin dosya iletişim kutusu açılmadığında dosyayı WordCraft'ın kendi dosya tarayıcısıyla açın.
+	Hide White Space	Boşluğu gizle
+	All pages	Tüm sayfalar
+	Current page	Geçerli sayfa
+	Selected pages	Seçili sayfalar
+	Custom range	Özel aralık
+	All pages in the range	Aralıktaki tüm sayfalar
+	Odd pages only	Yalnızca tek sayfalar
+	Even pages only	Yalnızca çift sayfalar
+	Copies	Kopya
+	Collate copies	Kopyaları harmanla
+	Pages like 1-3, 5	Sayfalar, örn. 1-3, 5
+	{count} of {total} pages will print	{total} sayfadan {count} sayfa yazdırılacak
+	Save these pages as PDF…	Bu sayfaları PDF olarak kaydet…
+	The printer, two-sided printing and pages per sheet are chosen in that dialog.	Yazıcı, çift taraflı yazdırma ve yaprak başına sayfa sayısı o iletişim kutusunda seçilir.
+	Previous Page	Önceki sayfa
+	Print to PDF	PDF'ye yazdır
+# Word XML Document (#548).
+	Word XML Document (*.xml)	Word XML Belgesi (*.xml)
+# Find and Replace special characters and wildcards (#543).
+	Use wildcards	Joker karakter kullan
+	Special	Özel
+	Match prefix	Ön eke uy
+	Match suffix	Son eke uy
+	Ignore punctuation characters	Noktalama karakterlerini yoksay
+	Ignore white-space characters	Boşluk karakterlerini yoksay
+	Regular expressions	Düzenli ifadeler
+	Search Options	Arama Seçenekleri
+	Tab Character	Sekme Karakteri
+	Any Character	Herhangi Bir Karakter
+	Any Digit	Herhangi Bir Rakam
+	Any Letter	Herhangi Bir Harf
+	Caret Character	Şapka Karakteri
+	Section Character	Bölüm Karakteri
+	Paragraph Character	Paragraf Karakteri
+	Graphic	Grafik
+	Manual Line Break	El ile Satır Sonu
+	Manual Page Break	El ile Sayfa Sonu
+	Section Break	Bölüm Sonu
+	White Space	Boşluk
+	Clipboard Contents	Pano İçeriği
+	Find What Text	Aranan Metin
+	Find What Expression	Aranan İfade
+	Character in Range	Aralıktaki Karakter
+	Beginning of Word	Sözcük Başı
+	End of Word	Sözcük Sonu
+	Expression	İfade
+	Not	Değil
+	Num Occurrences	Tekrar Sayısı
+	Previous 1 or More	Öncekinin 1 veya Daha Fazlası
+	0 or More Characters	0 veya Daha Fazla Karakter
+# Insert SmartArt (#497).
+	Add Shape	Şekil Ekle
+	Change Colors	Renkleri Değiştir
+	Change Layout	Düzeni Değiştir
+	Create Graphic	Grafik Oluştur
+	Edit Items	Öğeleri Düzenle
+	Layouts	Düzenler
+	Reset Graphic	Grafiği Sıfırla
+	SmartArt Design	SmartArt Tasarımı
+	SmartArt Styles	SmartArt Stilleri
+	Text Pane	Metin Bölmesi
+	List	Liste
+	Process	Süreç
+	Cycle	Döngü
+	Hierarchy	Hiyerarşi
+	Relationship	İlişki
+	Pyramid	Piramit
+	Basic List	Temel Liste
+	Basic Process	Temel Süreç
+	Basic Cycle	Temel Döngü
+	Basic Pyramid	Temel Piramit
+	Basic Radial	Temel Radyal
+	Basic Matrix	Temel Matris
+	Basic Venn	Temel Venn
+	Shows items of equal weight as blocks in rows.	Eşit ağırlıktaki öğeleri satırlar halinde bloklar olarak gösterir.
+	Shows steps in order, left to right, with arrows between them.	Adımları soldan sağa sırayla, aralarında oklarla gösterir.
+	Shows steps that repeat, around a circle.	Yinelenen adımları daire etrafında gösterir.
+	Shows a tree: each item below the item it belongs to.	Bir ağaç gösterir: her öğe ait olduğu öğenin altındadır.
+	Shows parts that build on each other, largest at the bottom.	Birbirinin üzerine kurulan parçaları, en büyüğü altta olacak şekilde gösterir.
+	Shows items around a central idea: the first item is the centre.	Öğeleri merkezi bir fikrin çevresinde gösterir: ilk öğe merkezdedir.
+	Shows parts of a whole as quadrants.	Bütünün parçalarını dörtte birlikler olarak gösterir.
+	Shows overlapping ideas as overlapping circles.	Örtüşen fikirleri iç içe geçen daireler olarak gösterir.
+	Accent {n}	Vurgu {n}
+	Colorful	Renkli
+	Insert SmartArt	SmartArt Ekle
+	One line per item. Enter adds an item.	Öğe başına bir satır. Enter bir öğe ekler.
+	Add\nShape	Şekil\nEkle
+	Change\nColors	Renkleri\nDeğiştir
+	Reset\nGraphic	Grafiği\nSıfırla
+# Outline view (#493).
+	Promote to Heading 1	Başlık 1'e yükselt
+	Demote to Body Text	Gövde metnine düşür
+	Move Up	Yukarı taşı
+	Move Down	Aşağı taşı
+	Collapse	Daralt
+	Expand or Collapse Heading	Başlığı genişlet veya daralt
+	Select Heading and Content	Başlığı ve içeriğini seç
+	Show Level	Düzeyi göster
+	Show Level 1	Düzey 1'i göster
+	Show Level 2	Düzey 2'yi göster
+	Show Level 3	Düzey 3'ü göster
+	Show Level 4	Düzey 4'ü göster
+	Show Level 5	Düzey 5'i göster
+	Show Level 6	Düzey 6'yı göster
+	Show Level 7	Düzey 7'yi göster
+	Show Level 8	Düzey 8'i göster
+	Show Level 9	Düzey 9'u göster
+	Show All Levels	Tüm düzeyleri göster
+	All Levels	Tüm düzeyler
+	Show First Line Only	Yalnızca ilk satırı göster
+	Show Text Formatting	Metin biçimlendirmesini göster
+	Close Outline View	Anahat görünümünü kapat
+	Outline State	Anahat durumu
+	Outlining	Anahat
+	Outline Tools	Anahat araçları
+	Close Outline\nView	Anahat görünümünü\nkapat
+# Wrap Text context menu (#513).
+	Move with Text	Metinle birlikte taşı
+	Fix Position on Page	Sayfadaki konumu sabitle
+# Paragraph dialog options (#512).
+	Formatting exceptions	Biçimlendirme özel durumları
+	Inside:	İç:
+	Mirror indents	Ayna girintiler
+	Outside:	Dış:
+# WordArt and connectors (#416).
+	WordArt Styles	WordArt Stilleri
+	Text Fill	Metin Dolgusu
+	Text Outline	Metin Anahattı
+	Transform	Dönüştür
+	No Fill	Dolgu Yok
+	No Outline	Anahat Yok
+	Reflection	Yansıma
+	No Reflection	Yansıma Yok
+	No Transform	Dönüşüm Yok
+	Connect Shapes	Şekilleri Bağla
+	Straight Connector	Düz Bağlayıcı
+	Straight Arrow Connector	Düz Oklu Bağlayıcı
+	Elbow Connector	Dirsekli Bağlayıcı
+	Elbow Arrow Connector	Dirsekli Oklu Bağlayıcı
+	Curved Connector	Eğri Bağlayıcı
+	Curved Arrow Connector	Eğri Oklu Bağlayıcı
+	Arch Up	Yukarı Kemer
+	Arch Down	Aşağı Kemer
+	Slant Up	Yukarı Eğim
+	Slant Down	Aşağı Eğim
+	Inflate	Şişir
+	Deflate	Söndür
+	Chevron Up	Yukarı Şevron
+	Chevron Down	Aşağı Şevron
+	Triangle Up	Yukarı Üçgen
+	Triangle Down	Aşağı Üçgen
+	Solid Accent	Düz Vurgu
+	Light with Outline	Anahatlı Açık
+	Hollow	İçi Boş
+	Accent Gradient	Vurgu Geçişi
+	Dark with Shadow	Gölgeli Koyu
+	Soft Glow	Yumuşak Parıltı
+	Accent with Reflection	Yansımalı Vurgu
+	Warm Gradient with Outline	Anahatlı Sıcak Geçiş
+	Add line numbering	Satır numaralandırma ekle
+	Add to Document	Belgeye Ekle
+	Address labels	Adres etiketleri
+	Auto	Otomatik
+	Automatically hyphenate document	Belgede otomatik heceleme yap
+	Chinese (Simplified)	Çince (Basitleştirilmiş)
+	Chinese (Traditional)	Çince (Geleneksel)
+	Column:	Sütun:
+	Count by:	Artış:
+	Czech	Çekçe
+	Danish	Danca
+	Delivery address:	Teslimat adresi:
+	Detect language automatically	Dili otomatik algıla
+	Do not check spelling or grammar	Yazım ve dil bilgisini denetleme
+	Dutch	Felemenkçe
+	Envelope size:	Zarf boyutu:
+	Estonian	Estonca
+	Finnish	Fince
+	French (France)	Fransızca (Fransa)
+	From text:	Metinden:
+	Full page of the same label	Aynı etiketten tam sayfa
+	German (Germany)	Almanca (Almanya)
+	Greek	Yunanca
+	Hebrew	İbranice
+	Hyphenate at:	Hecele:
+	Hyphenate words in CAPS	BÜYÜK HARFLİ sözcükleri hecele
+	Hyphenation Options…	Heceleme Seçenekleri…
+	Hyphenation zone:	Heceleme bölgesi:
+	Italian	İtalyanca
+	Japanese	Japonca
+	Korean	Korece
+	Limit consecutive hyphens to:	Ardışık tireleri şununla sınırla:
+	Line Numbering Options…	Satır Numaralandırma Seçenekleri…
+	Manual Hyphenation	El ile Heceleme
+	Manual hyphenation is complete.	El ile heceleme tamamlandı.
+	Manual…	El ile…
+	Mark selected text as:	Seçili metni şu olarak işaretle:
+	New Document	Yeni Belge
+	No limit	Sınır yok
+	Norwegian (Bokmål)	Norveççe (Bokmål)
+	Numbering:	Numaralandırma:
+	Omit	Atla
+	One label per recipient	Alıcı başına bir etiket
+	Portuguese (Brazil)	Portekizce (Brezilya)
+	Portuguese (Portugal)	Portekizce (Portekiz)
+	Return address labels	Gönderen adresi etiketleri
+	Return address:	Gönderen adresi:
+	Row:	Satır:
+	Russian	Rusça
+	Serbian (Cyrillic)	Sırpça (Kiril)
+	Serbian (Latin)	Sırpça (Latin)
+	Set As Default	Varsayılan Olarak Ayarla
+	Shipping labels	Kargo etiketleri
+	Single label	Tek etiket
+	Spanish (Mexico)	İspanyolca (Meksika)
+	Spanish (Spain)	İspanyolca (İspanya)
+	Swedish	İsveççe
+	Turkish	Türkçe
+	Ukrainian	Ukraynaca
+	{language} is now the document's default language.	{language} artık belgenin varsayılan dili.
+# File > Options panes (#485).
+	As you type	Yazarken
+	AutoSave writes your changes to the file a moment after you stop typing.	Otomatik kaydetme, yazmayı bıraktıktan kısa süre sonra değişikliklerinizi dosyaya yazar.
+	Centimeters	Santimetre
+	Check spelling as you type	Yazarken yazımı denetle
+	Click to switch back to inserting	Eklemeye geri dönmek için tıklayın
+	Custom dictionary	Özel sözlük
+	Formatting marks	Biçimlendirme işaretleri
+	Hidden text	Gizli metin
+	Ignore web and file addresses	Web ve dosya adreslerini yoksay
+	Ignore words in capitals	Büyük harfli sözcükleri yoksay
+	Ignore words with numbers	Rakam içeren sözcükleri yoksay
+	Inches	İnç
+	Initials:	Baş harfler:
+	Interface	Arayüz
+	Interface language	Arayüz dili
+	Mark grammar errors as you type	Yazarken dil bilgisi hatalarını işaretle
+	Measurement units:	Ölçü birimleri:
+	Millimeters	Milimetre
+	New comments and tracked changes are recorded under this name and these initials.	Yeni açıklamalar ve izlenen değişiklikler bu ad ve baş harflerle kaydedilir.
+	New word	Yeni sözcük
+	No words yet. Add to Dictionary on a misspelled word puts it here.	Henüz sözcük yok. Yanlış yazılmış bir sözcükte «Sözlüğe ekle» onu buraya koyar.
+	Overtype	Üzerine yaz
+	Overtype (typing replaces the characters after the caret)	Üzerine yazma (yazılan metin imleçten sonraki karakterlerin yerine geçer)
+	Page display	Sayfa görünümü
+	Paragraph marks	Paragraf işaretleri
+	Personalize	Kişiselleştir
+	Picas	Pika
+	Points	Punto
+	Print the page color	Sayfa rengini yazdır
+	Printing	Yazdırma
+	Proofing language	Yazım denetimi dili
+	Recent documents to show:	Gösterilecek son belge sayısı:
+	Save documents	Belgeleri kaydet
+	Show the mini toolbar when text is selected	Metin seçildiğinde mini araç çubuğunu göster
+	Spaces	Boşluklar
+	Spelling	Yazım
+	Spelling and grammar are checked in English (United States).	Yazım ve dil bilgisi İngilizce (Amerika Birleşik Devletleri) için denetlenir.
+	Tab characters	Sekme karakterleri
+	These marks show even when Show/Hide ¶ is off.	Bu işaretler, Göster/Gizle ¶ kapalıyken de görünür.
+	Typing replaces selected text	Yazmak seçili metnin yerine geçer
+	Update fields before printing	Yazdırmadan önce alanları güncelle
+	Use the Insert key to switch overtype on and off	Üzerine yazmayı açıp kapatmak için Insert tuşunu kullan
+# Asian and Latin text fonts (#505).
+	Asian text font:	Asya metni yazı tipi:
+	Latin text font:	Latin metni yazı tipi:
+	Visual effects	Görsel efektler
+	Animation effects:	Animasyon efektleri:
+	On	Açık
+	Off	Kapalı
+	Smooth scrolling and zooming, and menus and buttons that fade in. Off shows every change at once.	Yumuşak kaydırma ve yakınlaştırma ile menülerin ve düğmelerin yavaşça belirmesi. Kapalı seçildiğinde her değişiklik anında gösterilir.
+	Your system has animation effects turned on.	Sisteminizde animasyon efektleri açık.
+	Your system has animation effects turned off.	Sisteminizde animasyon efektleri kapalı.
+	Your system doesn't report an animation setting, so animation effects stay on.	Sisteminiz bir animasyon ayarı bildirmiyor, bu nedenle animasyon efektleri açık kalır.

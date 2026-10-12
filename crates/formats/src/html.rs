@@ -1004,9 +1004,7 @@ impl<'r> Builder<'r> {
                 }
             }
             "a" => {
-                if let Some(h) =
-                    attr(attrs, "href").filter(|h| !h.trim().is_empty() && !h.trim_start().to_ascii_lowercase().starts_with("javascript:"))
-                {
+                if let Some(h) = attr(attrs, "href").filter(|h| wordcraft_doc::link::is_safe_href(h)) {
                     fmt.link = Some(h.trim().to_string());
                 }
             }
@@ -1205,7 +1203,8 @@ pub fn inlines_html(inlines: &[Inline]) -> String {
             Inline::Text(t, f) => {
                 let mut open = String::new();
                 let mut close: Vec<&str> = Vec::new();
-                if let Some(l) = &f.link {
+                // A script or other non-web target is written as plain text (`is_safe_href`).
+                if let Some(l) = f.link.as_deref().filter(|l| wordcraft_doc::link::is_safe_href(l)) {
                     open.push_str(&format!("<a href=\"{}\">", esc(l)));
                     close.push("</a>");
                 }

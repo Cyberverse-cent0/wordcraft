@@ -128,6 +128,72 @@ impl From<InterfaceSize> for u16 {
     }
 }
 
+/// The Animation effects setting (File › Options › Accessibility, `ui.animations`): on, off, or
+/// `System`, which follows the system's own setting as the host reports it
+/// ([`Services::animations_enabled`](crate::Services::animations_enabled): Windows' Animation
+/// effects, macOS' Reduce motion, the Linux/BSD desktop's setting, a browser's
+/// `prefers-reduced-motion`).
+/// Off: wheel notches scroll and zoom at once ([`crate::scroll`]) and nothing fades or glides
+/// ([`apply_animations`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(from = "String", into = "String")]
+pub enum Animations {
+    #[default]
+    System,
+    On,
+    Off,
+}
+
+impl Animations {
+    /// In menu order.
+    pub const ALL: [Animations; 3] = [Animations::System, Animations::On, Animations::Off];
+
+    /// The value used in `ui.json` and by the `ui.animations` command.
+    pub fn code(self) -> &'static str {
+        match self {
+            Animations::System => "system",
+            Animations::On => "on",
+            Animations::Off => "off",
+        }
+    }
+
+    pub fn from_code(code: &str) -> Option<Animations> {
+        Animations::ALL.into_iter().find(|a| a.code().eq_ignore_ascii_case(code.trim()))
+    }
+
+    /// The English label (translated with `tl!` where shown).
+    pub fn label(self) -> &'static str {
+        match self {
+            Animations::System => "Use system setting",
+            Animations::On => "On",
+            Animations::Off => "Off",
+        }
+    }
+
+    /// Whether animation effects are on, given what the system reports (`None`: it doesn't say).
+    /// `System` falls back to on when the system reports nothing.
+    pub fn enabled(self, system: Option<bool>) -> bool {
+        match self {
+            Animations::System => system.unwrap_or(true),
+            Animations::On => true,
+            Animations::Off => false,
+        }
+    }
+}
+
+/// An unknown saved value reads as the default rather than discarding the whole `ui.json`.
+impl From<String> for Animations {
+    fn from(s: String) -> Self {
+        Animations::from_code(&s).unwrap_or_default()
+    }
+}
+
+impl From<Animations> for String {
+    fn from(a: Animations) -> Self {
+        a.code().to_string()
+    }
+}
+
 /// Every colour the UI uses; widgets never hard-code colours.
 #[derive(Clone, Copy, Debug)]
 pub struct Tokens {
@@ -194,7 +260,7 @@ impl Tokens {
             accent_text: APP_INK,
             on_accent: Color32::WHITE,
             input: Color32::WHITE,
-            input_border: Color32::from_rgb(0xC7, 0xC7, 0xC7),
+            input_border: Color32::from_rgb(0x8A, 0x8A, 0x8A),
             group_label: Color32::from_rgb(0x70, 0x70, 0x70),
             ruler: Color32::from_rgb(0xFF, 0xFF, 0xFF),
             ruler_margin: Color32::from_rgb(0xD4, 0xD4, 0xD4),
@@ -232,9 +298,10 @@ impl Tokens {
             checked: Color32::from_rgb(0x2E, 0x3A, 0x66),
             accent: Color32::from_rgb(0x7A, 0x93, 0xF0),
             accent_text: Color32::from_rgb(0x9C, 0xB0, 0xF5),
-            on_accent: Color32::WHITE,
+            // Dark text on the light dark-theme accent: white on #7a93f0 is only 2.9:1 (#655).
+            on_accent: Color32::from_rgb(0x11, 0x16, 0x2E),
             input: Color32::from_rgb(0x1E, 0x1E, 0x1E),
-            input_border: Color32::from_rgb(0x58, 0x58, 0x58),
+            input_border: Color32::from_rgb(0x7A, 0x7A, 0x7A),
             group_label: Color32::from_rgb(0xA0, 0xA0, 0xA0),
             ruler: Color32::from_rgb(0x2E, 0x2E, 0x2E),
             ruler_margin: Color32::from_rgb(0x45, 0x45, 0x45),
@@ -270,12 +337,57 @@ pub fn install_fonts_for(ctx: &egui::Context, prefer_hans: bool) {
     install_fonts_with(ctx, prefer_hans, false);
 }
 
-/// [`install_fonts_for`], also adding an installed CJK font when `system_cjk` is set and no
-/// embedded face covers the need (#241). Reading that font is a large file read, so callers ask
-/// for it only when CJK text is on screen: a CJK interface language, or the language names in
-/// Options.
+/// [`install_fonts_for`], also adding an installed CJK font after the embedded faces when
+/// `system_cjk` is set and the embedded faces leave CJK characters of the interface text without
+/// a glyph (#241, #486). Reading that font is a large file read, so callers ask for it only when
+/// CJK text is on screen: a CJK interface language, or the language names in Options.
 pub fn install_fonts_with(ctx: &egui::Context, prefer_hans: bool, system_cjk: bool) {
-    ctx.set_fonts(font_definitions(prefer_hans, system_cjk));
+    install_fonts_extra(ctx, prefer_hans, system_cjk, &[]);
+}
+
+/// [`install_fonts_with`], also adding document-font `faces` as last-resort fallbacks (#565): the
+/// faces that cover the text an input method is composing.
+pub fn install_fonts_extra(ctx: &egui::Context, prefer_hans: bool, system_cjk: bool, faces: &[Arc<wordcraft_fonts::FontFace>]) {
+    let mut fonts = font_definitions(prefer_hans, system_cjk);
+    add_fallback_faces(&mut fonts, faces);
+    ctx.set_fonts(fonts);
+}
+
+/// Add `faces` after every other font of the interface families.
+pub fn add_fallback_faces(fonts: &mut FontDefinitions, faces: &[Arc<wordcraft_fonts::FontFace>]) {
+    for f in faces {
+        let name = format!("fallback {} {} {}", f.family, f.style, f.id());
+        let mut data = FontData::from_owned(f.data().to_vec());
+        data.index = f.index();
+        fonts.font_data.insert(name.clone(), Arc::new(data));
+        for fam in [FontFamily::Proportional, FontFamily::Name("medium".into()), FontFamily::Name("semibold".into())] {
+            if let Some(v) = fonts.families.get_mut(&fam) {
+                v.push(name.clone());
+            }
+        }
+    }
+}
+
+/// Document faces needed to draw `text` (the input method's composition), one for each character
+/// the interface fonts cannot draw, skipping faces in `have` (#565). Characters of the embedded
+/// interface fonts are not looked up; very large faces (system CJK collections) are left to the CJK
+/// fallback.
+pub fn faces_for_preedit(
+    text: &str,
+    have: &[Arc<wordcraft_fonts::FontFace>],
+    covered: impl Fn(char) -> bool,
+    lookup: impl Fn(char) -> Option<Arc<wordcraft_fonts::FontFace>>,
+) -> Vec<Arc<wordcraft_fonts::FontFace>> {
+    let mut out: Vec<Arc<wordcraft_fonts::FontFace>> = Vec::new();
+    for c in text.chars().filter(|c| !c.is_ascii() && !c.is_whitespace() && !covered(*c)) {
+        if have.iter().chain(&out).any(|f| f.covers(c)) {
+            continue;
+        }
+        if let Some(f) = lookup(c).filter(|f| f.data().len() <= 16 << 20 && !have.iter().chain(&out).any(|h| h.id() == f.id())) {
+            out.push(f);
+        }
+    }
+    out
 }
 
 /// The interface fonts; see [`install_fonts_with`].
@@ -311,13 +423,11 @@ pub fn font_definitions(prefer_hans: bool, system_cjk: bool) -> FontDefinitions 
         // The same static bytes the document fonts use: one copy in the binary.
         add_cjk(&mut fonts, format!("{} {}", f.family, f.style), FontData::from_static(f.bytes));
     }
-    // No embedded face covers the interface language (a build without craft-fonts, or without
-    // its Chinese face, #241): an installed CJK font, so the menus don't show boxes.
+    // The embedded faces leave interface characters without a glyph (a build without craft-fonts,
+    // without its Chinese face, #241, or with faces lacking catalog characters, #486): an
+    // installed CJK font after them, so the menus don't show boxes or `?`.
     #[cfg(not(target_arch = "wasm32"))]
-    if system_cjk
-        && wordcraft_fonts::ui_needs_system_cjk(prefer_hans, &cjk)
-        && let Some(f) = system_cjk_font(prefer_hans)
-    {
+    if system_cjk && let Some(f) = system_cjk_font(prefer_hans) {
         let mut data = FontData::from_static(&f.bytes);
         data.index = f.index;
         add_cjk(&mut fonts, format!("system {}", f.family), data);
@@ -328,12 +438,29 @@ pub fn font_definitions(prefer_hans: bool, system_cjk: bool) -> FontDefinitions 
     fonts
 }
 
-/// The installed CJK interface font for a Chinese (`hans`) or other interface, read once.
+/// The installed CJK interface font for a Chinese (`hans`) or other interface, chosen once:
+/// `None` when the embedded faces already cover the interface text
+/// ([`cjk_font_text`](crate::i18n::Lang::cjk_font_text)). The font is picked for the catalogs'
+/// missing characters, or for the language names when only those are missing.
 #[cfg(not(target_arch = "wasm32"))]
 fn system_cjk_font(hans: bool) -> Option<&'static wordcraft_fonts::SystemUiFont> {
     static ZH: std::sync::OnceLock<Option<wordcraft_fonts::SystemUiFont>> = std::sync::OnceLock::new();
     static OTHER: std::sync::OnceLock<Option<wordcraft_fonts::SystemUiFont>> = std::sync::OnceLock::new();
-    (if hans { &ZH } else { &OTHER }).get_or_init(|| wordcraft_fonts::system_cjk_ui_font(hans)).as_ref()
+    (if hans { &ZH } else { &OTHER })
+        .get_or_init(|| {
+            let embedded = wordcraft_fonts::ui_cjk_fonts(hans);
+            let (catalogs, names) = crate::i18n::Lang::cjk_font_text(hans);
+            let mut needed = wordcraft_fonts::ui_uncovered_cjk(&catalogs, &embedded);
+            if needed.is_empty() {
+                needed = wordcraft_fonts::ui_uncovered_cjk(&[&names], &embedded);
+                if needed.is_empty() {
+                    return None;
+                }
+            }
+            log::debug!("interface: {} CJK characters lack an embedded glyph", needed.len());
+            wordcraft_fonts::system_cjk_ui_font(hans, &needed)
+        })
+        .as_ref()
 }
 
 pub fn medium(size: f32) -> FontId {
@@ -451,6 +578,17 @@ pub fn apply(ctx: &egui::Context, appearance: Appearance) {
     });
 }
 
+/// Turn egui's own animations on or off: hover and press fades, menus, tooltips and windows fading
+/// in, sections sliding open, and the glide when a scroll area brings the caret or a list item
+/// into view. Off, each of them happens at once.
+pub fn apply_animations(ctx: &egui::Context, on: bool) {
+    let defaults = egui::Style::default();
+    ctx.all_styles_mut(|s| {
+        s.animation_time = if on { defaults.animation_time } else { 0.0 };
+        s.scroll_animation = if on { defaults.scroll_animation } else { egui::style::ScrollAnimation::none() };
+    });
+}
+
 /// egui's visuals for one of our palettes.
 fn visuals(t: &Tokens) -> Visuals {
     let mut v = if t.dark { Visuals::dark() } else { Visuals::light() };
@@ -494,6 +632,62 @@ pub fn c32(c: wordcraft_doc::Rgb) -> Color32 {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
+
+    /// WCAG contrast ratio between two opaque colours.
+    pub(super) fn contrast(a: egui::Color32, b: egui::Color32) -> f32 {
+        let lum = |c: egui::Color32| {
+            let ch = |v: u8| {
+                let v = f32::from(v) / 255.0;
+                if v <= 0.040_45 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }
+            };
+            0.2126 * ch(c.r()) + 0.7152 * ch(c.g()) + 0.0722 * ch(c.b())
+        };
+        let (x, y) = (lum(a), lum(b));
+        (x.max(y) + 0.05) / (x.min(y) + 0.05)
+    }
+
+    /// #655: text and knobs on filled accent controls (Share, avatar, AutoSave, keytips) reach 4.5:1
+    /// on the accent and on its hover shade, in both themes.
+    #[test]
+    fn on_accent_reads_on_the_accent() {
+        for t in [super::Tokens::light(), super::Tokens::dark()] {
+            for (name, bg) in [("accent", t.accent), ("hover", t.accent_text)] {
+                let r = contrast(t.on_accent, bg);
+                assert!(r >= 4.5, "dark={}: on_accent on {name} is {r:.2}:1", t.dark);
+            }
+        }
+    }
+
+    /// #657: text field and combo outlines reach 3:1 against the field and everything it sits on.
+    #[test]
+    fn input_borders_reach_three_to_one() {
+        for t in [super::Tokens::light(), super::Tokens::dark()] {
+            for (name, bg) in [("input", t.input), ("ribbon", t.ribbon), ("panel", t.panel), ("menu", t.menu), ("title bar", t.title_bar)] {
+                let r = contrast(t.input_border, bg);
+                assert!(r >= 3.0, "dark={}: input_border on {name} is {r:.2}:1", t.dark);
+            }
+        }
+    }
+
+    /// #565: the composition of an input method (Bangla through ibus) drew as boxes because only the
+    /// interface fonts were used. Faces found for the uncovered characters are added as fallbacks,
+    /// once, and not for characters the interface fonts draw.
+    #[test]
+    fn preedit_gets_document_fallback_faces() {
+        let face = wordcraft_fonts::FontDb::global().face("Source Sans 3", "Regular");
+        let lookup = |_: char| Some(face.clone());
+        let bangla = "\u{0986}\u{09AE}\u{09BF}";
+        let got = super::faces_for_preedit(bangla, &[], |_| false, lookup);
+        assert_eq!(got.len(), 1, "one face, not one per character");
+        assert!(super::faces_for_preedit(bangla, &got, |_| false, lookup).is_empty(), "already added");
+        assert!(super::faces_for_preedit(bangla, &[], |_| true, lookup).is_empty(), "the interface fonts draw it");
+        assert!(super::faces_for_preedit("abc", &[], |_| false, lookup).is_empty(), "ASCII never needs one");
+        let mut defs = super::font_definitions(false, false);
+        let before = defs.font_data.len();
+        super::add_fallback_faces(&mut defs, &got);
+        assert_eq!(defs.font_data.len(), before + 1);
+        assert!(defs.families[&egui::FontFamily::Proportional].last().is_some_and(|n| n.starts_with("fallback ")));
+    }
 
     /// Symbols written as text in the interface code must exist in the interface fonts (Inter and
     /// egui's emoji fallbacks); a missing glyph draws as an empty box, as the panes' "✕" close

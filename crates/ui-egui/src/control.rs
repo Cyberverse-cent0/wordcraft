@@ -8,7 +8,8 @@
 //!   real pointer input in screen points (reaches every widget)
 //! - `ui.clickText {page, x, y}`: click at a page position (points from the page's top-left)
 //! - `ui.key {key, shift?, alt?, cmd?}`, `ui.text {text}`: keyboard input through egui
-//! - `ui.screenshot {path?}`: PNG of the window; `ui.render {path, page?, scale?}`: page PNG
+//! - `ui.screenshot {path?}`: PNG of the window; `ui.render {path?, page?, scale?}`: page PNG
+//!   (without `path`, both reply with the PNG as base64 `png`)
 //! - `ui.parity`: feature catalog parity
 
 use std::sync::mpsc::Sender;
@@ -203,11 +204,19 @@ pub fn handle(app: &mut WordApp, ctx: &egui::Context, req: &ControlRequest) -> O
         }
         "ui.screenshot" => Outcome::Screenshot { path: s("path").map(str::to_string) },
         "ui.render" => {
-            let path = s("path").unwrap_or("/tmp/wordcraft-page.png");
             let page = p.get("page").and_then(Value::as_u64).unwrap_or(1);
-            match app.session.run("file.exportPng", &json!({"path": path, "page": page, "scale": f("scale").unwrap_or(2.0)})) {
-                Ok(v) => ok(v),
-                Err(e) => err(e),
+            let scale = f("scale").unwrap_or(2.0);
+            match s("path") {
+                Some(path) => match app.session.run("file.exportPng", &json!({"path": path, "page": page, "scale": scale})) {
+                    Ok(v) => ok(v),
+                    Err(e) => err(e),
+                },
+                // No path: the PNG travels in the reply. Never a fixed name in the shared
+                // temporary folder, where another user could have planted a link to a file.
+                None => match render_png(app, page, scale) {
+                    Ok(v) => ok(v),
+                    Err(e) => err(e),
+                },
             }
         }
         "ui.resize" => {
@@ -234,12 +243,27 @@ pub fn handle(app: &mut WordApp, ctx: &egui::Context, req: &ControlRequest) -> O
     }
 }
 
+/// A page rendered by the engine, as base64 PNG in the reply (the same shape as the headless
+/// MCP server's `ui.render`).
+fn render_png(app: &WordApp, page: u64, scale: f32) -> Result<Value, String> {
+    let page = usize::try_from(page.max(1)).unwrap_or(usize::MAX).saturating_sub(1);
+    let l = app.session.export_layout();
+    let pg = l.pages.get(page).ok_or_else(|| format!("no page {}", page + 1))?;
+    let img = wordcraft_render::render_page(&app.session.doc, pg, scale.clamp(0.1, 8.0), &Default::default());
+    let png = img.to_png();
+    Ok(json!({"png": wordcraft_engine::cmd::insert::base64_encode(&png), "width": img.width, "height": img.height, "pages": l.pages.len()}))
+}
+
+/// The window screenshot: written to `path` when one was given, else base64 PNG in the reply
+/// (never a fixed name in the shared temporary folder).
 pub fn save_screenshot(image: &egui::ColorImage, path: Option<&str>) -> Value {
-    let path = path.unwrap_or("/tmp/wordcraft-screenshot.png");
     let [w, h] = image.size;
     let bytes: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
     let rendered = wordcraft_render::Rendered { width: w as u32, height: h as u32, pixels: bytes };
     let png = rendered.to_png();
+    let Some(path) = path else {
+        return json!({"ok": true, "result": {"png": wordcraft_engine::cmd::insert::base64_encode(&png), "width": w, "height": h}});
+    };
     #[cfg(target_arch = "wasm32")]
     let _ = (&png, path);
     #[cfg(not(target_arch = "wasm32"))]

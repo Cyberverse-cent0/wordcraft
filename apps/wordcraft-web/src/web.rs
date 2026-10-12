@@ -8,9 +8,10 @@ use wasm_bindgen::JsCast as _;
 use wordcraft_engine::Session;
 use wordcraft_ui_egui::{Inbox, Services, WordApp};
 
-const DOC_EXTS: &[&str] = &["docx", "docm", "dotx", "dotm", "doc", "dot", "odt", "rtf", "txt", "md", "html", "htm", "tex", "json"];
+const DOC_EXTS: &[&str] = &["docx", "docm", "dotx", "dotm", "doc", "dot", "odt", "rtf", "txt", "md", "html", "htm", "tex", "json", "xml"];
 const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp"];
 const RECIPIENT_EXTS: &[&str] = &["csv", "tsv", "txt", "xlsx", "xlsm", "ods"];
+mod font_store;
 const CANVAS_ID: &str = "wordcraft_canvas";
 const LOADING_ID: &str = "wordcraft_loading";
 
@@ -43,6 +44,8 @@ pub fn start() {
                     if let Some(rs) = &cc.wgpu_render_state {
                         log::info!("wordcraft-web: wgpu backend {:?}", rs.adapter.get_info().backend);
                     }
+                    // Fonts the user added on an earlier visit (#582); the app notices them arrive.
+                    font_store::load_all(cc.egui_ctx.clone());
                     let inbox: Inbox = Inbox::default();
                     if let Err(e) = listen_for_pasted_pictures(inbox.clone(), cc.egui_ctx.clone()) {
                         log::error!("pasting pictures is unavailable: {e}");
@@ -158,6 +161,8 @@ fn services(inbox: Inbox, ctx: egui::Context, dirty: Rc<Cell<bool>>) -> Services
             let ctx = ctx.clone();
             let dialog = if purpose == "picture" {
                 rfd::AsyncFileDialog::new().add_filter("Pictures", IMAGE_EXTS)
+            } else if purpose == "font" {
+                rfd::AsyncFileDialog::new().add_filter("Fonts", wordcraft_fonts::FONT_FILE_EXTS)
             } else if purpose == "recipients" {
                 rfd::AsyncFileDialog::new().add_filter("Recipient lists", RECIPIENT_EXTS)
             } else {
@@ -178,8 +183,19 @@ fn services(inbox: Inbox, ctx: egui::Context, dirty: Rc<Cell<bool>>) -> Services
         print: Some(Box::new(print_pdf)),
         inbox: Some(inbox),
         on_dirty: Some(Box::new(move |d| dirty.set(d))),
+        animations_enabled: Some(animations_enabled()),
+        store_font: Some(Box::new(font_store::store)),
+        forget_font: Some(Box::new(font_store::forget)),
         ..Default::default()
     }
+}
+
+/// Whether the system has animation effects on, as the browser passes it on: off while the
+/// `prefers-reduced-motion: reduce` media query matches. `None` when the browser can't say. The
+/// query is made once and asked every frame; it follows the system's setting by itself.
+fn animations_enabled() -> Box<dyn Fn() -> Option<bool>> {
+    let reduce = web_sys::window().and_then(|w| w.match_media("(prefers-reduced-motion: reduce)").ok().flatten());
+    Box::new(move || reduce.as_ref().map(|query| !query.matches()))
 }
 
 /// Closing, reloading or leaving the tab with unsaved changes asks first. Browsers show their own
@@ -306,6 +322,7 @@ fn mime_for(name: &str) -> &'static str {
         Some("md" | "txt") => "text/plain",
         Some("tex") => "application/x-tex",
         Some("json") => "application/json",
+        Some("xml") => "application/xml",
         _ => "application/octet-stream",
     }
 }

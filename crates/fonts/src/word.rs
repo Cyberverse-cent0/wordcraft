@@ -36,6 +36,24 @@ fn substitutes(family: &str) -> &'static [&'static str] {
     // headings and screens. Open fonts with full Persian coverage first.
     const NASKH: &[&str] = &["Noto Naskh Arabic", "XB Zar", "XB Niloofar", "Amiri", "Vazirmatn", "Noto Sans Arabic", "DejaVu Sans", "Source Serif 4"];
     const ARABIC_SANS: &[&str] = &["Vazirmatn", "Sahel", "Shabnam", "Samim", "Noto Sans Arabic", "Noto Naskh Arabic", "DejaVu Sans", "Source Sans 3"];
+    // Palatino Linotype / Book Antiqua: macOS ships the same design as "Palatino"; open
+    // look-alikes with matching metrics (TeX Gyre Pagella, URW P052 / Palladio) on Linux.
+    const PALATINO: &[&str] = &[
+        "Palatino Linotype",
+        "Palatino",
+        "Book Antiqua",
+        "TeX Gyre Pagella",
+        "P052",
+        "URW Palladio L",
+        "Palladio",
+        "Caladea",
+        "Times New Roman",
+        "Liberation Serif",
+        "Georgia",
+        "Noto Serif",
+        "DejaVu Serif",
+        "Source Serif 4",
+    ];
     let f = family.to_ascii_lowercase();
     if is_persian_naskh(&f) {
         return NASKH;
@@ -44,6 +62,7 @@ fn substitutes(family: &str) -> &'static [&'static str] {
         return ARABIC_SANS;
     }
     match f.as_str() {
+        "palatino linotype" | "book antiqua" | "palatino" => PALATINO,
         "arial" | "helvetica" | "arial nova" => ARIAL,
         "times new roman" | "times" => TIMES,
         "courier new" | "courier" | "consolas" | "lucida console" | "cascadia code" | "cascadia mono" => MONO,
@@ -52,8 +71,6 @@ fn substitutes(family: &str) -> &'static [&'static str] {
         | "cambria math"
         | "georgia"
         | "garamond"
-        | "book antiqua"
-        | "palatino linotype"
         | "constantia"
         | "baskerville old face"
         | "century"
@@ -157,15 +174,24 @@ fn style_name(bold: bool, italic: bool) -> &'static str {
     }
 }
 
-/// Resolve `family` with bold/italic to a face (memoised).
+/// Resolve `family` with bold/italic to a face (memoised until user fonts are added or removed,
+/// [`FontDb::generation`]).
 pub fn resolve(family: &str, bold: bool, italic: bool) -> Resolved {
-    static CACHE: OnceLock<Mutex<HashMap<(String, bool, bool), Resolved>>> = OnceLock::new();
-    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
-    let key = (family.to_string(), bold, italic);
-    if let Some(r) = cache.lock().unwrap_or_else(|e| e.into_inner()).get(&key) {
-        return *r;
-    }
+    type Memo = (u64, HashMap<(String, bool, bool), Resolved>);
+    static CACHE: OnceLock<Mutex<Memo>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new((0, HashMap::new())));
     let db = FontDb::global();
+    let generation = db.generation();
+    let key = (family.to_string(), bold, italic);
+    {
+        let mut c = cache.lock().unwrap_or_else(|e| e.into_inner());
+        if c.0 != generation {
+            *c = (generation, HashMap::new());
+        }
+        if let Some(r) = c.1.get(&key) {
+            return *r;
+        }
+    }
     let (fam, substituted) = if db.has_family(family) {
         (family.to_string(), false)
     } else {
@@ -174,7 +200,10 @@ pub fn resolve(family: &str, bold: bool, italic: bool) -> Resolved {
     };
     let face = db.face(&fam, style_name(bold, italic));
     let r = Resolved { synth_bold: bold && face.weight < 600.0, synth_italic: italic && !face.italic, substituted, face: FaceRef::of(&face) };
-    cache.lock().unwrap_or_else(|e| e.into_inner()).insert(key, r);
+    let mut c = cache.lock().unwrap_or_else(|e| e.into_inner());
+    if c.0 == generation {
+        c.1.insert(key, r);
+    }
     r
 }
 
@@ -206,9 +235,15 @@ pub fn symbol_font_char(family: &str, c: char) -> Option<char> {
     Some(u)
 }
 
+/// A line's (ascent, descent) from hhea values, both positive: the line gap goes above the ascent.
+fn hhea_line(ascender: i16, descender: i16, line_gap: i16) -> (f64, f64) {
+    (f64::from(ascender) + f64::from(line_gap.max(0)), f64::from(descender).abs())
+}
+
 /// Line metrics for a face in font units: (ascent, descent), both positive, the way word
-/// processors measure single line spacing (OS/2 usWinAscent/usWinDescent, falling back to the
-/// hhea values plus line gap).
+/// processors measure single line spacing: the hhea values with the line gap above the ascent
+/// (Word puts the first baseline that far below the line top), falling back to OS/2
+/// usWinAscent/usWinDescent.
 pub fn line_metrics(face: &crate::FontFace) -> (f64, f64) {
     static CACHE: OnceLock<Mutex<HashMap<u32, (f64, f64)>>> = OnceLock::new();
     let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
@@ -217,12 +252,9 @@ pub fn line_metrics(face: &crate::FontFace) -> (f64, f64) {
     }
     let mut v = (face.ascent.max(1.0), face.descent.abs());
     if let Some(f) = face.skrifa() {
-        // hhea ascender + descender + line gap (Word on macOS); OS/2 win metrics only when the
-        // hhea values are missing, and never more than twice the em.
-        let hhea = f.hhea().ok().map(|h| {
-            let gap = h.line_gap().to_i16().max(0) as f64;
-            (h.ascender().to_i16() as f64 + gap / 2.0, (h.descender().to_i16() as f64).abs() + gap / 2.0)
-        });
+        // hhea ascender + descender + line gap (Word on macOS), the gap above the ascent; OS/2
+        // win metrics only when the hhea values are missing, and never more than twice the em.
+        let hhea = f.hhea().ok().map(|h| hhea_line(h.ascender().to_i16(), h.descender().to_i16(), h.line_gap().to_i16()));
         let win = f.os2().ok().map(|o| (o.us_win_ascent() as f64, o.us_win_descent() as f64));
         let ok = |m: &(f64, f64)| m.0 > 0.0 && m.0 + m.1 <= face.upem * 2.0;
         if let Some(m) = hhea.filter(ok) {
@@ -240,6 +272,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_line_gap_goes_above_the_ascent() {
+        // Times New Roman (hhea 1825 / -443, gap 87), and a font with a large gap: Word puts the
+        // first baseline the ascent plus the whole gap below the line top.
+        assert_eq!(hhea_line(1825, -443, 87), (1912.0, 443.0));
+        assert_eq!(hhea_line(1536, -512, 452), (1988.0, 512.0));
+        // A negative gap adds nothing; the most negative descender doesn't overflow.
+        assert_eq!(hhea_line(1000, -300, -50), (1000.0, 300.0));
+        assert_eq!(hhea_line(1000, i16::MIN, 0), (1000.0, 32768.0));
+    }
+
+    #[test]
     fn unknown_family_substitutes() {
         let r = resolve("Definitely Not A Font 123", false, false);
         assert!(r.substituted);
@@ -248,6 +291,19 @@ mod tests {
         assert!(!b.synth_bold);
         let (a, d) = line_metrics(&b.face);
         assert!(a > 0.0 && d >= 0.0);
+    }
+
+    #[test]
+    fn palatino_family_prefers_palatino_look_alikes_over_generic_serif() {
+        for name in ["Palatino Linotype", "Book Antiqua", "palatino"] {
+            let list = substitutes(name);
+            let pos = |n: &str| list.iter().position(|x| *x == n);
+            assert!(pos("Palatino").is_some() && pos("TeX Gyre Pagella").is_some() && pos("P052").is_some(), "{name}");
+            // All of them come before the generic serif fallbacks (Caladea, Times New Roman).
+            assert!(pos("Palatino") < pos("Caladea") && pos("TeX Gyre Pagella") < pos("Times New Roman"), "{name}");
+        }
+        // Other serif families are unchanged.
+        assert_eq!(substitutes("Georgia").first(), Some(&"Caladea"));
     }
 
     #[test]

@@ -1,4 +1,6 @@
-//! Side panes: Navigation (headings, pages, search results), Clipboard, Styles, Style Inspector, Comments.
+//! Side panes: Navigation (headings, pages, search results), Clipboard, Styles, Style Inspector,
+//! Accessibility and Alt Text (see `a11y_pane`), Restrict Editing ([`crate::dialogs_review`]), Comments,
+//! and the SmartArt Text Pane.
 
 use egui::{Stroke, Ui, vec2};
 use serde_json::{Value, json};
@@ -9,6 +11,20 @@ use crate::theme::{Tokens, regular, semibold};
 
 pub fn show(app: &mut WordApp, ui: &mut Ui) {
     let t = Tokens::get(ui.ctx());
+    // SmartArt Design › Text Pane, while a SmartArt graphic WordCraft can edit is selected.
+    if app.session.view.smart_art_pane && wordcraft_engine::cmd::smart_art::selected_smart_art(&app.session).is_some() {
+        egui::Panel::left("smart_art_pane")
+            .default_size(250.0)
+            .resizable(true)
+            .frame(egui::Frame::NONE.fill(t.panel).inner_margin(10).stroke(Stroke::new(1.0, t.border)))
+            .show(ui, |ui| {
+                if header(ui, "Text Pane") {
+                    let _ = app.run("smartArt.textPane", json!({"value": false}));
+                    return;
+                }
+                crate::dialogs_smart_art::text_pane(app, ui);
+            });
+    }
     if app.session.view.nav_pane {
         egui::Panel::left("nav_pane")
             .default_size(260.0)
@@ -37,6 +53,33 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
             .frame(egui::Frame::NONE.fill(t.panel).inner_margin(10).stroke(Stroke::new(1.0, t.border)))
             .show(ui, |ui| inspector(app, ui));
     }
+    if app.session.view.accessibility_pane {
+        egui::Panel::right("accessibility_pane")
+            .default_size(280.0)
+            .resizable(true)
+            .frame(egui::Frame::NONE.fill(t.panel).inner_margin(10).stroke(Stroke::new(1.0, t.border)))
+            .show(ui, |ui| crate::a11y_pane::accessibility(app, ui));
+    }
+    if app.session.view.alt_text_pane {
+        egui::Panel::right("alt_text_pane")
+            .default_size(260.0)
+            .resizable(true)
+            .frame(egui::Frame::NONE.fill(t.panel).inner_margin(10).stroke(Stroke::new(1.0, t.border)))
+            .show(ui, |ui| crate::a11y_pane::alt_text(app, ui));
+    }
+    if app.restrict.open {
+        egui::Panel::right("restrict_pane")
+            .default_size(270.0)
+            .resizable(true)
+            .frame(egui::Frame::NONE.fill(t.panel).inner_margin(10).stroke(Stroke::new(1.0, t.border)))
+            .show(ui, |ui| {
+                if header(ui, "Restrict Editing") {
+                    app.restrict.open = false;
+                    return;
+                }
+                crate::dialogs_review::restrict_pane(app, ui);
+            });
+    }
     if app.session.view.comments_pane {
         egui::Panel::right("comments_pane")
             .default_size(290.0)
@@ -46,7 +89,7 @@ pub fn show(app: &mut WordApp, ui: &mut Ui) {
     }
 }
 
-fn header(ui: &mut Ui, title: &str) -> bool {
+pub(crate) fn header(ui: &mut Ui, title: &str) -> bool {
     let mut close = false;
     ui.horizontal(|ui| {
         ui.label(egui::RichText::new(tl!(title)).font(semibold(15.0)));
@@ -566,6 +609,7 @@ fn describe(prop: &str, v: &Value) -> String {
         "spaceAfter" => "Space after",
         "lineSpacing" => "Line spacing",
         "contextualSpacing" => "Don't add space between paragraphs of the same style",
+        "mirrorIndents" => "Mirror indents",
         "keepNext" => "Keep with next",
         "keepLines" => "Keep lines together",
         "pageBreakBefore" => "Page break before",

@@ -112,15 +112,27 @@ fn dispatch(app: &mut WordApp, key: Key, m: Modifiers) -> bool {
         let _ = app.run(spec.id, json!({}));
         return true;
     }
-    // Shift extends caret movement.
+    // Shift extends caret movement; Shift+Backspace still erases (#707).
     if m.shift
         && let Some(spec) = app.session.keymap.resolve(&reg, &combo(m, name, false))
-        && spec.id.starts_with("caret.")
+        && let Some(params) = shift_variant_params(spec.id)
     {
-        let _ = app.run(spec.id, json!({"extend": true}));
+        let _ = app.run(spec.id, params);
         return true;
     }
     false
+}
+
+/// How a command bound to a plain key runs when Shift is also held and nothing is bound to the
+/// shifted combo: caret moves extend the selection, Backspace erases as usual (#707).
+fn shift_variant_params(id: &str) -> Option<Value> {
+    if id.starts_with("caret.") {
+        Some(json!({"extend": true}))
+    } else if id == "text.backspace" {
+        Some(json!({}))
+    } else {
+        None
+    }
 }
 
 /// F1–F12: shortcuts on these work without the canvas focused.
@@ -258,6 +270,10 @@ pub fn canvas_events(app: &mut WordApp, ctx: &egui::Context) {
                     app.session.painter = None;
                     continue;
                 }
+                // The lasso selection and Ink Replay take Delete and Escape first.
+                if crate::ink::key(app, key) {
+                    continue;
+                }
                 // Escape puts the pen or eraser down (back to selecting).
                 if key == Key::Escape && app.session.view.draw.mode != wordcraft_engine::cmd::draw::DrawMode::Select {
                     app.canvas.ink = None;
@@ -265,6 +281,13 @@ pub fn canvas_events(app: &mut WordApp, ctx: &egui::Context) {
                     continue;
                 }
                 if key == Key::Escape && crate::table_pen::stop(app) {
+                    continue;
+                }
+                // File › Options › Advanced: the Insert key switches overtype only when asked to.
+                if key == Key::Insert && modifiers.is_none() {
+                    if app.session.prefs.insert_key_overtype {
+                        let _ = app.run("text.overtype", json!({}));
+                    }
                     continue;
                 }
                 if crate::objects::key(app, key, modifiers) {
@@ -310,6 +333,13 @@ pub fn global_shortcuts(app: &mut WordApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn shift_backspace_still_erases() {
+        assert_eq!(shift_variant_params("text.backspace"), Some(json!({})));
+        assert_eq!(shift_variant_params("caret.left"), Some(json!({"extend": true})));
+        assert_eq!(shift_variant_params("text.delete"), None);
+    }
 
     #[test]
     fn only_plain_paste_releases_paste_a_clipboard_picture() {

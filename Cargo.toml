@@ -40,17 +40,23 @@ rayon = "1"
 unicode-bidi = "0.3"
 unicode-segmentation = "1"
 unicode-linebreak = "0.1"
+unicode-script = "0.5"
 regex = { version = "1", default-features = false, features = ["std", "unicode", "perf"] }
 regex-automata = { version = "0.4", default-features = false, features = ["std", "syntax", "meta", "nfa-pikevm", "unicode"] }
 
 # text / rendering / formats
 skrifa = "0.47"
 harfrust = "0.13"
+# WOFF / WOFF2 web fonts added by the user (#582): pure Rust (MIT); its brotli and zlib decoders
+# (brotli-decompressor, flate2) are already in the tree.
+wuff = "0.2.9"
 vello_cpu = "0.2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp", "tiff"] }
 krilla = { version = "0.8", features = ["pdf"] }
 quick-xml = "0.41"
 zip = { version = "3", default-features = false, features = ["deflate"] }
+# zlib streams (compressed metafile pictures in `.doc` drawings); already in the lock as a dependency of other crates.
+miniz_oxide = "0.8"
 cfb = "0.15"
 # Password-protected (agile-encrypted) Word documents: pure-Rust RustCrypto primitives.
 aes = "0.9"

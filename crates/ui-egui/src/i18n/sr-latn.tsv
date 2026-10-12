@@ -65,12 +65,15 @@
 	Arrow	Strelica
 	Artistic Effects	Umetnički efekti
 	As Recommended	Kao što je preporučeno
+	As you type	Tokom kucanja
+	Asian text font:	Font azijskog teksta:
 	Asian Typography	Azijska tipografija
 	Author	Autor
 	AutoCorrect Options	Opcije automatske ispravke
 	AutoFit	Automatsko uklapanje
 	AutoFit Contents	Automatski uklopi prema sadržaju
 	AutoFit Window	Automatski uklopi prema prozoru
+	AutoSave writes your changes to the file a moment after you stop typing.	Automatsko čuvanje upisuje izmene u datoteku čim prestanete da kucate.
 	Automatic	Automatski
 	Automatic ({language})	Automatski ({language})
 	Automatic follows your system's language. Menus and commands change; your documents don't.	Automatski prati jezik sistema. Meniji i naredbe se menjaju; dokumenti ne.
@@ -81,6 +84,8 @@
 	AutoSave failed: {error}. Save the document to turn AutoSave back on.	Automatsko čuvanje neuspelo: {error}. Sačuvajte dokument da biste ga ponovo uključili.
 	Balloons	Oblačići
 	Bottom Margin	Donja margina
+	Centimeters	Centimetri
+	Check spelling as you type	Proveravaj pravopis tokom kucanja
 	Click a border between two cells to merge them. Esc stops.	Kliknite ivicu između dve ćelije da ih spojite. Esc završava.
 	Based on: {style}	Zasnovan na: {style}
 	Built-in style	Ugrađeni stil
@@ -92,12 +97,15 @@
 	Character style	Stil znakova
 	Click an item to paste it.	Kliknite na stavku da biste je nalepili.
 	Click level to modify:	Kliknite nivo koji menjate:
+	Click to switch back to inserting	Kliknite da biste se vratili na umetanje
 	Clipboard Items	Stavke ostave
 	Clipboard Pane	Okno ostave
 	Color only	Samo boja
 	Color: {color}	Boja: {color}
 	Compress punctuation at the start of a line	Sažmi interpunkciju na početku reda
 	Confirm password:	Potvrdite lozinku:
+	Couldn't make WordCraft the default: {error}	WordCraft nije mogao da postane podrazumevana aplikacija: {error}
+	Custom dictionary	Prilagođeni rečnik
 	Dark page (white text on black)	Tamna stranica (beo tekst na crnom)
 	Drag a rectangle to draw a table, or a line across cells to split them. Esc stops.	Prevucite pravougaonik da nacrtate tabelu ili liniju preko ćelija da ih podelite. Esc završava.
 	Draw Table	Nacrtaj tabelu
@@ -108,20 +116,56 @@
 	Enter formatting for number:	Oblik broja:
 	Follow number with:	Posle broja:
 	Formatting	Oblikovanje
+	Formatting marks	Oznake oblikovanja
+	Hidden text	Skriveni tekst
+	Ignore web and file addresses	Zanemari veb-adrese i putanje datoteka
+	Ignore words in capitals	Zanemari reči pisane velikim slovima
+	Ignore words with numbers	Zanemari reči sa brojevima
+	Inches	Inči
+	Formatting exceptions	Izuzeci formatiranja
 	Include level number from:	Uključi broj nivoa:
+	Initials:	Inicijali:
 	Ink	Mastilo
 	Insertions and Deletions	Umetanja i brisanja
 	Insertions:	Umetanja:
+	Interface	Interfejs
+	Interface language	Jezik interfejsa
+	Inside:	Unutra:
+	Latin text font:	Font latiničnog teksta:
 	Left border	Leva ivica
 	Left Margin	Leva margina
 	Legal style numbering	Pravno numerisanje
 	Link level to style:	Poveži nivo sa stilom:
 	List Definition	Definicija liste
+	Mark grammar errors as you type	Označavaj gramatičke greške tokom kucanja
+	Measurement units:	Jedinice mere:
+	Millimeters	Milimetri
+	New comments and tracked changes are recorded under this name and these initials.	Novi komentari i praćene izmene beleže se pod ovim imenom i inicijalima.
+	New word	Nova reč
+	No words yet. Add to Dictionary on a misspelled word puts it here.	Još nema reči. Dodaj u rečnik na pogrešno napisanoj reči stavlja je ovde.
+	Mirror indents	Preslikaj uvlačenja
 	Nothing	Ništa
 	Number alignment:	Poravnanje broja:
 	Number format	Format broja
 	Number style for this level:	Stil broja za ovaj nivo:
 	Outside border	Spoljna ivica
+	In Default apps, choose WordCraft for the document types you want it to open.	U podrazumevanim aplikacijama izaberite WordCraft za vrste dokumenata koje želite da otvara.
+	Make WordCraft the default for Word documents…	Postavi WordCraft kao podrazumevanu aplikaciju za Word dokumente…
+	Opens .docx, .doc, .rtf and .odt files and Word templates with WordCraft from now on.	Od sada će se .docx, .doc, .rtf i .odt datoteke i Word šabloni otvarati u WordCraft-u.
+	Opens Settings › Default apps, where you choose WordCraft for .docx and the other document types.	Otvara Podešavanja › Podrazumevane aplikacije, gde birate WordCraft za .docx i druge vrste dokumenata.
+	Overtype	Prepisivanje
+	Overtype (typing replaces the characters after the caret)	Prepisivanje (otkucano zamenjuje znakove posle kursora)
+	Page display	Prikaz strane
+	Paragraph marks	Oznake pasusa
+	Personalize	Personalizacija
+	Picas	Pike
+	Points	Tačke
+	Print the page color	Štampaj boju strane
+	Printing	Štampanje
+	Proofing language	Jezik provere pisanja
+	Recent documents to show:	Broj nedavnih dokumenata za prikaz:
+	Remove	Ukloni
+	Outside:	Spolja:
 	Reopen	Ponovo otvori
 	Restart list after:	Ponovo počni listu posle:
 	Right border	Desna ivica
@@ -159,6 +203,7 @@
 	Paste Clipboard Item	Nalepi stavku iz ostave
 	Preview	Pregled
 	Remove Password	Ukloni lozinku
+	Save documents	Čuvanje dokumenata
 	Shadow, glow and soft edges	Senka, sjaj i meke ivice
 	Shape Effects	Efekti oblika
 	Show all revisions inline	Prikaži sve izmene u tekstu
@@ -167,7 +212,6 @@
 	Distribute spacing	Rasporedi razmak
 	Offset (pt):	Pomak (pt):
 	Phonetic Guide	Fonetski vodič
-	Remove	Ukloni
 	Right (vertical)	Desno (vertikalno)
 	Ruby text:	Rubi tekst:
 	Show documents with their colours inverted, like View › Switch Modes. Saving, printing and PDFs are unchanged.	Prikaži dokumente sa invertovanim bojama, kao kod Prikaz › Promeni režim. Čuvanje, štampanje i PDF nisu pogođeni.
@@ -195,6 +239,11 @@
 	Border Painter	Kopiranje ivica
 	Border\nPainter	Kopiranje\nivica
 	Borders	Ivice
+	Show the mini toolbar when text is selected	Prikaži mini traku sa alatkama pri izboru teksta
+	Spaces	Razmaci
+	Spelling	Pravopis
+	Spelling and grammar are checked in English (United States).	Pravopis i gramatika se proveravaju na engleskom (Sjedinjene Države).
+	Tab characters	Znakovi tabulatora
 	Tab stop position:	Položaj tabulatora:
 	Default tab stops:	Podrazumevani tabulatori:
 	Tab stops to be cleared:	Tabulatori za brisanje:
@@ -205,6 +254,10 @@
 	Set	Postavi
 	Page Border	Ivica strane
 	Apply to:	Primeni na:
+	These marks show even when Show/Hide ¶ is off.	Ove oznake se prikazuju i kada je Prikaži/sakrij ¶ isključeno.
+	Typing replaces selected text	Otkucano zamenjuje izabrani tekst
+	Update fields before printing	Ažuriraj polja pre štampanja
+	Use the Insert key to switch overtype on and off	Taster Insert uključuje i isključuje prepisivanje
 	Whole document	Ceo dokument
 	This section	Ovaj odeljak
 	Fill	Ispuna
@@ -319,6 +372,8 @@
 	Delete Style	Obriši stil
 	Delete Table	Obriši tabelu
 	Design	Dizajn
+	To open Word documents with WordCraft by default: select one in Finder, choose File › Get Info, pick WordCraft under Open with, then click Change All.	Da bi se Word dokumenti podrazumevano otvarali u WordCraft-u: izaberite jedan u Finder-u, izaberite Datoteka › Prikaži informacije, pod „Otvori pomoću” izaberite WordCraft, pa kliknite „Promeni sve”.
+	WordCraft is now the default app for Word documents.	WordCraft je sada podrazumevana aplikacija za Word dokumente.
 	development build	razvojna verzija
 	Diagonal	Dijagonalno
 	Diamond	Dijamant
@@ -380,6 +435,7 @@
 	Export PDF	Izvezi PDF
 	Exported {path}	Izvezeno: {path}
 	Extend Selection	Proširi izbor
+	Extend Selection by Units	Proširi izbor po jedinicama
 	Field	Polje
 	File	Fajl
 	Find	Pronađi
@@ -787,6 +843,9 @@
 	Show or Hide Style	Prikaži ili sakrij stil
 	Show revisions in balloons	Prikaži izmene u oblačićima
 	Show rulers	Prikaži lenjire
+	Animation	Animacija
+	Animate the caret (it glides and fades)	Animiraj kursor (klizi i postepeno se gasi)
+	On: the caret glides to its new place when you type or use the arrow keys, and its blink fades. Off: it jumps and blinks on and off.	Uključeno: kursor klizi na novo mesto dok kucate ili koristite strelice, a njegovo treptanje se postepeno gasi. Isključeno: skače i trepće naglo.
 	Show the community button in the title bar	Prikaži dugme zajednice u traci naslova
 	Show/Hide ¶	Prikaži/sakrij ¶
 	Show\nComments	Prikaži\nkomentare
@@ -939,10 +998,10 @@
 	Wide	Široko
 	Widow/Orphan Control	Kontrola usamljenih redova
 	Widow/Orphan control	Kontrola usamljenih redova
-	Wildcards (regex)	Džoker znaci (regex)
 	Window	Prozor
 	Word Count	Broj reči
 	Word document (*.docx)	Word dokument (*.docx)
+	Word XML Document (*.xml)	Word XML dokument (*.xml)
 	Word Left	Reč levo
 	Word Right	Reč desno
 	WordArt	WordArt
@@ -1358,8 +1417,86 @@
 	Selected Fields	Izabrana polja
 	Edit Field…	Uredi polje…
 	Formatted	Formatirano
+	Deleted	Izbrisano
 	Interface size:	Veličina interfejsa:
 	Makes the ribbon, menus and dialogs larger or smaller, on top of your system's display scaling. Document zoom is separate.	Povećava ili smanjuje traku, menije i dijaloge, povrh skaliranja ekrana u sistemu. Zumiranje dokumenta je zasebno.
+	Resize Table by Dragging	Promena veličine tabele prevlačenjem
+	Print Markup	Štampaj oznake
+	Comments beside each page and tracked changes in PDFs, prints and images; a comment list at the end of web pages, Markdown and text.	Komentari pored svake stranice i praćene izmene u PDF-ovima, otiscima i slikama; lista komentara na kraju veb-stranica, Markdown-a i teksta.
+
+# Compare / Combine, AutoCorrect Options and Restrict Editing (#412)
+	1. Formatting restrictions	1. Ograničenja oblikovanja
+	2. Editing restrictions	2. Ograničenja uređivanja
+	3. Start enforcement	3. Pokretanje zaštite
+	<< Less	<< Manje
+	Another file	Druga datoteka
+	Apply as you type	Primeni dok kucaš
+	AutoCorrect	Automatska ispravka
+	AutoFormat As You Type	Automatsko oblikovanje tokom kucanja
+	Automatic bulleted lists	Automatske liste sa znakovima
+	Automatic numbered lists	Automatske numerisane liste
+	Border lines	Linije ivica
+	Capitalize first letter of sentences	Veliko prvo slovo rečenice
+	Capitalize first letter of table cells	Veliko prvo slovo u ćelijama tabele
+	Capitalize names of days	Veliko slovo u nazivima dana
+	Case changes	Promene veličine slova
+	Character level	Nivo znaka
+	Checked styles are allowed:	Označeni stilovi su dozvoljeni:
+	Combine Documents	Spajanje dokumenata
+	Compare Documents	Upoređivanje dokumenata
+	Compared: {changes} changes	Upoređeno: izmena {changes}
+	Comparing with another file needs the desktop app.	Za poređenje sa drugom datotekom potrebna je desktop aplikacija.
+	Comparison settings	Podešavanja poređenja
+	Don't capitalize after:	Bez velikog slova posle:
+	Editing in this document is restricted.	Uređivanje ovog dokumenta je ograničeno.
+	Every change is recorded as a tracked change.	Svaka izmena se beleži kao praćena izmena.
+	Everyone	Svi
+	Exceptions (optional)	Izuzeci (neobavezno)
+	Exceptions…	Izuzeci…
+	Fields	Polja
+	Filling in forms	Popunjavanje obrazaca
+	Find Next Editable Region	Pronađi sledeći deo za uređivanje
+	Footnotes and endnotes	Fusnote i krajnje napomene
+	Formatting, case changes, white space and tables are compared; the other settings are kept for later.	Porede se oblikovanje, veličina slova, razmaci i tabele; ostala podešavanja se čuvaju za kasnije.
+	Fractions (1/2) as fraction characters (½)	Razlomci (1/2) kao znakovi razlomka (½)
+	Headers and footers	Zaglavlja i podnožja
+	Hyphens (--) as dashes (—)	Crtice (--) kao crte (—)
+	In equations, typing a name after a backslash replaces it with its symbol.	U jednačinama se naziv otkucan posle obrnute kose crte zamenjuje simbolom.
+	Internet addresses as links	Internet adrese kao veze
+	Label changes with:	Označi izmene sa:
+	Limit formatting to a selection of styles	Ograniči oblikovanje na izabrane stilove
+	Math AutoCorrect	Automatska ispravka matematike
+	More >>	Više >>
+	Moves	Premeštanja
+	New document	Novi dokument
+	No changes (read only)	Bez izmena (samo za čitanje)
+	Only allow this kind of editing:	Dozvoli samo ovu vrstu uređivanja:
+	Only comments can be added, except in regions marked editable.	Mogu se dodavati samo komentari, osim u delovima označenim za uređivanje.
+	Only form fields can be filled in.	Mogu se popuniti samo polja obrasca.
+	Only the allowed styles can be applied.	Mogu se primeniti samo dozvoljeni stilovi.
+	Ordinals (1st) as superscript	Redni brojevi (1st) kao eksponent
+	Original document	Originalni dokument
+	This password type isn't supported.	Ova vrsta lozinke nije podržana.
+	Replace as you type	Zameni dok kucaš
+	Replace text as you type	Zameni tekst dok kucaš
+	Replace:	Zameni:
+	Revised document	Izmenjeni dokument
+	Select text, then tick who can still edit it.	Izaberite tekst, pa označite ko još može da ga uređuje.
+	Settings…	Podešavanja…
+	Show changes at:	Prikaži izmene na nivou:
+	Show changes in:	Prikaži izmene u:
+	Smart quotes instead of straight quotes	Tipografski navodnici umesto pravih
+	Start Enforcing Protection	Pokreni zaštitu
+	Stop Protection	Zaustavi zaštitu
+	Text boxes	Okviri za tekst
+	The document is read only, except for regions marked editable.	Dokument je samo za čitanje, osim delova označenih za uređivanje.
+	The password is optional; without it anyone can stop the protection.	Lozinka nije obavezna; bez nje svako može da zaustavi zaštitu.
+	This document	Ovaj dokument
+	Tracked changes	Praćene izmene
+	Type the password to stop the protection.	Unesite lozinku da biste zaustavili zaštitu.
+	White space	Razmaci
+	With:	Sa:
+	Word level	Nivo reči
 	In Line with Text	U ravni sa tekstom
 	Square	Kvadratno
 	Through	Kroz
@@ -1406,8 +1543,78 @@
 	New Group	Nova grupa
 	Rename…	Preimenuj…
 	Ribbon and Quick Access Toolbar:	Traka i traka sa alatkama za brzi pristup:
+	Add Font…	Dodaj font…
+	Added Fonts	Dodati fontovi
+	Remove Added Font	Ukloni dodati font
+	Recent Colors	Nedavne boje
+	More Colors…	Još boja…
+	Standard	Standardne
+	Current	Trenutna
+	Colors:	Boje:
+	Color model:	Model boja:
+	Red:	Crvena:
+	Green:	Zelena:
+	Blue:	Plava:
+	Hue:	Nijansa:
+	Sat:	Zasićenost:
+	Lum:	Osvetljenost:
+	Hex:	Heks:
+	Accessibility Pane	Okno pristupačnosti
+	Alt Text Pane	Okno alternativnog teksta
+	Alt\nText	Alternativni\ntekst
+	View Alt Text…	Prikaži alternativni tekst…
+	Mark as decorative	Označi kao dekorativno
+	Title:	Naslov:
+	Errors ({n})	Greške ({n})
+	Warnings ({n})	Upozorenja ({n})
+	Tips ({n})	Saveti ({n})
+	No accessibility issues found.	Nije pronađen nijedan problem pristupačnosti.
+	Describe what this object shows, for people who can't see it.	Opišite šta ovaj objekat prikazuje, za one koji ne mogu da ga vide.
+	Decorative objects only add visual interest: screen readers skip them.	Dekorativni objekti samo doprinose izgledu: čitači ekrana ih preskaču.
+	Describe what this table shows, for people who can't see it.	Opišite šta ova tabela prikazuje, za one koji ne mogu da je vide.
+	Select a picture, shape, chart or table to describe it.	Izaberite sliku, oblik, grafikon ili tabelu da biste ih opisali.
+	Document Grid	Mreža dokumenta
+	No grid	Bez mreže
+	Lines only	Samo redovi
+	Lines and characters	Redovi i znakovi
+	Text snaps to characters	Tekst se poravnava sa znakovima
+	Characters per line:	Znakova po redu:
+	Lines per page:	Redova po stranici:
 	Moved from	Premešteno odavde
 	Moved to	Premešteno ovde
+	Developer	Programer
+	Controls	Kontrole
+	Rich Text Content Control	Kontrola sadržaja za obogaćeni tekst
+	Plain Text Content Control	Kontrola sadržaja za običan tekst
+	Picture Content Control	Kontrola sadržaja za sliku
+	Building Block Gallery Content Control	Kontrola sadržaja za galeriju gradivnih blokova
+	Check Box Content Control	Kontrola sadržaja za polje za potvrdu
+	Combo Box Content Control	Kontrola sadržaja za kombinovano polje
+	Drop-Down List Content Control	Kontrola sadržaja za padajuću listu
+	Date Picker Content Control	Kontrola sadržaja za biranje datuma
+	Repeating Section Content Control	Kontrola sadržaja za odeljak koji se ponavlja
+	Design Mode	Režim dizajna
+	Content Control at Selection	Kontrola sadržaja na izboru
+	Toggle Check Box	Promeni polje za potvrdu
+	Choose List Item	Izaberi stavku liste
+	Set Date	Postavi datum
+	Remove Content Control	Ukloni kontrolu sadržaja
+	Content Control Properties	Svojstva kontrole sadržaja
+	Title	Naslov
+	Tag	Oznaka
+	Placeholder text	Tekst čuvara mesta
+	Can't be deleted	Ne može da se izbriše
+	Contents can't be edited	Sadržaj ne može da se uređuje
+	Remove the control once edited	Ukloni kontrolu posle uređivanja
+	Allow line breaks	Dozvoli prelome reda
+	Date format	Format datuma
+	Checked symbol	Simbol za potvrđeno
+	Unchecked symbol	Simbol za nepotvrđeno
+	List entries	Stavke liste
+	Display text	Prikazani tekst
+	Value	Vrednost
+	Today	Danas
+	Put the caret in a content control first.	Prvo postavite kursor u kontrolu sadržaja.
 	Right-to-Left Table	Tabela sa desna na levo
 	Right-to-Left Section	Odeljak sa desna na levo
 	Table direction:	Smer tabele:
@@ -1435,6 +1642,56 @@
 	Enlarge symbol	Uvećaj simbol
 	Enclosure	Okvir
 	Circle	Krug
+	Numerals:	Brojevi:
+	Numerals	Brojevi
+	Arabic	Arapski
+	Hindi	Hindi
+	Context	Kontekst
+	System	Sistem
+	Templates	Šabloni
+	Templates and Add-ins	Šabloni i dodaci
+	Attach Template	Priloži šablon
+	Detach Template	Ukloni šablon
+	Automatically Update Document Styles	Automatski ažuriraj stilove dokumenta
+	Update Styles from Template	Ažuriraj stilove iz šablona
+	Organizer	Organizator
+	Copy Styles	Kopiraj stilove
+	Rename Style	Preimenuj stil
+	Document template:	Šablon dokumenta:
+	Attach…	Priloži…
+	Automatically update document styles	Automatski ažuriraj stilove dokumenta
+	Organizer…	Organizator…
+	Change Chart Type	Promeni tip grafikona
+	Chart Design	Dizajn grafikona
+	Type	Tip
+	Edit Data	Uredi podatke
+	Chart Title	Naslov grafikona
+	Chart Layouts	Rasporedi grafikona
+	Add Chart Element	Dodaj element grafikona
+	Legend	Legenda
+	Data Labels	Oznake podataka
+	Above Chart	Iznad grafikona
+	Insert Chart	Umetni grafikon
+	Clustered Column	Grupisane kolone
+	Stacked Column	Naslagane kolone
+	Clustered Bar	Grupisane trake
+	Stacked Bar	Naslagane trake
+	Area	Površinski
+	Pie	Kružni
+	Doughnut	Prstenasti
+	Scatter	Raspršeni
+	“{text}” ({row}, {series}) isn't a number.	„{text}” ({row}, {series}) nije broj.
+	Category {n}	Kategorija {n}
+	Series {n}	Serija {n}
+	Type the categories down the side and a column of values per series.	Unesite kategorije sa strane i po jednu kolonu vrednosti za svaku seriju.
+	Categories	Kategorije
+	Series name	Naziv serije
+	Remove series	Ukloni seriju
+	Remove row	Ukloni red
+	Add Row	Dodaj red
+	Add Series	Dodaj seriju
+	Edit\nData	Uredi\npodatke
+	Change\nChart Type	Promeni tip\ngrafikona
 	Align Text	Poravnaj tekst
 	Create Link	Napravi vezu
 	Break Link	Prekini vezu
@@ -1456,3 +1713,348 @@
 	Continuous numbering	Neprekidna numeracija
 	Apply	Primeni
 	Convert Notes	Pretvori napomene
+	English (United Kingdom)	Engleski (Velika Britanija)
+	Polish	Poljski
+	Do Not Check Spelling or Grammar	Ne proveravaj pravopis i gramatiku
+
+# Built-in file browser when the system file dialog is unavailable (#576)
+	Documents	Dokumenti
+	Word document	Word dokument
+	All files	Sve datoteke
+	Recipient lists	Liste primalaca
+	The system file dialog isn't available, so WordCraft shows its own. To get the system dialog, install a file chooser portal (such as xdg-desktop-portal-gtk) or zenity.	Sistemski dijalog za datoteke nije dostupan, pa WordCraft prikazuje svoj. Da biste dobili sistemski dijalog, instalirajte portal za izbor datoteka (na primer xdg-desktop-portal-gtk) ili zenity.
+	Up one level	Jedan nivo gore
+	Home folder	Lična fascikla
+	{name} wasn't found.	{name} nije pronađen.
+	{name} already exists. Choose Save again to replace it.	{name} već postoji. Izaberite Sačuvaj ponovo da biste zamenili datoteku.
+	This folder can't be read: {error}	Ova fascikla ne može da se pročita: {error}
+	Showing the first {count} items.	Prikazane su samo prve stavke: {count}.
+	File name:	Ime datoteke:
+	Browse in WordCraft…	Potraži u WordCraft-u…
+	Open a file with WordCraft's own browser when the system file dialog doesn't appear.	Otvorite datoteku pomoću WordCraft-ovog pregledača kada se sistemski dijalog za datoteke ne pojavi.
+	Hide White Space	Sakrij prazan prostor
+	All pages	Sve stranice
+	Current page	Trenutna stranica
+	Selected pages	Izabrane stranice
+	Custom range	Prilagođeni opseg
+	All pages in the range	Sve stranice u opsegu
+	Odd pages only	Samo neparne stranice
+	Even pages only	Samo parne stranice
+	Copies	Kopije
+	Collate copies	Složi kopije
+	Pages like 1-3, 5	Stranice poput 1-3, 5
+	{count} of {total} pages will print	Štampaće se {count} od {total} stranica
+	Save these pages as PDF…	Sačuvaj ove stranice kao PDF…
+	The printer, two-sided printing and pages per sheet are chosen in that dialog.	Štampač, obostrana štampa i broj stranica po listu biraju se u tom dijalogu.
+	Previous Page	Prethodna stranica
+	Print to PDF	Štampaj u PDF
+	Add Shape	Dodaj oblik
+	Change Colors	Promeni boje
+	Change Layout	Promeni raspored
+	Create Graphic	Kreiranje grafike
+	Edit Items	Uredi stavke
+	Layouts	Rasporedi
+	Reset Graphic	Resetuj grafiku
+	SmartArt Design	SmartArt dizajn
+	SmartArt Styles	SmartArt stilovi
+	Text Pane	Okno za tekst
+	List	Lista
+	Process	Proces
+	Cycle	Ciklus
+	Hierarchy	Hijerarhija
+	Relationship	Odnos
+	Pyramid	Piramida
+	Basic List	Osnovna lista
+	Basic Process	Osnovni proces
+	Basic Cycle	Osnovni ciklus
+	Basic Pyramid	Osnovna piramida
+	Basic Radial	Osnovni radijalni
+	Basic Matrix	Osnovna matrica
+	Basic Venn	Osnovni Venov dijagram
+	Shows items of equal weight as blocks in rows.	Prikazuje stavke jednake važnosti kao blokove u redovima.
+	Shows steps in order, left to right, with arrows between them.	Prikazuje korake redom, sleva nadesno, sa strelicama između njih.
+	Shows steps that repeat, around a circle.	Prikazuje korake koji se ponavljaju, oko kruga.
+	Shows a tree: each item below the item it belongs to.	Prikazuje stablo: svaka stavka ispod stavke kojoj pripada.
+	Shows parts that build on each other, largest at the bottom.	Prikazuje delove koji se oslanjaju jedan na drugi, najveći na dnu.
+	Shows items around a central idea: the first item is the centre.	Prikazuje stavke oko centralne ideje: prva stavka je u sredini.
+	Shows parts of a whole as quadrants.	Prikazuje delove celine kao kvadrante.
+	Shows overlapping ideas as overlapping circles.	Prikazuje ideje koje se preklapaju kao krugove koji se preklapaju.
+	Accent {n}	Akcenat {n}
+	Colorful	Šareno
+	Insert SmartArt	Umetni SmartArt
+	One line per item. Enter adds an item.	Jedan red po stavci. Enter dodaje stavku.
+	Add\nShape	Dodaj\noblik
+	Change\nColors	Promeni\nboje
+	Reset\nGraphic	Resetuj\ngrafiku
+	Promote to Heading 1	Podigni na Naslov 1
+	Demote to Body Text	Spusti na osnovni tekst
+	Move Up	Pomeri nagore
+	Move Down	Pomeri nadole
+	Collapse	Skupi
+	Expand or Collapse Heading	Proširi ili skupi naslov
+	Select Heading and Content	Izaberi naslov i sadržaj
+	Show Level	Prikaži nivo
+	Show Level 1	Prikaži nivo 1
+	Show Level 2	Prikaži nivo 2
+	Show Level 3	Prikaži nivo 3
+	Show Level 4	Prikaži nivo 4
+	Show Level 5	Prikaži nivo 5
+	Show Level 6	Prikaži nivo 6
+	Show Level 7	Prikaži nivo 7
+	Show Level 8	Prikaži nivo 8
+	Show Level 9	Prikaži nivo 9
+	Show All Levels	Prikaži sve nivoe
+	All Levels	Svi nivoi
+	Show First Line Only	Prikaži samo prvi red
+	Show Text Formatting	Prikaži oblikovanje teksta
+	Close Outline View	Zatvori prikaz konture
+	Outline State	Stanje konture
+	Outlining	Kontura
+	Outline Tools	Alatke konture
+	Close Outline\nView	Zatvori prikaz\nkonture
+	A, B, C, …	A, B, C, …
+	Above the item	Iznad stavke
+	Accessed on	Pristupljeno
+	Add New Source…	Dodaj novi izvor…
+	Add the chapter number	Dodaj broj poglavlja
+	Atmosphere	Atmosfera
+	Below the item	Ispod stavke
+	Book	Knjiga
+	Book title	Naslov knjige
+	Caption	Natpis
+	Caption Numbering	Numerisanje natpisa
+	Caption text	Tekst natpisa
+	Caption:	Natpis:
+	Chapter in a book	Poglavlje u knjizi
+	Chapters begin at:	Poglavlja počinju na:
+	Collect entries from:	Stavke uzeti iz:
+	Columns:	Kolone:
+	Conference	Konferencija
+	Conference paper	Rad sa konferencije
+	Container Title	Naslov zbirke
+	Create Source	Napravi izvor
+	Cross-reference:	Unakrsna referenca:
+	Custom Table of Contents…	Prilagođeni sadržaj…
+	DOI	DOI
+	Day	Dan
+	Delete Label	Obriši oznaku
+	Edit Source	Uredi izvor
+	Edition	Izdanje
+	Edit…	Uredi…
+	Entry marked.	Stavka je označena.
+	Example: {sample}	Primer: {sample}
+	Figure	Slika
+	Film	Film
+	Heading styles (levels 1–{n})	Stilovi naslova (nivoi 1–{n})
+	Heading {n}	Naslov {n}
+	I, II, III, …	I, II, III, …
+	Include page numbers	Uključi brojeve stranica
+	Indented	Uvučeno
+	Institution	Institucija
+	Ionosphere	Jonosfera
+	Issue	Broj
+	Journal	Časopis
+	Label:	Oznaka:
+	Last, First; Last, First	Prezime, Ime; Prezime, Ime
+	Leave the label out of the caption	Izostavi oznaku iz natpisa
+	Letter headings	Naslovi po slovima
+	Levels:	Nivoi:
+	Link entries to their headings	Poveži stavke sa naslovima
+	Made from the author and year when empty	Ako je prazno, pravi se od autora i godine
+	Magazine or newspaper article	Članak u magazinu ili novinama
+	Main entry:	Glavna stavka:
+	Mark	Označi
+	Mark All	Označi sve
+	Mark Entry…	Označi stavku…
+	Mark Index Entry	Označi stavku indeksa
+	Mesosphere	Mezosfera
+	Month	Mesec
+	New Label	Nova oznaka
+	New Label…	Nova oznaka…
+	New…	Novo…
+	No sources yet.	Još nema izvora.
+	Numbering…	Numerisanje…
+	Options…	Opcije…
+	Other	Drugo
+	Other styles and their TOC level:	Ostali stilovi i njihov nivo u sadržaju:
+	Outline levels	Nivoi strukture
+	Page number style	Stil broja stranice
+	Page numbers at the right margin	Brojevi stranica uz desnu marginu
+	Page title	Naslov stranice
+	Pages of bookmark:	Stranice obeleživača:
+	Periodical	Periodika
+	Position:	Položaj:
+	Publisher	Izdavač
+	Run-in	U nizu
+	See	Vidi
+	Separator:	Razdvajač:
+	Show every bibliography field	Prikaži sva polja bibliografije
+	Site name	Naziv sajta
+	Source Manager	Upravljač izvorima
+	Source type:	Vrsta izvora:
+	Sources in this document:	Izvori u ovom dokumentu:
+	Styles:	Stilovi:
+	Subentry:	Podstavka:
+	TC entry fields	Polja stavki TC
+	Tab leader:	Popuna tabulatora:
+	Table of Contents Options	Opcije sadržaja
+	Table of Contents Styles	Stilovi sadržaja
+	This page	Ova stranica
+	Type:	Vrsta:
+	URL	URL
+	Volume	Tom
+	Website	Veb-sajt
+	Year	Godina
+	a, b, c, …	a, b, c, …
+	i, ii, iii, …	i, ii, iii, …
+	{n} entries marked.	Označeno stavki: {n}.
+	Lasso Select	Izbor lasom
+	Move Selected Ink	Premesti izabrani rukopis
+	Delete Selected Ink	Obriši izabrani rukopis
+	Recolor Selected Ink	Promeni boju izabranog rukopisa
+	Add Pen	Dodaj pero
+	Remove Pen	Ukloni pero
+	Ink to Shape	Rukopis u oblik
+	Convert to Shapes	Pretvori u oblike
+	Ink Replay	Rukopis repriza
+	Add\nPen	Dodaj\npero
+	Rewind	Na početak
+	Forward	Napred
+	Stroke {n} of {total}	Potez {n} od {total}
+	Use wildcards	Koristi džoker znake
+	Special	Posebno
+	Match prefix	Podudari prefiks
+	Match suffix	Podudari sufiks
+	Ignore punctuation characters	Zanemari znake interpunkcije
+	Ignore white-space characters	Zanemari beline
+	Regular expressions	Regularni izrazi
+	Search Options	Opcije pretrage
+	Tab Character	Znak tabulatora
+	Any Character	Bilo koji znak
+	Any Digit	Bilo koja cifra
+	Any Letter	Bilo koje slovo
+	Caret Character	Znak kapice
+	Section Character	Znak odeljka
+	Paragraph Character	Simbol pasusa
+	Graphic	Grafika
+	Manual Line Break	Ručni prekid reda
+	Manual Page Break	Ručni prekid strane
+	Section Break	Prekid odeljka
+	White Space	Belina
+	Clipboard Contents	Sadržaj ostave
+	Find What Text	Pronađeni tekst
+	Find What Expression	Pronađeni izraz
+	Character in Range	Znak u opsegu
+	Beginning of Word	Početak reči
+	End of Word	Kraj reči
+	Expression	Izraz
+	Not	Nije
+	Num Occurrences	Broj ponavljanja
+	Previous 1 or More	Prethodno 1 ili više puta
+	0 or More Characters	0 ili više znakova
+	Move with Text	Pomeraj sa tekstom
+	Fix Position on Page	Fiksiraj položaj na stranici
+
+# WordArt and connectors (#416).
+	WordArt Styles	WordArt stilovi
+	Text Fill	Popuna teksta
+	Text Outline	Kontura teksta
+	Transform	Transformacija
+	No Fill	Bez popune
+	No Outline	Bez konture
+	Reflection	Odraz
+	No Reflection	Bez odraza
+	No Transform	Bez transformacije
+	Connect Shapes	Poveži oblike
+	Straight Connector	Pravi konektor
+	Straight Arrow Connector	Pravi konektor sa strelicom
+	Elbow Connector	Ugaoni konektor
+	Elbow Arrow Connector	Ugaoni konektor sa strelicom
+	Curved Connector	Zakrivljeni konektor
+	Curved Arrow Connector	Zakrivljeni konektor sa strelicom
+	Arch Up	Luk nagore
+	Arch Down	Luk nadole
+	Slant Up	Nagib nagore
+	Slant Down	Nagib nadole
+	Inflate	Naduvavanje
+	Deflate	Izduvavanje
+	Chevron Up	Ševron nagore
+	Chevron Down	Ševron nadole
+	Triangle Up	Trougao nagore
+	Triangle Down	Trougao nadole
+	Solid Accent	Puna boja isticanja
+	Light with Outline	Svetlo sa konturom
+	Hollow	Šuplje
+	Accent Gradient	Gradijent boje isticanja
+	Dark with Shadow	Tamno sa senkom
+	Soft Glow	Meki sjaj
+	Accent with Reflection	Isticanje sa odrazom
+	Warm Gradient with Outline	Topli gradijent sa konturom
+	Add line numbering	Dodaj brojeve redova
+	Add to Document	Dodaj u dokument
+	Address labels	Adresne nalepnice
+	Auto	Automatski
+	Automatically hyphenate document	Automatski deli reči u dokumentu
+	Chinese (Simplified)	Kineski (pojednostavljeni)
+	Chinese (Traditional)	Kineski (tradicionalni)
+	Column:	Kolona:
+	Count by:	Korak:
+	Czech	Češki
+	Danish	Danski
+	Delivery address:	Adresa primaoca:
+	Detect language automatically	Automatski prepoznaj jezik
+	Do not check spelling or grammar	Ne proveravaj pravopis ni gramatiku
+	Dutch	Holandski
+	Envelope size:	Veličina koverte:
+	Estonian	Estonski
+	Finnish	Finski
+	French (France)	Francuski (Francuska)
+	From text:	Od teksta:
+	Full page of the same label	Cela stranica iste nalepnice
+	German (Germany)	Nemački (Nemačka)
+	Greek	Grčki
+	Hebrew	Hebrejski
+	Hyphenate at:	Podeli na:
+	Hyphenate words in CAPS	Deli reči napisane VELIKIM SLOVIMA
+	Hyphenation Options…	Opcije deljenja reči…
+	Hyphenation zone:	Zona deljenja reči:
+	Italian	Italijanski
+	Japanese	Japanski
+	Korean	Korejski
+	Limit consecutive hyphens to:	Najviše uzastopnih crtica:
+	Line Numbering Options…	Opcije brojeva redova…
+	Manual Hyphenation	Ručno deljenje reči
+	Manual hyphenation is complete.	Ručno deljenje reči je završeno.
+	Manual…	Ručno…
+	Mark selected text as:	Označi izabrani tekst kao:
+	New Document	Novi dokument
+	No limit	Bez ograničenja
+	Norwegian (Bokmål)	Norveški (bukmol)
+	Numbering:	Numerisanje:
+	Omit	Izostavi
+	One label per recipient	Jedna nalepnica po primaocu
+	Portuguese (Brazil)	Portugalski (Brazil)
+	Portuguese (Portugal)	Portugalski (Portugalija)
+	Return address labels	Nalepnice sa adresom pošiljaoca
+	Return address:	Adresa pošiljaoca:
+	Row:	Red:
+	Russian	Ruski
+	Serbian (Cyrillic)	Srpski (ćirilica)
+	Serbian (Latin)	Srpski (latinica)
+	Set As Default	Postavi kao podrazumevano
+	Shipping labels	Nalepnice za pošiljke
+	Single label	Jedna nalepnica
+	Spanish (Mexico)	Španski (Meksiko)
+	Spanish (Spain)	Španski (Španija)
+	Swedish	Švedski
+	Turkish	Turski
+	Ukrainian	Ukrajinski
+	{language} is now the document's default language.	{language} je sada podrazumevani jezik dokumenta.
+	Visual effects	Vizuelni efekti
+	Animation effects:	Efekti animacije:
+	On	Uključeno
+	Off	Isključeno
+	Smooth scrolling and zooming, and menus and buttons that fade in. Off shows every change at once.	Glatko pomeranje i zumiranje, kao i postepeno pojavljivanje menija i dugmadi. Uz „Isključeno“ svaka promena se prikazuje odmah.
+	Your system has animation effects turned on.	U sistemu su efekti animacije uključeni.
+	Your system has animation effects turned off.	U sistemu su efekti animacije isključeni.
+	Your system doesn't report an animation setting, so animation effects stay on.	Sistem ne prijavljuje podešavanje animacije, pa efekti animacije ostaju uključeni.

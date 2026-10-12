@@ -1013,7 +1013,7 @@ fn emit(mut nodes: Vec<Node>) -> Vec<Inline> {
 // Export
 
 /// Escape text for Markdown (inline context).
-fn escape(s: &str) -> String {
+pub(crate) fn escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 8);
     for c in s.chars() {
         match c {
@@ -1125,8 +1125,9 @@ fn inlines_md(inlines: &[Inline]) -> String {
         }
     };
     for (text, f, raw) in pieces {
-        // Links are the outermost construct.
-        if f.link != link || raw.is_some() {
+        // Links are the outermost construct; a script or other non-web target is plain text.
+        let f_link = f.link.clone().filter(|l| wordcraft_doc::link::is_safe_href(l));
+        if f_link != link || raw.is_some() {
             close_all(&mut out, &mut stack);
             if let Some(l) = &link {
                 out.push_str(&format!("]({})", link_target(l)));
@@ -1136,9 +1137,9 @@ fn inlines_md(inlines: &[Inline]) -> String {
                 out.push_str(&r);
                 continue;
             }
-            if let Some(l) = &f.link {
+            if let Some(l) = f_link {
                 out.push('[');
-                link = Some(l.clone());
+                link = Some(l);
             }
         }
         let want: Vec<Mark> =

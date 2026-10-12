@@ -144,6 +144,23 @@ pub fn specs() -> Vec<CommandSpec> {
                 }
             })
         })),
+        // Table Properties › Alt Text: the title (`w:tblCaption`) and description (`w:tblDescription`).
+        t(CommandSpec::new("table.altText", "Alt Text", "Table Layout › Table › Properties", |s, v| {
+            let (title, text) = (p::str(v, "title"), p::str(v, "text"));
+            if title.is_none() && text.is_none() {
+                return Err(CmdError::Params("`text` or `title` (string) is required".into()));
+            }
+            let set = |x: Option<&str>, cur: &Option<String>| match x {
+                Some(x) if x.trim().is_empty() => None,
+                Some(x) => Some(wordcraft_doc::para::cap_alt(x)),
+                None => cur.clone(),
+            };
+            with_table(s, |t| {
+                t.props.caption = set(title, &t.props.caption);
+                t.props.description = set(text, &t.props.description);
+            })
+        })
+        .params(r#"{"text"?: string, "title"?: string} (empty clears)"#)),
         t(CommandSpec::new("table.sort", "Sort", "Table Layout › Data", sort_table)
             .params(r#"{"column"?: n, "descending"?: bool, "header"?: bool}"#)),
         t(CommandSpec::new("table.toText", "Convert to Text", "Table Layout › Data", to_text).params(r#"{"separator"?: "tab|comma|paragraph"}"#)),
@@ -398,7 +415,7 @@ fn with_cells(s: &mut Session, f: impl Fn(&mut wordcraft_doc::Cell)) -> CmdResul
 
 /// Table Layout › Text Direction: turn the selected cells' text. Without a value it cycles the
 /// caret cell's direction (horizontal → down → up) and gives every selected cell the result.
-fn text_direction(s: &mut Session, v: &Value) -> CmdResult {
+pub(crate) fn text_direction(s: &mut Session, v: &Value) -> CmdResult {
     let (tp, r, c) = cell(s)?;
     let dir = match p::str(v, "value") {
         Some("horizontal" | "lrTb") => TextDirection::Horizontal,
@@ -480,13 +497,28 @@ fn del_row(s: &mut Session, _: &Value) -> CmdResult {
 
 fn del_col(s: &mut Session, _: &Value) -> CmdResult {
     let (tp, r, c) = cell(s)?;
+    let cells = selected_cells(s);
     let story = s.sel.focus.story;
     let t = s.doc.table_mut(story, &tp)?;
     if t.grid.len() <= 1 {
         return del_table(s, &Value::Null);
     }
-    let g = t.grid_col(r, c);
-    t.delete_col(g);
+    // Every grid column a selected cell covers goes (the caret's alone without a selection).
+    let mut cols = std::collections::BTreeSet::new();
+    for (rr, cc) in cells {
+        let g = t.grid_col(rr, cc);
+        let span = t.rows.get(rr).and_then(|x| x.cells.get(cc)).map_or(1, wordcraft_doc::Cell::span);
+        cols.extend(g..g.saturating_add(span).min(t.grid.len()));
+    }
+    if cols.is_empty() {
+        cols.insert(t.grid_col(r, c));
+    }
+    if cols.len() >= t.grid.len() {
+        return del_table(s, &Value::Null);
+    }
+    for g in cols.iter().rev() {
+        t.delete_col(*g);
+    }
     // Rows left without cells are dropped; if that was every row, no table is left.
     if t.rows.is_empty() {
         return del_table(s, &Value::Null);
@@ -527,7 +559,10 @@ fn split_table(s: &mut Session, _: &Value) -> CmdResult {
     let story = s.sel.focus.story;
     let t = s.doc.table_mut(story, &tp)?;
     let tail_rows = t.rows.split_off(r);
-    let tail = Table { props: t.props.clone(), grid: t.grid.clone(), rows: tail_rows };
+    // Content controls closing after the table now close after its second part.
+    let close = std::mem::take(&mut t.controls.close);
+    let controls = wordcraft_doc::ControlWrap { open: Vec::new(), close };
+    let tail = Table { props: t.props.clone(), grid: t.grid.clone(), rows: tail_rows, controls };
     let after = tp.with_last(tp.last() + 1);
     s.doc.insert_block(story, &after, Block::Para(Paragraph::new()))?;
     s.doc.insert_block(story, &after.with_last(after.last() + 1), Block::Table(tail))?;

@@ -31,7 +31,7 @@ pub(crate) fn fill_colour(e: &El, theme: &[Rgb]) -> Option<Rgb> {
 }
 
 fn is_color(e: &El) -> bool {
-    matches!(e.name.as_str(), "a:srgbClr" | "a:schemeClr" | "a:sysClr")
+    matches!(e.name.as_str(), "a:srgbClr" | "a:schemeClr" | "a:sysClr" | "a:prstClr" | "a:scrgbClr" | "a:hslClr")
 }
 
 /// A colour element (`a:srgbClr`, `a:schemeClr`, `a:sysClr`), or the one inside `e`, with its
@@ -41,7 +41,25 @@ pub(crate) fn color(e: &El, theme: &[Rgb]) -> Option<Rgb> {
     let base = match c.name.as_str() {
         "a:srgbClr" => Rgb::parse(c.attr("val")?)?,
         "a:schemeClr" => *theme.get(scheme_slot(c.attr("val")?)?)?,
-        "a:sysClr" => Rgb::parse(c.attr("lastClr")?)?,
+        "a:sysClr" => match c.attr("lastClr").and_then(Rgb::parse) {
+            Some(rgb) => rgb,
+            None => sys_color(c.attr("val")?)?,
+        },
+        "a:prstClr" => preset_color(c.attr("val")?)?,
+        "a:scrgbClr" => {
+            // Linear 0–100 000 per channel, to sRGB.
+            let ch = |n: &str| -> u8 {
+                let l = c.attr(n).and_then(int).map_or(0.0, |v| (v as f64 / 100_000.0).clamp(0.0, 1.0));
+                let s = if l <= 0.003_130_8 { l * 12.92 } else { 1.055 * l.powf(1.0 / 2.4) - 0.055 };
+                (s * 255.0).round().clamp(0.0, 255.0) as u8
+            };
+            Rgb(ch("r"), ch("g"), ch("b"))
+        }
+        "a:hslClr" => {
+            let v = |n: &str| c.attr(n).and_then(int).unwrap_or(0) as f64;
+            let hue = (v("hue") / 60_000.0).rem_euclid(360.0) / 360.0;
+            from_hsl(hue, (v("sat") / 100_000.0).clamp(0.0, 1.0), (v("lum") / 100_000.0).clamp(0.0, 1.0))
+        }
         _ => return None,
     };
     let val = |m: &El| m.attr("val").and_then(int).map_or(0.0, |v| (v as f64 / 100_000.0).clamp(-10.0, 10.0));
@@ -56,6 +74,47 @@ pub(crate) fn color(e: &El, theme: &[Rgb]) -> Option<Rgb> {
         };
     }
     Some(rgb)
+}
+
+/// A preset colour (`a:prstClr/@val`, ECMA-376 Part 1 §20.1.10.48): the common ones; others are
+/// unknown (`None`).
+pub(crate) fn preset_color(name: &str) -> Option<Rgb> {
+    Some(match name {
+        "black" => Rgb(0, 0, 0),
+        "white" => Rgb(0xFF, 0xFF, 0xFF),
+        "red" => Rgb(0xFF, 0, 0),
+        "green" => Rgb(0, 0x80, 0),
+        "lime" => Rgb(0, 0xFF, 0),
+        "blue" => Rgb(0, 0, 0xFF),
+        "yellow" => Rgb(0xFF, 0xFF, 0),
+        "cyan" | "aqua" => Rgb(0, 0xFF, 0xFF),
+        "magenta" | "fuchsia" => Rgb(0xFF, 0, 0xFF),
+        "gray" | "grey" => Rgb(0x80, 0x80, 0x80),
+        "silver" => Rgb(0xC0, 0xC0, 0xC0),
+        "ltGray" | "ltGrey" => Rgb(0xD3, 0xD3, 0xD3),
+        "dkGray" | "dkGrey" => Rgb(0xA9, 0xA9, 0xA9),
+        "maroon" => Rgb(0x80, 0, 0),
+        "navy" => Rgb(0, 0, 0x80),
+        "olive" => Rgb(0x80, 0x80, 0),
+        "purple" => Rgb(0x80, 0, 0x80),
+        "teal" => Rgb(0, 0x80, 0x80),
+        "orange" => Rgb(0xFF, 0xA5, 0),
+        "brown" => Rgb(0xA5, 0x2A, 0x2A),
+        "pink" => Rgb(0xFF, 0xC0, 0xCB),
+        _ => return None,
+    })
+}
+
+/// A system colour without its `lastClr`: the usual light-theme values of the common ones.
+fn sys_color(name: &str) -> Option<Rgb> {
+    Some(match name {
+        "windowText" | "btnText" | "menuText" | "captionText" | "infoText" => Rgb(0, 0, 0),
+        "window" | "menu" | "highlightText" => Rgb(0xFF, 0xFF, 0xFF),
+        "btnFace" | "3dLight" => Rgb(0xF0, 0xF0, 0xF0),
+        "grayText" | "btnShadow" => Rgb(0xA0, 0xA0, 0xA0),
+        "highlight" => Rgb(0x00, 0x78, 0xD7),
+        _ => return None,
+    })
 }
 
 /// Index into `Document::settings.theme_colors` (dk1, lt1, dk2, lt2, accent1..6, hlink, folHlink).
@@ -77,13 +136,24 @@ fn scheme_slot(name: &str) -> Option<usize> {
     })
 }
 
+/// Theme colour `name` (`accent1`, `tx1`…) of `theme`.
+pub(crate) fn scheme(name: &str, theme: &[Rgb]) -> Option<Rgb> {
+    scheme_slot(name).map(|i| slot(theme, i))
+}
+
+/// `c` with its luminance changed by `f`.
+pub(crate) fn lum(c: Rgb, f: impl Fn(f64) -> f64) -> Rgb {
+    adjust_lum(c, f)
+}
+
 /// `tint` (towards `to` = 255) and `shade` (towards 0): `v` is the share of the original colour kept.
 fn mix(c: Rgb, to: f64, v: f64) -> Rgb {
     let f = |x: u8| (x as f64 * v + to * (1.0 - v)).round().clamp(0.0, 255.0) as u8;
     Rgb(f(c.0), f(c.1), f(c.2))
 }
 
-fn adjust_lum(c: Rgb, f: impl Fn(f64) -> f64) -> Rgb {
+/// `c` with its HSL luminance changed by `f`.
+pub(crate) fn adjust_lum(c: Rgb, f: impl Fn(f64) -> f64) -> Rgb {
     let (h, s, l) = to_hsl(c);
     from_hsl(h, s, f(l).clamp(0.0, 1.0))
 }

@@ -6,6 +6,10 @@
 //! pending New/Open/Close, export, insert the picture). A host with only the blocking
 //! `pick_open` / `pick_save` gets the same follow-up straight away. One dialog at a time: asking
 //! for another while one is open does nothing.
+//!
+//! When the host can't show a system dialog at all (a Linux desktop with neither a file chooser
+//! portal nor zenity, #576) it answers with an error, and the app finishes the job in its own
+//! [`file_browser`](crate::file_browser) instead.
 
 use std::sync::mpsc::{Receiver, TryRecvError};
 
@@ -16,11 +20,30 @@ use crate::WordApp;
 /// A file dialog the app asks the host to show ([`Services::file_dialog`](crate::Services::file_dialog)).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FileDialogRequest {
-    /// Pick a file to open; `purpose` says what for (`document`, `picture`, `recipients`), as for
+    /// Pick a file to open; `purpose` says what for (`document`, `picture`, `recipients`, `font`), as for
     /// `pick_open`.
     Open { purpose: String },
     /// Pick a path to save to, given a suggested file name.
     Save { name: String },
+}
+
+/// The host's answer to a [`FileDialogRequest`]: the picked path, `Ok(None)` when the user
+/// cancelled, or an error when no system dialog could be shown (the app then shows its own).
+pub type FileDialogAnswer = Result<Option<String>, String>;
+
+const PICTURES: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp"];
+const DOCUMENTS: &[&str] = &["docx", "docm", "dotx", "dotm", "doc", "dot", "odt", "rtf", "txt", "md", "html", "htm", "tex", "json", "xml"];
+
+/// The file types Open offers, as (label, extensions; `*` is any file): pictures for Insert/Change
+/// Picture, recipient lists for Select Recipients › Use an Existing List…, documents otherwise.
+/// The host's system dialog and the built-in browser offer the same.
+pub fn open_filters(purpose: &str) -> &'static [(&'static str, &'static [&'static str])] {
+    match purpose {
+        "picture" => &[("Pictures", PICTURES)],
+        "font" => &[("Fonts", wordcraft_fonts::FONT_FILE_EXTS)],
+        "recipients" => &[("Recipient lists", &["csv", "tsv", "txt", "xlsx", "xlsm", "ods"]), ("All files", &["*"])],
+        _ => &[("Documents", DOCUMENTS), ("Word document", &["docx"]), ("All files", &["*"])],
+    }
 }
 
 /// What to do with the path picked in a dialog.
@@ -33,8 +56,17 @@ pub(crate) enum AfterPick {
     SaveAs(AfterSave),
     /// Save a copy there in this format (`pdf`, `docx`, `png`…).
     Export { ext: String },
+    /// Write the PDF of these print settings there (File › Print › Save these pages as PDF).
+    PrintPdf { settings: Value },
     /// Load the picked CSV/TSV/text file or spreadsheet as the mail-merge recipients (#240, #334).
     Recipients,
+    /// Add the picked font file (#582).
+    Font,
+    /// Hand the picked path to the open dialog (`WordApp::dialog_pick`): Templates and Add-ins,
+    /// Organizer (#377).
+    ForDialog,
+    /// Put the picked document into the Compare dialog (original or revised, #412).
+    ComparePath { revised: bool },
 }
 
 /// What to do once Save As has written the document.
@@ -53,7 +85,8 @@ pub(crate) enum AfterSave {
 
 /// A dialog the host is showing; the answer arrives on `rx` (`None`: cancelled).
 pub(crate) struct PendingDialog {
-    rx: Receiver<Option<String>>,
+    rx: Receiver<FileDialogAnswer>,
+    req: FileDialogRequest,
     after: AfterPick,
 }
 
@@ -68,22 +101,32 @@ pub(crate) enum Asked {
 }
 
 impl WordApp {
-    /// Whether a file dialog is open (its answer hasn't arrived yet).
+    /// Whether a file dialog is open (its answer hasn't arrived yet), the host's or the built-in one.
     pub fn file_dialog_open(&self) -> bool {
-        self.file_dialog.is_some()
+        self.file_dialog.is_some() || self.file_browser_open()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn file_browser_open(&self) -> bool {
+        self.file_browser.open.is_some()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn file_browser_open(&self) -> bool {
+        false
     }
 
     /// Ask the host for a file and do `after` with the answer: now for a blocking dialog, on a
     /// later frame for an asynchronous one. Ignored while another dialog is open.
     pub(crate) fn ask_file(&mut self, req: FileDialogRequest, after: AfterPick) -> Asked {
-        if self.file_dialog.is_some() {
+        if self.file_dialog_open() {
             log::debug!("file dialog already open; ignoring {req:?}");
             self.status(tl!("A file dialog is already open."));
             return Asked::Busy;
         }
         if let Some(show) = &self.services.file_dialog {
-            let rx = show(req);
-            self.file_dialog = Some(PendingDialog { rx, after });
+            let rx = show(req.clone());
+            self.file_dialog = Some(PendingDialog { rx, req, after });
             // A host that answered at once (or failed to show anything) is handled right away.
             return self.poll_file_dialog().map_or(Asked::Pending, Asked::Done);
         }
@@ -97,18 +140,46 @@ impl WordApp {
     /// Pick up the answer of an open file dialog, if it has arrived (every frame, from `logic`),
     /// and finish what it was for. `None` while there is nothing to finish.
     pub(crate) fn poll_file_dialog(&mut self) -> Option<Result<Value, String>> {
-        let picked = match self.file_dialog.as_ref().map(|d| d.rx.try_recv()) {
+        let answer = match self.file_dialog.as_ref().map(|d| d.rx.try_recv()) {
             None | Some(Err(TryRecvError::Empty)) => return None,
-            Some(Ok(picked)) => picked,
+            Some(Ok(answer)) => answer,
             // The host dropped the dialog without an answer: as good as cancelled.
-            Some(Err(TryRecvError::Disconnected)) => None,
+            Some(Err(TryRecvError::Disconnected)) => Ok(None),
         };
         let d = self.file_dialog.take()?;
-        Some(self.finish_pick(d.after, picked))
+        match answer {
+            Ok(picked) => Some(self.finish_pick(d.after, picked)),
+            Err(reason) => {
+                log::warn!("no system file dialog ({reason}); showing the built-in file browser");
+                self.dialog_unavailable(d.req, d.after)
+            }
+        }
+    }
+
+    /// Treat the system dialog the host is showing as cancelled, e.g. one that never showed up.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn give_up_file_dialog(&mut self) {
+        if let Some(d) = self.file_dialog.take() {
+            let _ = self.finish_pick(d.after, None);
+        }
+    }
+
+    /// The host couldn't show a system dialog (#576): ask in the built-in browser instead, which
+    /// finishes the job later. `None` while it is open.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn dialog_unavailable(&mut self, req: FileDialogRequest, after: AfterPick) -> Option<Result<Value, String>> {
+        self.show_file_browser(req, after, true);
+        None
+    }
+
+    /// The browser has no built-in file browser (it can't list the user's folders): cancelled.
+    #[cfg(target_arch = "wasm32")]
+    fn dialog_unavailable(&mut self, _req: FileDialogRequest, after: AfterPick) -> Option<Result<Value, String>> {
+        Some(self.finish_pick(after, None))
     }
 
     /// Do what the dialog was for with the picked path (`None`: the user cancelled).
-    fn finish_pick(&mut self, after: AfterPick, picked: Option<String>) -> Result<Value, String> {
+    pub(crate) fn finish_pick(&mut self, after: AfterPick, picked: Option<String>) -> Result<Value, String> {
         match after {
             AfterPick::OpenDocument => {
                 let Some(path) = picked else { return Ok(json!({"cancelled": true})) };
@@ -123,13 +194,38 @@ impl WordApp {
                 };
                 self.insert_or_change_picture(json!({"path": path}))
             }
+            AfterPick::Font => {
+                let Some(path) = picked else { return Ok(json!({"cancelled": true})) };
+                self.run("font.add", json!({"path": path}))
+            }
+            AfterPick::ForDialog => {
+                let picked = picked.filter(|p| !p.is_empty());
+                let r = json!({"picked": picked});
+                self.dialog_pick = picked;
+                Ok(r)
+            }
             AfterPick::Recipients => {
                 let Some(path) = picked else { return Ok(json!({"cancelled": true})) };
                 self.load_recipients(json!({"path": path}))
             }
+            AfterPick::ComparePath { revised } => {
+                let Some(path) = picked else { return Ok(json!({"cancelled": true})) };
+                crate::dialogs_review::set_compare_path(self, revised, path);
+                Ok(json!({"picked": true}))
+            }
             AfterPick::Export { ext } => {
                 let Some(path) = picked else { return Ok(json!({"cancelled": true})) };
                 let r = if ext == "png" { self.run("file.exportPng", json!({"path": path})) } else { self.run("file.saveAs", json!({"path": path})) };
+                if r.is_ok() {
+                    self.status(crate::i18n::fmt(tl!("Exported {path}"), &[("path", &path)]));
+                }
+                r
+            }
+            AfterPick::PrintPdf { settings } => {
+                let Some(path) = picked else { return Ok(json!({"cancelled": true})) };
+                let mut params = settings;
+                params["path"] = json!(path);
+                let r = self.run("file.printPdf", params);
                 if r.is_ok() {
                     self.status(crate::i18n::fmt(tl!("Exported {path}"), &[("path", &path)]));
                 }
@@ -175,6 +271,14 @@ impl WordApp {
         let _ = self.ask_file(FileDialogRequest::Save { name }, AfterPick::Export { ext: ext.to_string() });
     }
 
+    /// File › Print › Save these pages as PDF: ask where, then write the pages the print
+    /// settings choose.
+    pub(crate) fn print_pdf_dialog(&mut self) {
+        let name = format!("{}.pdf", self.title_stem());
+        let settings = self.ui.print.params();
+        let _ = self.ask_file(FileDialogRequest::Save { name }, AfterPick::PrintPdf { settings });
+    }
+
     pub(crate) fn open_dialog(&mut self) {
         if let Some(f) = &self.services.open_async {
             f("document");
@@ -189,6 +293,15 @@ impl WordApp {
             return;
         }
         let _ = self.ask_file(FileDialogRequest::Open { purpose: "picture".into() }, AfterPick::Picture);
+    }
+
+    /// Pick a font file to add (Add Font…; web: it arrives through the inbox).
+    pub(crate) fn pick_font(&mut self) {
+        if let Some(f) = &self.services.open_async {
+            f("font");
+            return;
+        }
+        let _ = self.ask_file(FileDialogRequest::Open { purpose: "font".into() }, AfterPick::Font);
     }
 }
 
@@ -205,7 +318,7 @@ mod tests {
     const UNSAVED: &str = "My unsaved novel chapter";
 
     /// Dialogs the fake host was asked to show, each with the channel its answer goes through.
-    type Shown = Rc<RefCell<Vec<(FileDialogRequest, Sender<Option<String>>)>>>;
+    type Shown = Rc<RefCell<Vec<(FileDialogRequest, Sender<FileDialogAnswer>)>>>;
 
     /// An app whose host shows dialogs asynchronously: nothing is answered until the test does.
     fn async_app() -> (WordApp, Shown) {
@@ -225,7 +338,7 @@ mod tests {
     /// Answer the dialog the host is showing (the last one asked for).
     fn answer(shown: &Shown, picked: Option<&str>) {
         let (_, tx) = shown.borrow_mut().pop().unwrap();
-        tx.send(picked.map(str::to_string)).unwrap();
+        tx.send(Ok(picked.map(str::to_string))).unwrap();
     }
 
     fn typed(a: &mut WordApp) {
@@ -267,6 +380,35 @@ mod tests {
         assert!(!a.file_dialog_open());
         assert!(!a.session.dirty);
         assert!(saved_text(&path).contains(UNSAVED));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// #689: Save As honours the filename typed in the dialog, not just the folder: a document
+    /// opened as `a/one.docx` and saved as `b/two.docx` is written there and takes that path.
+    #[test]
+    fn save_as_with_a_new_filename_saves_under_it() {
+        let dir = scratch("rename");
+        let opened = dir.join("one.docx");
+        let picked = dir.join("sub").join("two.docx");
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        wordcraft_engine::Session::new(wordcraft_doc::Document::from_text("original"))
+            .run("file.save", &json!({"path": opened.to_string_lossy()}))
+            .unwrap();
+        let (mut a, shown) = async_app();
+        a.run("file.open", json!({"path": opened.to_string_lossy()})).unwrap();
+        assert_eq!(a.session.path.as_deref(), Some(opened.as_path()));
+        a.save_as_dialog();
+        answer(&shown, Some(&picked.to_string_lossy()));
+        let r = a.poll_file_dialog().unwrap().unwrap();
+        assert_eq!(r, json!({"saved": true}), "the save-as succeeded");
+        assert_eq!(a.session.path.as_deref(), Some(picked.as_path()), "the picked filename is the document's path");
+        assert!(picked.is_file(), "the file is written under the picked name");
+        assert!(saved_text(&picked).contains("original"));
+        // F12 (file.saveAs without a path) lands in the same dialog, suggesting the new name.
+        let r = a.run("file.saveAs", json!({})).unwrap();
+        assert_eq!(r, json!({"saved": false}));
+        assert!(a.file_dialog_open(), "F12's saveAs request opens the dialog");
+        assert_eq!(shown.borrow()[0].0, FileDialogRequest::Save { name: "two.docx".into() });
         let _ = std::fs::remove_dir_all(&dir);
     }
 

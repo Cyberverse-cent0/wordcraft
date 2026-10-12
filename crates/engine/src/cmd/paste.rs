@@ -111,7 +111,7 @@ fn paste_special(s: &mut Session, v: &Value) -> CmdResult {
     };
     let frag = match fmt {
         "text" => {
-            super::type_text(s, &src.replace('\n', "\r"))?;
+            super::paste_text(s, &src.replace("\r\n", "\r").replace('\n', "\r"))?;
             let mut r = sel_result(s)?;
             r["pastedAs"] = json!(fmt);
             return Ok(r);
@@ -128,6 +128,7 @@ fn paste_special(s: &mut Session, v: &Value) -> CmdResult {
 
 /// Replace the selection with `frag`, marking it as an insertion under Track Changes.
 pub fn insert(s: &mut Session, mut frag: Fragment) -> Result<(), CmdError> {
+    super::controls::prepare_edit(s)?;
     let at = delete_selection(s)?;
     let track = s.doc.settings.track_changes;
     let mut rid = None;
@@ -151,7 +152,8 @@ pub fn insert(s: &mut Session, mut frag: Fragment) -> Result<(), CmdError> {
         }
     }
     let end = s.doc.insert_fragment(&at, &frag)?;
-    // The paragraph marks the paste added are inserted too.
+    // The paragraph marks the paste added are inserted too, so rejecting it joins the
+    // paragraphs again. The last paragraph ends with the original mark and keeps it.
     if let Some(r) = rid
         && at.story == end.story
         && at.path.parent() == end.path.parent()

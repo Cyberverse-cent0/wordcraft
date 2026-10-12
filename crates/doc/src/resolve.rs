@@ -36,6 +36,9 @@ pub struct ResolvedChar {
     pub shadow: bool,
     pub emboss: bool,
     pub engrave: bool,
+    /// WordArt text effects (sanitized; `None` when there are none).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_effects: Option<Box<crate::wordart::TextEffects>>,
     pub link: Option<String>,
     pub ins: Option<u32>,
     pub del: Option<u32>,
@@ -49,6 +52,9 @@ pub struct ResolvedChar {
     pub cs: bool,
     /// Complex-script font, size, bold and italic (Arabic, Persian, Hebrew… text).
     pub font_cs: String,
+    /// East Asian font (Chinese, Japanese and Korean text), when one is set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub font_ea: Option<String>,
     pub size_cs: f32,
     pub bold_cs: bool,
     pub italic_cs: bool,
@@ -80,6 +86,7 @@ impl ResolvedChar {
             shadow: c.shadow.unwrap_or(false),
             emboss: c.emboss.unwrap_or(false),
             engrave: c.engrave.unwrap_or(false),
+            text_effects: c.text_effects.as_deref().map(crate::wordart::TextEffects::sanitized).filter(|t| !t.is_empty()).map(Box::new),
             link: c.link.clone(),
             ins: c.ins,
             del: c.del,
@@ -89,6 +96,7 @@ impl ResolvedChar {
             rtl: c.rtl.unwrap_or(false),
             cs: c.cs.unwrap_or(false),
             font_cs: c.font_cs.clone().or_else(|| c.font.clone()).unwrap_or_else(|| crate::styles::BODY_FONT.to_string()),
+            font_ea: c.font_ea.clone(),
             size_cs: c.size_cs.or(c.size).unwrap_or(11.0).clamp(1.0, 1638.0),
             bold_cs: c.bold_cs.or(c.bold).unwrap_or(false),
             italic_cs: c.italic_cs.or(c.italic).unwrap_or(false),
@@ -132,6 +140,8 @@ pub struct ResolvedPara {
     pub space_after: f32,
     pub line_spacing: LineSpacing,
     pub contextual_spacing: bool,
+    /// Left/right indents are inside/outside: they swap on even pages.
+    pub mirror_indents: bool,
     pub keep_next: bool,
     pub keep_lines: bool,
     pub page_break_before: bool,
@@ -144,6 +154,7 @@ pub struct ResolvedPara {
     pub bidi: bool,
     pub drop_cap: u8,
     pub suppress_hyphens: bool,
+    pub suppress_line_numbers: bool,
     /// Asian typography (see `ParaProps`): East Asian line-breaking rules.
     pub kinsoku: bool,
     /// Latin words wrap whole (`false`: they may break at any character).
@@ -152,6 +163,12 @@ pub struct ResolvedPara {
     pub top_line_punct: bool,
     pub auto_space_de: bool,
     pub auto_space_dn: bool,
+    /// Lines snap to the document grid, when the section has one.
+    pub snap_to_grid: bool,
+    /// Indents in characters (left, right, first line; 0 = in points), which win over the
+    /// point values; see [`ResolvedPara::set_char_unit`].
+    #[serde(default)]
+    pub indent_chars: [f32; 3],
 }
 
 const MAX_INDENT: f32 = 1584.0; // 22"
@@ -162,6 +179,18 @@ impl ResolvedPara {
     /// `w:ind/@w:start`, read from `w:left` too).
     pub fn visual_indents(&self) -> (f32, f32) {
         if self.bidi { (self.indent_right, self.indent_left) } else { (self.indent_left, self.indent_right) }
+    }
+
+    /// Turn the indents given in characters into points, one character being `size` points: the
+    /// size of the paragraph mark's font (as Word measures `w:firstLineChars` and friends).
+    pub fn set_char_unit(&mut self, size: f32) {
+        let size = if size.is_finite() { size.clamp(1.0, 1638.0) } else { 12.0 };
+        let [l, r, f] = self.indent_chars;
+        for (chars, pts) in [(l, &mut self.indent_left), (r, &mut self.indent_right), (f, &mut self.indent_first)] {
+            if chars != 0.0 {
+                *pts = (chars * size).clamp(-MAX_INDENT, MAX_INDENT);
+            }
+        }
     }
 }
 
@@ -185,6 +214,7 @@ impl ResolvedPara {
                 LineSpacing::Exactly(v) => LineSpacing::Exactly(if v.is_finite() { v.clamp(0.7, 1584.0) } else { 12.0 }),
             },
             contextual_spacing: p.contextual_spacing.unwrap_or(false),
+            mirror_indents: p.mirror_indents.unwrap_or(false),
             keep_next: p.keep_next.unwrap_or(false),
             keep_lines: p.keep_lines.unwrap_or(false),
             page_break_before: p.page_break_before.unwrap_or(false),
@@ -197,15 +227,22 @@ impl ResolvedPara {
             bidi: p.bidi.unwrap_or(false),
             drop_cap: p.drop_cap.unwrap_or(0).min(10),
             suppress_hyphens: p.suppress_hyphens.unwrap_or(false),
+            suppress_line_numbers: p.suppress_line_numbers.unwrap_or(false),
             kinsoku: p.kinsoku.unwrap_or(true),
             word_wrap: p.word_wrap.unwrap_or(true),
             overflow_punct: p.overflow_punct.unwrap_or(true),
             top_line_punct: p.top_line_punct.unwrap_or(false),
             auto_space_de: p.auto_space_de.unwrap_or(true),
             auto_space_dn: p.auto_space_dn.unwrap_or(true),
+            snap_to_grid: p.snap_to_grid.unwrap_or(true),
+            indent_chars: [p.indent_left_chars, p.indent_right_chars, p.indent_first_chars]
+                .map(|c| c.filter(|c| c.is_finite()).unwrap_or(0.0).clamp(-MAX_CHARS, MAX_CHARS)),
         }
     }
 }
+
+/// The largest indent in characters (Word allows indents up to 22").
+const MAX_CHARS: f32 = 1584.0;
 
 impl StyleSheet {
     /// Paragraph properties after defaults and the style chain (without direct formatting).
@@ -256,7 +293,13 @@ impl StyleSheet {
             direct.tabs = Some(merged);
         }
         base.overlay(&direct);
-        ResolvedPara::from(&base, &style)
+        let mut rp = ResolvedPara::from(&base, &style);
+        // Indents in characters: measured in the style's font size here; layout measures them in
+        // the paragraph mark's (`set_char_unit`), which direct formatting may change.
+        if rp.indent_chars.iter().any(|c| *c != 0.0) {
+            rp.set_char_unit(self.resolve_char(Some(&style), &CharProps::default()).size);
+        }
+        rp
     }
 
     /// Resolve character formatting for a run in a paragraph of style `para_style`.

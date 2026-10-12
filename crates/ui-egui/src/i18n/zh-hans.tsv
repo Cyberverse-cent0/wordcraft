@@ -60,12 +60,15 @@
 	Arrange\nAll	全部重排
 	Arrow	箭头
 	Artistic Effects	艺术效果
+	As you type	键入时
+	Asian text font:	亚洲文字字体：
 	Asian Typography	亚洲版式
 	Author	作者
 	AutoCorrect Options	自动更正选项
 	AutoFit	自动调整
 	AutoFit Contents	根据内容自动调整
 	AutoFit Window	根据窗口自动调整
+	AutoSave writes your changes to the file a moment after you stop typing.	停止键入片刻后，自动保存会将更改写入文件。
 	Automatic	自动
 	Automatic ({language})	自动（{language}）
 	Automatic follows your system's language. Menus and commands change; your documents don't.	“自动”跟随系统语言。菜单和命令会改变，文档内容不会改变。
@@ -76,13 +79,18 @@
 	AutoSave failed: {error}. Save the document to turn AutoSave back on.	自动保存失败：{error}。重新保存文档后将恢复自动保存。
 	Balloons	批注框
 	Bottom Margin	下边距
+	Centimeters	厘米
+	Check spelling as you type	键入时检查拼写
 	Click a border between two cells to merge them. Esc stops.	单击两个单元格之间的边框以合并它们。按 Esc 结束。
 	Bullet	项目符号
 	By author	按作者
 	Changed lines:	修订行：
 	Click level to modify:	单击要修改的级别：
+	Click to switch back to inserting	单击以切换回插入模式
 	Color only	仅颜色
 	Compress punctuation at the start of a line	压缩行首标点
+	Couldn't make WordCraft the default: {error}	无法将 WordCraft 设为默认应用：{error}
+	Custom dictionary	自定义词典
 	Dark page (white text on black)	深色页面（黑底白字）
 	Drag a rectangle to draw a table, or a line across cells to split them. Esc stops.	拖出矩形以绘制表格，或拖出穿过单元格的线条以拆分单元格。按 Esc 结束。
 	Draw Table	绘制表格
@@ -93,24 +101,60 @@
 	Enter formatting for number:	输入编号的格式：
 	Follow number with:	编号之后：
 	Formatting	格式
+	Formatting marks	格式标记
+	Hidden text	隐藏文字
+	Ignore web and file addresses	忽略网址和文件路径
+	Ignore words in capitals	忽略全部大写的单词
+	Ignore words with numbers	忽略包含数字的单词
+	Inches	英寸
+	Formatting exceptions	格式例外
 	Include level number from:	包含的级别编号来自：
+	Initials:	缩写：
 	Ink	墨迹
 	Insertions and Deletions	插入和删除
 	Insertions:	插入内容：
+	Interface	界面
+	Interface language	界面语言
+	Inside:	内侧：
+	Latin text font:	拉丁文字字体：
 	Left border	左框线
+	In Default apps, choose WordCraft for the document types you want it to open.	请在“默认应用”中，为希望由 WordCraft 打开的文档类型选择 WordCraft。
 	Left Margin	左边距
 	Indents and Spacing	缩进和间距
 	Legal style numbering	正规形式编号
 	Line breaking	断行
 	Link level to style:	将级别链接到样式：
 	List Definition	列表定义
+	Mark grammar errors as you type	键入时标记语法错误
+	Measurement units:	度量单位：
+	Millimeters	毫米
+	Mirror indents	对称缩进
 	More templates →	更多模板 →
+	New comments and tracked changes are recorded under this name and these initials.	新批注和修订将以此名称和缩写记录。
+	New word	新单词
 	No templates match your search.	没有与搜索匹配的模板。
+	No words yet. Add to Dictionary on a misspelled word puts it here.	还没有单词。对拼写错误的单词选择“添加到词典”会将其放在这里。
 	Nothing	无
 	Number alignment:	编号对齐方式：
 	Number format	编号格式
 	Number style for this level:	此级别的编号样式：
 	Outside border	外侧框线
+	Make WordCraft the default for Word documents…	将 WordCraft 设为 Word 文档的默认应用…
+	Opens .docx, .doc, .rtf and .odt files and Word templates with WordCraft from now on.	今后用 WordCraft 打开 .docx、.doc、.rtf、.odt 文件和 Word 模板。
+	Opens Settings › Default apps, where you choose WordCraft for .docx and the other document types.	打开“设置 › 默认应用”，在其中为 .docx 及其他文档类型选择 WordCraft。
+	Overtype	改写
+	Overtype (typing replaces the characters after the caret)	改写（键入的内容替换插入点后的字符）
+	Page display	页面显示
+	Paragraph marks	段落标记
+	Personalize	个性化
+	Picas	派卡
+	Points	磅
+	Print the page color	打印页面颜色
+	Printing	打印
+	Proofing language	校对语言
+	Recent documents to show:	显示的最近文档数：
+	Remove	移除
+	Outside:	外侧：
 	Reopen	重新打开
 	Restart list after:	重新开始列表的级别：
 	Right border	右框线
@@ -120,9 +164,9 @@
 	Distribute spacing	间距均匀分布
 	Offset (pt):	偏移量（磅）：
 	Phonetic Guide	拼音指南
-	Remove	删除
 	Right (vertical)	右对齐（竖排）
 	Ruby text:	拼音文字：
+	Save documents	保存文档
 	Search for templates	搜索模板
 	Show all revisions inline	以嵌入方式显示所有修订
 	Show documents with their colours inverted, like View › Switch Modes. Saving, printing and PDFs are unchanged.	像“视图 › 切换模式”一样以反转的颜色显示文档。保存、打印和 PDF 不受影响。
@@ -150,6 +194,11 @@
 	Border Painter	边框刷
 	Border\nPainter	边框刷
 	Borders	边框
+	Show the mini toolbar when text is selected	选择文本时显示浮动工具栏
+	Spaces	空格
+	Spelling	拼写
+	Spelling and grammar are checked in English (United States).	拼写和语法按英语（美国）检查。
+	Tab characters	制表符
 	Tab stop position:	制表位位置：
 	Default tab stops:	默认制表位：
 	Tab stops to be cleared:	要清除的制表位：
@@ -160,6 +209,10 @@
 	Set	设置
 	Page Border	页面边框线
 	Apply to:	应用于：
+	These marks show even when Show/Hide ¶ is off.	即使关闭“显示/隐藏 ¶”，这些标记也会显示。
+	Typing replaces selected text	键入内容替换所选文字
+	Update fields before printing	打印前更新域
+	Use the Insert key to switch overtype on and off	用 Insert 键切换改写模式
 	Whole document	整篇文档
 	This section	本节
 	Fill	填充
@@ -283,6 +336,8 @@
 	Delete Style	删除样式
 	Delete Table	删除表格
 	Design	设计
+	To open Word documents with WordCraft by default: select one in Finder, choose File › Get Info, pick WordCraft under Open with, then click Change All.	要默认用 WordCraft 打开 Word 文档：在访达中选中一个文档，选择“文件 › 显示简介”，在“打开方式”中选择 WordCraft，然后点按“全部更改”。
+	WordCraft is now the default app for Word documents.	WordCraft 现在是 Word 文档的默认应用。
 	development build	开发版本
 	Diagonal	斜式
 	Diamond	菱形
@@ -344,6 +399,7 @@
 	Export PDF	导出 PDF
 	Exported {path}	已导出 {path}
 	Extend Selection	扩展选定范围
+	Extend Selection by Units	按单位扩展选定范围
 	Field	域
 	File	文件
 	Find	查找
@@ -749,6 +805,9 @@
 	Show only comments and formatting in balloons	仅在批注框中显示批注和格式
 	Show revisions in balloons	在批注框中显示修订
 	Show rulers	显示标尺
+	Animation	动画
+	Animate the caret (it glides and fades)	为光标添加动画（平滑移动并淡入淡出）
+	On: the caret glides to its new place when you type or use the arrow keys, and its blink fades. Off: it jumps and blinks on and off.	开启：输入或使用方向键时，光标平滑移动到新位置，闪烁时淡入淡出。关闭：光标直接跳转，闪烁时直接显示和隐藏。
 	Show the community button in the title bar	在标题栏中显示社区按钮
 	Show/Hide ¶	显示/隐藏 ¶
 	Show\nComments	显示批注
@@ -891,10 +950,10 @@
 	Wide	宽
 	Widow/Orphan Control	孤行控制
 	Widow/Orphan control	孤行控制
-	Wildcards (regex)	通配符（正则表达式）
 	Window	窗口
 	Word Count	字数统计
 	Word document (*.docx)	Word 文档 (*.docx)
+	Word XML Document (*.xml)	Word XML 文档 (*.xml)
 	Word Left	左移一个单词
 	Word Right	右移一个单词
 	WordArt	艺术字
@@ -1360,8 +1419,86 @@
 	Selected Fields	所选域
 	Edit Field…	编辑域…
 	Formatted	已设置格式
+	Deleted	已删除
 	Interface size:	界面大小：
 	Makes the ribbon, menus and dialogs larger or smaller, on top of your system's display scaling. Document zoom is separate.	在系统显示缩放的基础上放大或缩小功能区、菜单和对话框。文档缩放单独设置。
+	Resize Table by Dragging	拖动调整表格大小
+	Print Markup	打印标记
+	Comments beside each page and tracked changes in PDFs, prints and images; a comment list at the end of web pages, Markdown and text.	在 PDF、打印和图像中于每页旁显示批注和修订；在网页、Markdown 和文本末尾附上批注列表。
+
+# Compare / Combine, AutoCorrect Options and Restrict Editing (#412)
+	1. Formatting restrictions	1. 格式限制
+	2. Editing restrictions	2. 编辑限制
+	3. Start enforcement	3. 启动保护
+	<< Less	<< 更少
+	Another file	其他文件
+	Apply as you type	键入时应用
+	AutoCorrect	自动更正
+	AutoFormat As You Type	键入时自动套用格式
+	Automatic bulleted lists	自动项目符号列表
+	Automatic numbered lists	自动编号列表
+	Border lines	边框线
+	Capitalize first letter of sentences	句首字母大写
+	Capitalize first letter of table cells	表格单元格首字母大写
+	Capitalize names of days	星期名称首字母大写
+	Case changes	大小写更改
+	Character level	字符级
+	Checked styles are allowed:	选中的样式允许使用:
+	Combine Documents	合并文档
+	Compare Documents	比较文档
+	Compared: {changes} changes	已比较: {changes} 处更改
+	Comparing with another file needs the desktop app.	与其他文件比较需要桌面版应用。
+	Comparison settings	比较设置
+	Don't capitalize after:	不在以下内容后大写:
+	Editing in this document is restricted.	此文档的编辑受到限制。
+	Every change is recorded as a tracked change.	每处更改都会作为修订记录。
+	Everyone	每个人
+	Exceptions (optional)	例外项(可选)
+	Exceptions…	例外项…
+	Fields	域
+	Filling in forms	填写窗体
+	Find Next Editable Region	查找下一个可编辑区域
+	Footnotes and endnotes	脚注和尾注
+	Formatting, case changes, white space and tables are compared; the other settings are kept for later.	会比较格式、大小写、空白和表格；其他设置留待以后支持。
+	Fractions (1/2) as fraction characters (½)	分数 (1/2) 替换为分数字符 (½)
+	Headers and footers	页眉和页脚
+	Hyphens (--) as dashes (—)	连字符 (--) 替换为破折号 (—)
+	In equations, typing a name after a backslash replaces it with its symbol.	在公式中，在反斜杠后键入名称会将其替换为相应符号。
+	Internet addresses as links	Internet 地址替换为链接
+	Label changes with:	修订者标记:
+	Limit formatting to a selection of styles	将格式限制为所选样式
+	Math AutoCorrect	数学符号自动更正
+	More >>	更多 >>
+	Moves	移动
+	New document	新文档
+	No changes (read only)	不允许任何更改(只读)
+	Only allow this kind of editing:	仅允许此类编辑:
+	Only comments can be added, except in regions marked editable.	只能添加批注，标记为可编辑的区域除外。
+	Only form fields can be filled in.	只能填写窗体域。
+	Only the allowed styles can be applied.	只能应用允许的样式。
+	Ordinals (1st) as superscript	序数 (1st) 替换为上标
+	Original document	原文档
+	This password type isn't supported.	不支持此密码类型。
+	Replace as you type	键入时自动替换
+	Replace text as you type	键入时自动替换文本
+	Replace:	替换:
+	Revised document	修订的文档
+	Select text, then tick who can still edit it.	选择文本，然后勾选仍可编辑它的人。
+	Settings…	设置…
+	Show changes at:	显示修订的级别:
+	Show changes in:	修订的显示位置:
+	Smart quotes instead of straight quotes	以弯引号替换直引号
+	Start Enforcing Protection	启动强制保护
+	Stop Protection	停止保护
+	Text boxes	文本框
+	The document is read only, except for regions marked editable.	文档为只读，标记为可编辑的区域除外。
+	The password is optional; without it anyone can stop the protection.	密码是可选的；没有密码，任何人都可以停止保护。
+	This document	此文档
+	Tracked changes	修订
+	Type the password to stop the protection.	键入密码以停止保护。
+	White space	空白
+	With:	替换为:
+	Word level	字词级
 	In Line with Text	与文字同行
 	Square	四周型
 	Through	穿越型
@@ -1408,8 +1545,78 @@
 	New Group	新建组
 	Rename…	重命名…
 	Ribbon and Quick Access Toolbar:	功能区和快速访问工具栏：
+	Add Font…	添加字体…
+	Added Fonts	已添加的字体
+	Remove Added Font	删除已添加的字体
+	Recent Colors	最近使用的颜色
+	More Colors…	其他颜色…
+	Standard	标准
+	Current	当前
+	Colors:	颜色:
+	Color model:	颜色模式:
+	Red:	红色:
+	Green:	绿色:
+	Blue:	蓝色:
+	Hue:	色调:
+	Sat:	饱和度:
+	Lum:	亮度:
+	Hex:	十六进制:
+	Accessibility Pane	辅助功能窗格
+	Alt Text Pane	替代文字窗格
+	Alt\nText	替代\n文字
+	View Alt Text…	查看替代文字…
+	Mark as decorative	标记为装饰性
+	Title:	标题：
+	Errors ({n})	错误 ({n})
+	Warnings ({n})	警告 ({n})
+	Tips ({n})	提示 ({n})
+	No accessibility issues found.	未发现辅助功能问题。
+	Describe what this object shows, for people who can't see it.	请为看不见的人描述此对象显示的内容。
+	Decorative objects only add visual interest: screen readers skip them.	装饰性对象仅增添视觉效果：屏幕阅读器会跳过它们。
+	Describe what this table shows, for people who can't see it.	请为看不见的人描述此表格显示的内容。
+	Select a picture, shape, chart or table to describe it.	选择图片、形状、图表或表格以添加描述。
+	Document Grid	文档网格
+	No grid	无网格
+	Lines only	仅行
+	Lines and characters	行和字符
+	Text snaps to characters	文字贴合字符网格
+	Characters per line:	每行字数：
+	Lines per page:	每页行数：
 	Moved from	移动自
 	Moved to	移动到
+	Developer	开发工具
+	Controls	控件
+	Rich Text Content Control	格式文本内容控件
+	Plain Text Content Control	纯文本内容控件
+	Picture Content Control	图片内容控件
+	Building Block Gallery Content Control	构建基块库内容控件
+	Check Box Content Control	复选框内容控件
+	Combo Box Content Control	组合框内容控件
+	Drop-Down List Content Control	下拉列表内容控件
+	Date Picker Content Control	日期选取器内容控件
+	Repeating Section Content Control	重复节内容控件
+	Design Mode	设计模式
+	Content Control at Selection	所选位置的内容控件
+	Toggle Check Box	切换复选框
+	Choose List Item	选择列表项
+	Set Date	设置日期
+	Remove Content Control	删除内容控件
+	Content Control Properties	内容控件属性
+	Title	标题
+	Tag	标记
+	Placeholder text	占位符文本
+	Can't be deleted	无法删除
+	Contents can't be edited	无法编辑内容
+	Remove the control once edited	编辑后删除控件
+	Allow line breaks	允许换行
+	Date format	日期格式
+	Checked symbol	选中符号
+	Unchecked symbol	未选中符号
+	List entries	列表项
+	Display text	显示文本
+	Value	值
+	Today	今天
+	Put the caret in a content control first.	请先将光标放在内容控件中。
 	Right-to-Left Table	从右向左表格
 	Right-to-Left Section	从右向左节
 	Table direction:	表格方向：
@@ -1437,6 +1644,56 @@
 	Enlarge symbol	增大圈号
 	Enclosure	圈号
 	Circle	圆形
+	Numerals:	数字：
+	Numerals	数字
+	Arabic	阿拉伯
+	Hindi	印地
+	Context	上下文
+	System	系统
+	Templates	模板
+	Templates and Add-ins	模板和加载项
+	Attach Template	附加模板
+	Detach Template	分离模板
+	Automatically Update Document Styles	自动更新文档样式
+	Update Styles from Template	从模板更新样式
+	Organizer	管理器
+	Copy Styles	复制样式
+	Rename Style	重命名样式
+	Document template:	文档模板：
+	Attach…	附加…
+	Automatically update document styles	自动更新文档样式
+	Organizer…	管理器…
+	Change Chart Type	更改图表类型
+	Chart Design	图表设计
+	Type	类型
+	Edit Data	编辑数据
+	Chart Title	图表标题
+	Chart Layouts	图表布局
+	Add Chart Element	添加图表元素
+	Legend	图例
+	Data Labels	数据标签
+	Above Chart	图表上方
+	Insert Chart	插入图表
+	Clustered Column	簇状柱形图
+	Stacked Column	堆积柱形图
+	Clustered Bar	簇状条形图
+	Stacked Bar	堆积条形图
+	Area	面积图
+	Pie	饼图
+	Doughnut	圆环图
+	Scatter	散点图
+	“{text}” ({row}, {series}) isn't a number.	“{text}”（{row}，{series}）不是数字。
+	Category {n}	类别 {n}
+	Series {n}	系列 {n}
+	Type the categories down the side and a column of values per series.	在左侧输入类别，每个系列输入一列数值。
+	Categories	类别
+	Series name	系列名称
+	Remove series	删除系列
+	Remove row	删除行
+	Add Row	添加行
+	Add Series	添加系列
+	Edit\nData	编辑\n数据
+	Change\nChart Type	更改\n图表类型
 	Align Text	对齐文本
 	Create Link	创建链接
 	Break Link	断开链接
@@ -1458,3 +1715,348 @@
 	Continuous numbering	连续编号
 	Apply	应用
 	Convert Notes	转换注释
+	English (United Kingdom)	英语（英国）
+	Polish	波兰语
+	Do Not Check Spelling or Grammar	不检查拼写和语法
+
+# Built-in file browser when the system file dialog is unavailable (#576)
+	Documents	文档
+	Word document	Word 文档
+	All files	所有文件
+	Recipient lists	收件人列表
+	The system file dialog isn't available, so WordCraft shows its own. To get the system dialog, install a file chooser portal (such as xdg-desktop-portal-gtk) or zenity.	系统文件对话框不可用，因此 WordCraft 显示自己的对话框。要使用系统对话框，请安装文件选择器门户（例如 xdg-desktop-portal-gtk）或 zenity。
+	Up one level	向上一级
+	Home folder	主文件夹
+	{name} wasn't found.	未找到 {name}。
+	{name} already exists. Choose Save again to replace it.	{name} 已存在。再次选择“保存”即可替换它。
+	This folder can't be read: {error}	无法读取此文件夹：{error}
+	Showing the first {count} items.	仅显示前 {count} 项。
+	File name:	文件名:
+	Browse in WordCraft…	在 WordCraft 中浏览…
+	Open a file with WordCraft's own browser when the system file dialog doesn't appear.	当系统文件对话框没有出现时，使用 WordCraft 自带的浏览器打开文件。
+	Hide White Space	隐藏空白
+	All pages	所有页面
+	Current page	当前页
+	Selected pages	所选页面
+	Custom range	自定义范围
+	All pages in the range	范围内的所有页面
+	Odd pages only	仅奇数页
+	Even pages only	仅偶数页
+	Copies	份数
+	Collate copies	逐份打印
+	Pages like 1-3, 5	页码,如 1-3, 5
+	{count} of {total} pages will print	将打印 {total} 页中的 {count} 页
+	Save these pages as PDF…	将这些页面另存为 PDF…
+	The printer, two-sided printing and pages per sheet are chosen in that dialog.	打印机、双面打印和每张页数在该对话框中选择。
+	Previous Page	上一页
+	Print to PDF	打印到 PDF
+	Add Shape	添加形状
+	Change Colors	更改颜色
+	Change Layout	更改布局
+	Create Graphic	创建图形
+	Edit Items	编辑项目
+	Layouts	布局
+	Reset Graphic	重设图形
+	SmartArt Design	SmartArt 设计
+	SmartArt Styles	SmartArt 样式
+	Text Pane	文本窗格
+	List	列表
+	Process	流程
+	Cycle	循环
+	Hierarchy	层次结构
+	Relationship	关系
+	Pyramid	棱锥图
+	Basic List	基本列表
+	Basic Process	基本流程
+	Basic Cycle	基本循环
+	Basic Pyramid	基本棱锥图
+	Basic Radial	基本射线图
+	Basic Matrix	基本矩阵
+	Basic Venn	基本维恩图
+	Shows items of equal weight as blocks in rows.	将同等重要的项目显示为成行排列的方块。
+	Shows steps in order, left to right, with arrows between them.	按从左到右的顺序显示步骤，步骤之间用箭头连接。
+	Shows steps that repeat, around a circle.	沿圆周显示重复的步骤。
+	Shows a tree: each item below the item it belongs to.	显示树形结构：每个项目位于其所属项目的下方。
+	Shows parts that build on each other, largest at the bottom.	显示层层递进的部分，最大的在底部。
+	Shows items around a central idea: the first item is the centre.	围绕中心思想显示项目：第一个项目位于中心。
+	Shows parts of a whole as quadrants.	将整体的各部分显示为象限。
+	Shows overlapping ideas as overlapping circles.	将相互重叠的观点显示为重叠的圆。
+	Accent {n}	着色 {n}
+	Colorful	彩色
+	Insert SmartArt	插入 SmartArt
+	One line per item. Enter adds an item.	每个项目一行。按 Enter 添加项目。
+	Add\nShape	添加\n形状
+	Change\nColors	更改\n颜色
+	Reset\nGraphic	重设\n图形
+	Promote to Heading 1	提升至标题 1
+	Demote to Body Text	降级为正文文本
+	Move Up	上移
+	Move Down	下移
+	Collapse	折叠
+	Expand or Collapse Heading	展开或折叠标题
+	Select Heading and Content	选择标题及其内容
+	Show Level	显示级别
+	Show Level 1	显示 1 级
+	Show Level 2	显示 2 级
+	Show Level 3	显示 3 级
+	Show Level 4	显示 4 级
+	Show Level 5	显示 5 级
+	Show Level 6	显示 6 级
+	Show Level 7	显示 7 级
+	Show Level 8	显示 8 级
+	Show Level 9	显示 9 级
+	Show All Levels	显示所有级别
+	All Levels	所有级别
+	Show First Line Only	仅显示首行
+	Show Text Formatting	显示文本格式
+	Close Outline View	关闭大纲视图
+	Outline State	大纲状态
+	Outlining	大纲显示
+	Outline Tools	大纲工具
+	Close Outline\nView	关闭\n大纲视图
+	A, B, C, …	A, B, C, …
+	Above the item	项目上方
+	Accessed on	访问日期
+	Add New Source…	添加新源…
+	Add the chapter number	添加章节编号
+	Atmosphere	大气
+	Below the item	项目下方
+	Book	书籍
+	Book title	书名
+	Caption	题注
+	Caption Numbering	题注编号
+	Caption text	题注文字
+	Caption:	题注：
+	Chapter in a book	书籍章节
+	Chapters begin at:	章节起始于：
+	Collect entries from:	条目来源：
+	Columns:	栏数：
+	Conference	会议
+	Conference paper	会议论文
+	Container Title	载体标题
+	Create Source	创建源
+	Cross-reference:	交叉引用：
+	Custom Table of Contents…	自定义目录…
+	DOI	DOI
+	Day	日
+	Delete Label	删除标签
+	Edit Source	编辑源
+	Edition	版次
+	Edit…	编辑…
+	Entry marked.	已标记条目。
+	Example: {sample}	示例：{sample}
+	Figure	图
+	Film	电影
+	Heading styles (levels 1–{n})	标题样式（级别 1–{n}）
+	Heading {n}	标题 {n}
+	I, II, III, …	I, II, III, …
+	Include page numbers	包含页码
+	Indented	缩进式
+	Institution	机构
+	Ionosphere	电离层
+	Issue	期号
+	Journal	期刊
+	Label:	标签：
+	Last, First; Last, First	姓, 名; 姓, 名
+	Leave the label out of the caption	题注中不含标签
+	Letter headings	字母标题
+	Levels:	级别：
+	Link entries to their headings	将条目链接到标题
+	Made from the author and year when empty	留空时由作者和年份生成
+	Magazine or newspaper article	杂志或报纸文章
+	Main entry:	主索引项：
+	Mark	标记
+	Mark All	全部标记
+	Mark Entry…	标记条目…
+	Mark Index Entry	标记索引项
+	Mesosphere	中间层
+	Month	月
+	New Label	新建标签
+	New Label…	新建标签…
+	New…	新建…
+	No sources yet.	尚无源。
+	Numbering…	编号…
+	Options…	选项…
+	Other	其他
+	Other styles and their TOC level:	其他样式及其目录级别：
+	Outline levels	大纲级别
+	Page number style	页码样式
+	Page numbers at the right margin	页码靠右边距
+	Page title	页面标题
+	Pages of bookmark:	书签所在页：
+	Periodical	期刊名
+	Position:	位置：
+	Publisher	出版商
+	Run-in	接排式
+	See	参见
+	Separator:	分隔符：
+	Show every bibliography field	显示所有书目字段
+	Site name	网站名称
+	Source Manager	源管理器
+	Source type:	源类型：
+	Sources in this document:	本文档中的源：
+	Styles:	样式：
+	Subentry:	次索引项：
+	TC entry fields	TC 条目域
+	Tab leader:	制表符前导符：
+	Table of Contents Options	目录选项
+	Table of Contents Styles	目录样式
+	This page	当前页
+	Type:	类型：
+	URL	URL
+	Volume	卷
+	Website	网站
+	Year	年份
+	a, b, c, …	a, b, c, …
+	i, ii, iii, …	i, ii, iii, …
+	{n} entries marked.	已标记 {n} 个条目。
+	Lasso Select	套索选择
+	Move Selected Ink	移动所选墨迹
+	Delete Selected Ink	删除所选墨迹
+	Recolor Selected Ink	更改所选墨迹颜色
+	Add Pen	添加笔
+	Remove Pen	删除笔
+	Ink to Shape	墨迹转形状
+	Convert to Shapes	转换为形状
+	Ink Replay	墨迹重播
+	Add\nPen	添加笔
+	Rewind	倒回
+	Forward	前进
+	Stroke {n} of {total}	第 {n} 笔，共 {total} 笔
+	Use wildcards	使用通配符
+	Special	特殊字符
+	Match prefix	匹配前缀
+	Match suffix	匹配后缀
+	Ignore punctuation characters	忽略标点符号
+	Ignore white-space characters	忽略空白字符
+	Regular expressions	正则表达式
+	Search Options	搜索选项
+	Tab Character	制表符字符
+	Any Character	任意字符
+	Any Digit	任意数字
+	Any Letter	任意字母
+	Caret Character	脱字号
+	Section Character	章节号
+	Paragraph Character	段落符号
+	Graphic	图形
+	Manual Line Break	手动换行符
+	Manual Page Break	手动分页符
+	Section Break	分节符
+	White Space	空白
+	Clipboard Contents	剪贴板内容
+	Find What Text	查找到的文本
+	Find What Expression	查找到的表达式
+	Character in Range	范围内的字符
+	Beginning of Word	单词开头
+	End of Word	单词结尾
+	Expression	表达式
+	Not	非
+	Num Occurrences	出现次数
+	Previous 1 or More	前一项 1 次或多次
+	0 or More Characters	0 个或多个字符
+	Move with Text	随文字移动
+	Fix Position on Page	在页面上的位置固定
+
+# WordArt and connectors (#416).
+	WordArt Styles	艺术字样式
+	Text Fill	文本填充
+	Text Outline	文本轮廓
+	Transform	转换
+	No Fill	无填充
+	No Outline	无轮廓
+	Reflection	映像
+	No Reflection	无映像
+	No Transform	无转换
+	Connect Shapes	连接形状
+	Straight Connector	直线连接符
+	Straight Arrow Connector	直线箭头连接符
+	Elbow Connector	肘形连接符
+	Elbow Arrow Connector	肘形箭头连接符
+	Curved Connector	曲线连接符
+	Curved Arrow Connector	曲线箭头连接符
+	Arch Up	上弯弧
+	Arch Down	下弯弧
+	Slant Up	上斜
+	Slant Down	下斜
+	Inflate	膨胀
+	Deflate	收缩
+	Chevron Up	上V形
+	Chevron Down	下V形
+	Triangle Up	正三角
+	Triangle Down	倒三角
+	Solid Accent	纯色强调
+	Light with Outline	浅色带轮廓
+	Hollow	空心
+	Accent Gradient	强调渐变
+	Dark with Shadow	深色带阴影
+	Soft Glow	柔和发光
+	Accent with Reflection	强调带映像
+	Warm Gradient with Outline	暖色渐变带轮廓
+	Add line numbering	添加行号
+	Add to Document	添加到文档
+	Address labels	地址标签
+	Auto	自动
+	Automatically hyphenate document	自动断字
+	Chinese (Simplified)	中文（简体）
+	Chinese (Traditional)	中文（繁体）
+	Column:	列：
+	Count by:	行号间隔：
+	Czech	捷克语
+	Danish	丹麦语
+	Delivery address:	收信人地址：
+	Detect language automatically	自动检测语言
+	Do not check spelling or grammar	不检查拼写或语法
+	Dutch	荷兰语
+	Envelope size:	信封尺寸：
+	Estonian	爱沙尼亚语
+	Finnish	芬兰语
+	French (France)	法语（法国）
+	From text:	距正文：
+	Full page of the same label	同一标签的整页
+	German (Germany)	德语（德国）
+	Greek	希腊语
+	Hebrew	希伯来语
+	Hyphenate at:	断字位置：
+	Hyphenate words in CAPS	大写单词断字
+	Hyphenation Options…	断字选项…
+	Hyphenation zone:	断字区：
+	Italian	意大利语
+	Japanese	日语
+	Korean	韩语
+	Limit consecutive hyphens to:	连续断字数限制：
+	Line Numbering Options…	行号选项…
+	Manual Hyphenation	手动断字
+	Manual hyphenation is complete.	手动断字已完成。
+	Manual…	手动…
+	Mark selected text as:	将所选文字标记为：
+	New Document	新建文档
+	No limit	无限制
+	Norwegian (Bokmål)	挪威语（书面挪威语）
+	Numbering:	编号：
+	Omit	省略
+	One label per recipient	每位收件人一个标签
+	Portuguese (Brazil)	葡萄牙语（巴西）
+	Portuguese (Portugal)	葡萄牙语（葡萄牙）
+	Return address labels	回信地址标签
+	Return address:	寄信人地址：
+	Row:	行：
+	Russian	俄语
+	Serbian (Cyrillic)	塞尔维亚语（西里尔文）
+	Serbian (Latin)	塞尔维亚语（拉丁文）
+	Set As Default	设为默认值
+	Shipping labels	运输标签
+	Single label	单个标签
+	Spanish (Mexico)	西班牙语（墨西哥）
+	Spanish (Spain)	西班牙语（西班牙）
+	Swedish	瑞典语
+	Turkish	土耳其语
+	Ukrainian	乌克兰语
+	{language} is now the document's default language.	{language} 现在是此文档的默认语言。
+	Visual effects	视觉效果
+	Animation effects:	动画效果：
+	On	开
+	Off	关
+	Smooth scrolling and zooming, and menus and buttons that fade in. Off shows every change at once.	平滑滚动和缩放，以及菜单和按钮的淡入效果。选择“关”后，所有更改会立即显示。
+	Your system has animation effects turned on.	系统已打开动画效果。
+	Your system has animation effects turned off.	系统已关闭动画效果。
+	Your system doesn't report an animation setting, so animation effects stay on.	系统未提供动画设置，因此动画效果保持打开。

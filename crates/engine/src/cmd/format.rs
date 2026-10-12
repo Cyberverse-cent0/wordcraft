@@ -15,15 +15,14 @@ pub const SIZES: [f32; 17] = [8.0, 9.0, 10.0, 10.5, 11.0, 12.0, 14.0, 16.0, 18.0
 pub fn specs() -> Vec<CommandSpec> {
     vec![
         CommandSpec::new("format.bold", "Bold", "Home › Font", |s, v| {
-            // Like Word's button, for complex-script (Persian, Arabic) text too: an unset `bold_cs`
-            // follows `bold`.
+            // The button formats both plain and complex-script text explicitly.
             toggle(
                 s,
                 v,
                 |r| r.bold,
                 |c, on| {
                     c.bold = Some(on);
-                    c.bold_cs = None;
+                    c.bold_cs = Some(on);
                 },
             )
         })
@@ -36,7 +35,7 @@ pub fn specs() -> Vec<CommandSpec> {
                 |r| r.italic,
                 |c, on| {
                     c.italic = Some(on);
-                    c.italic_cs = None;
+                    c.italic_cs = Some(on);
                 },
             )
         })
@@ -95,7 +94,7 @@ pub fn specs() -> Vec<CommandSpec> {
         CommandSpec::new("format.shadow", "Shadow", "Home › Font › Text Effects", |s, v| toggle(s, v, |r| r.shadow, |c, on| c.shadow = Some(on))),
         CommandSpec::new("format.emboss", "Emboss", "Home › Font › Font", |s, v| toggle(s, v, |r| r.emboss, |c, on| c.emboss = Some(on))),
         CommandSpec::new("format.engrave", "Engrave", "Home › Font › Font", |s, v| toggle(s, v, |r| r.engrave, |c, on| c.engrave = Some(on))),
-        CommandSpec::new("format.font", "Font", "Home › Font", font).key("Mod+Shift+F").params(r#"{"name": string}"#),
+        CommandSpec::new("format.font", "Font", "Home › Font", font).key("Mod+Shift+F").params(r#"{"name"?: string, "eastAsia"?: string}"#),
         CommandSpec::new("format.size", "Font Size", "Home › Font", size).key("Mod+Shift+P").params(r#"{"size": number}"#),
         CommandSpec::new("format.growFont", "Increase Font Size", "Home › Font", |s, _| step_size(s, 1)).key("Mod+Shift+. / Mod+Shift+>"),
         CommandSpec::new("format.shrinkFont", "Decrease Font Size", "Home › Font", |s, _| step_size(s, -1)).key("Mod+Shift+, / Mod+Shift+<"),
@@ -275,15 +274,38 @@ fn underline(s: &mut Session, v: &Value) -> CmdResult {
     apply(s, &|c| c.underline = Some(u))
 }
 
+/// `format.font`: `name` is the font (Latin text, and Persian/Arabic text too); `eastAsia` sets the
+/// East Asian text's font on its own, as the Font dialog's Asian text font box does (#505).
 fn font(s: &mut Session, v: &Value) -> CmdResult {
-    let name = p::req_str(v, "name")?.trim().to_string();
-    if name.is_empty() || name.len() > 128 {
-        return Err(CmdError::Params("bad font name".into()));
+    let arg = |k: &str| -> Result<Option<String>, CmdError> {
+        let Some(n) = v.get(k) else { return Ok(None) };
+        let n = n.as_str().map(str::trim).unwrap_or("");
+        if n.is_empty() || n.len() > 128 {
+            return Err(CmdError::Params(format!("bad font name `{k}`")));
+        }
+        Ok(Some(n.to_string()))
+    };
+    let (name, east_asia) = (arg("name")?, arg("eastAsia")?);
+    if name.is_none() && east_asia.is_none() {
+        return Err(CmdError::Params("`name` or `eastAsia` (string) is required".into()));
     }
-    // The font applies to Persian/Arabic text in the selection too (its complex-script font).
+    // The font applies to Persian/Arabic text in the selection too (its complex-script font). A
+    // Chinese, Japanese or Korean font is the East Asian text's font as well (`w:eastAsia`), as in
+    // Word; choosing a Latin font leaves that text's font as it was.
+    let ea = east_asia.or_else(|| {
+        name.clone().filter(|n| {
+            let r = wordcraft_fonts::word::resolve(n, false, false);
+            !r.substituted && r.face.is_east_asian()
+        })
+    });
     apply(s, &|c| {
-        c.font = Some(name.clone());
-        c.font_cs = Some(name.clone());
+        if let Some(n) = &name {
+            c.font = Some(n.clone());
+            c.font_cs = Some(n.clone());
+        }
+        if let Some(n) = &ea {
+            c.font_ea = Some(n.clone());
+        }
     })
 }
 
@@ -296,7 +318,7 @@ fn size(s: &mut Session, v: &Value) -> CmdResult {
     let sz = (sz * 2.0).round() / 2.0;
     apply(s, &|c| {
         c.size = Some(sz);
-        c.size_cs = None;
+        c.size_cs = Some(sz);
     })
 }
 
@@ -315,7 +337,7 @@ fn step_size(s: &mut Session, dir: i32) -> CmdResult {
     // Each run steps from its own size when the selection mixes sizes.
     apply(s, &|c| {
         c.size = Some(next);
-        c.size_cs = None;
+        c.size_cs = Some(next);
     })
 }
 
@@ -323,7 +345,7 @@ fn nudge_size(s: &mut Session, d: f32) -> CmdResult {
     let next = (current_size(s) + d).clamp(1.0, 1638.0);
     apply(s, &|c| {
         c.size = Some(next);
-        c.size_cs = None;
+        c.size_cs = Some(next);
     })
 }
 
@@ -371,75 +393,142 @@ fn change_case(s: &mut Session, v: &Value) -> CmdResult {
         }
     });
     for path in s.doc.paths_between(&a, &b) {
-        let (from, to, src) = {
+        // Changed stretches of one run each: (start, end, replacement), in text order.
+        let groups = {
             let Some(p) = s.doc.para(a.story, &path) else { continue };
             let from = if path == a.path { a.off } else { 0 };
             let to = if path == b.path { b.off } else { p.len() };
-            (from, to, p.text.get(from..to).unwrap_or("").to_string())
+            let Some(src) = p.text.get(from..to) else { continue };
+            case_groups(p, from, src, &convert_chars(src, &mode, from == 0))
         };
-        let new = convert(&src, &mode, from == 0);
-        if new.len() != src.len() {
-            // Lengths differ (ß → SS): replace text keeping the first run's formatting.
-            let para = s.doc.para_mut(a.story, &path)?;
-            let props = para.props_of_char(from).clone();
-            para.delete(from, to)?;
-            para.insert_text(from, &new, &props)?;
-        } else {
-            let para = s.doc.para_mut(a.story, &path)?;
-            if let Some(slice) = para.text.get(from..to)
-                && slice.len() == new.len()
-            {
-                para.text.replace_range(from..to, &new);
-                para.touch();
+        if groups.is_empty() {
+            continue;
+        }
+        // Each stretch keeps its own run's formatting (#421); right to left so offsets hold.
+        let para = s.doc.para_mut(a.story, &path)?;
+        for (start, end, new) in groups.iter().rev() {
+            if new.len() == end - start {
+                if para.text.get(*start..*end).is_some() {
+                    para.text.replace_range(*start..*end, new);
+                }
+            } else {
+                let props = para.props_of_char(*start).clone();
+                para.delete(*start, *end)?;
+                para.insert_text(*start, new, &props)?;
+            }
+        }
+        para.touch();
+        // The selection keeps covering the converted text when its length changed (#420).
+        let spans: Vec<(usize, usize, usize)> = groups.iter().map(|(x, y, n)| (*x, *y, n.len())).collect();
+        for end in [&mut s.sel.anchor, &mut s.sel.focus] {
+            if end.story == a.story && end.path == path {
+                end.off = map_offset(&spans, end.off);
             }
         }
     }
     sel_result(s)
 }
 
+/// Group the characters of `src` (at `from` in `p`) whose converted form `conv` differs into
+/// stretches that stay inside one run: `(start, end, replacement)`, in text order.
+fn case_groups(p: &wordcraft_doc::Paragraph, from: usize, src: &str, conv: &[String]) -> Vec<(usize, usize, String)> {
+    let runs: Vec<std::ops::Range<usize>> = p.run_ranges().map(|(r, _)| r).collect();
+    let run_of = |off: usize| runs.iter().position(|r| r.contains(&off));
+    let mut out: Vec<(usize, usize, String, Option<usize>)> = Vec::new();
+    for ((i, c), new) in src.char_indices().zip(conv) {
+        let (start, end) = (from + i, from + i + c.len_utf8());
+        let mut buf = [0u8; 4];
+        if new.as_str() == c.encode_utf8(&mut buf) {
+            continue;
+        }
+        let run = run_of(start);
+        match out.last_mut() {
+            Some(g) if g.1 == start && g.3 == run => {
+                g.1 = end;
+                g.2.push_str(new);
+            }
+            _ => out.push((start, end, new.clone(), run)),
+        }
+    }
+    out.into_iter().map(|(a, b, n, _)| (a, b, n)).collect()
+}
+
+/// Where `off` lands after the stretches `(start, end, new_len)` (text order) were replaced;
+/// an offset inside a stretch moves to its end.
+fn map_offset(spans: &[(usize, usize, usize)], off: usize) -> usize {
+    let mut out = off;
+    for &(start, end, new_len) in spans {
+        if end <= off {
+            out = out.saturating_sub(end.saturating_sub(start)).saturating_add(new_len);
+        } else if start < off {
+            out = out.saturating_sub(off - start).saturating_add(new_len);
+        }
+    }
+    out
+}
+
 fn is_title(t: &str) -> bool {
     t.split_whitespace().all(|w| w.chars().next().is_some_and(char::is_uppercase))
 }
 
+#[cfg(test)]
 fn convert(src: &str, mode: &str, para_start: bool) -> String {
-    match mode {
-        "upper" => src.to_uppercase(),
-        "lower" => src.to_lowercase(),
-        "toggle" => src.chars().map(|c| if c.is_uppercase() { c.to_lowercase().collect::<String>() } else { c.to_uppercase().collect() }).collect(),
-        "title" => {
-            let mut out = String::with_capacity(src.len());
-            let mut up = true;
-            for c in src.chars() {
-                if up && c.is_alphabetic() {
-                    out.extend(c.to_uppercase());
-                    up = false;
+    convert_chars(src, mode, para_start).concat()
+}
+
+/// The case-converted form of each character of `src`, in order (one entry per char, so a
+/// change of length such as ß → SS or İ → i̇ can be applied run by run).
+fn convert_chars(src: &str, mode: &str, para_start: bool) -> Vec<String> {
+    let chars: Vec<char> = src.chars().collect();
+    // Greek capital sigma lowers to the final form at the end of a word (as `str::to_lowercase`).
+    let lower = |i: usize, c: char| -> String {
+        let prev = i.checked_sub(1).and_then(|j| chars.get(j)).is_some_and(|p| p.is_alphabetic());
+        let next = chars.get(i + 1).is_some_and(|n| n.is_alphabetic());
+        if c == 'Σ' && prev && !next { "ς".to_string() } else { c.to_lowercase().collect() }
+    };
+    // Title case capitalises the first word of any selection; sentence case only at a paragraph start.
+    let mut up = mode == "title" || para_start;
+    let mut out = Vec::with_capacity(chars.len());
+    for (i, &c) in chars.iter().enumerate() {
+        let new = match mode {
+            "upper" => c.to_uppercase().collect(),
+            "lower" => lower(i, c),
+            "toggle" => {
+                if c.is_uppercase() {
+                    lower(i, c)
                 } else {
-                    out.extend(c.to_lowercase());
+                    c.to_uppercase().collect()
                 }
+            }
+            "title" => {
+                let n = if up && c.is_alphabetic() {
+                    up = false;
+                    c.to_uppercase().collect()
+                } else {
+                    lower(i, c)
+                };
                 if c.is_whitespace() {
                     up = true;
                 }
+                n
             }
-            out
-        }
-        _ => {
-            // Sentence case.
-            let mut out = String::with_capacity(src.len());
-            let mut up = para_start;
-            for c in src.chars() {
-                if up && c.is_alphabetic() {
-                    out.extend(c.to_uppercase());
+            _ => {
+                // Sentence case.
+                let n = if up && c.is_alphabetic() {
                     up = false;
+                    c.to_uppercase().collect()
                 } else {
-                    out.extend(c.to_lowercase());
-                }
+                    lower(i, c)
+                };
                 if matches!(c, '.' | '!' | '?') {
                     up = true;
                 }
+                n
             }
-            out
-        }
+        };
+        out.push(new);
     }
+    out
 }
 
 fn clear(s: &mut Session, _: &Value) -> CmdResult {
@@ -478,7 +567,12 @@ fn char_style(s: &mut Session, v: &Value) -> CmdResult {
 }
 
 fn set(s: &mut Session, v: &Value) -> CmdResult {
-    let props: CharProps = serde_json::from_value(v.get("props").cloned().unwrap_or(Value::Null)).map_err(|e| CmdError::Params(e.to_string()))?;
+    let mut props: CharProps = serde_json::from_value(v.get("props").cloned().unwrap_or(Value::Null)).map_err(|e| CmdError::Params(e.to_string()))?;
+    // The font dialog and callers supplying one value format both scripts. Explicit
+    // complex-script values still take precedence; importing a DOCX never uses this command.
+    props.size_cs = props.size_cs.or(props.size);
+    props.bold_cs = props.bold_cs.or(props.bold);
+    props.italic_cs = props.italic_cs.or(props.italic);
     apply(s, &|c| c.overlay(&props))
 }
 
@@ -495,6 +589,7 @@ pub fn state(s: &Session) -> Value {
     let style_name = s.doc.styles.get(&style).map(|st| st.name.clone()).unwrap_or(style.clone());
     json!({
         "font": same(&|r| json!(r.font)),
+        "fontEastAsia": same(&|r| json!(r.font_ea)),
         "size": same(&|r| json!(r.size)),
         "bold": all.iter().all(|r| r.bold),
         "italic": all.iter().all(|r| r.italic),
@@ -503,10 +598,17 @@ pub fn state(s: &Session) -> Value {
         "border": all.iter().all(|r| r.border.is_some()),
         "subscript": all.iter().all(|r| r.vert_align == VertAlign::Subscript),
         "superscript": all.iter().all(|r| r.vert_align == VertAlign::Superscript),
+        "smallCaps": all.iter().all(|r| r.small_caps),
+        "caps": all.iter().all(|r| r.caps),
+        "hidden": all.iter().all(|r| r.hidden),
+        "spacing": same(&|r| json!(r.spacing)),
         "color": same(&|r| json!(match r.color { TextColor::Auto => "auto".to_string(), TextColor::Rgb(c) => c.hex() })),
         "highlight": same(&|r| json!(r.highlight.map(|c| c.hex()))),
         "style": style,
         "styleName": style_name,
+        // The proofing language (a BCP 47 tag; null when mixed or unset) and "Do not check".
+        "lang": same(&|r| json!(r.lang)),
+        "noProof": all.iter().all(|r| r.no_proof),
     })
 }
 
@@ -520,6 +622,8 @@ mod tests {
         assert_eq!(convert("hello WORLD", "title", true), "Hello World");
         assert_eq!(convert("Hello", "toggle", true), "hELLO");
         assert_eq!(convert("straße", "upper", true), "STRASSE");
+        assert_eq!(convert("hello world", "title", false), "Hello World");
+        assert_eq!(convert("ΣΟΦΟΣ ΟΔΟΣ", "lower", true), "σοφος οδος");
     }
 }
 

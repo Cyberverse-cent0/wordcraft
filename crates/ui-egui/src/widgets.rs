@@ -89,7 +89,7 @@ pub fn enabled(app: &WordApp, id: &str) -> bool {
     }
 }
 
-fn bg(ui: &Ui, r: Rect, resp: &Response, checked: bool, t: &Tokens) {
+pub(crate) fn bg(ui: &Ui, r: Rect, resp: &Response, checked: bool, t: &Tokens) {
     let fill = if resp.is_pointer_button_down_on() {
         t.pressed
     } else if checked {
@@ -399,7 +399,7 @@ pub fn color_grid(ui: &mut Ui, theme: &[wordcraft_doc::Rgb]) -> Option<String> {
     picked
 }
 
-fn swatch(ui: &mut Ui, c: wordcraft_doc::Rgb) -> bool {
+pub(crate) fn swatch(ui: &mut Ui, c: wordcraft_doc::Rgb) -> bool {
     let (r, resp) = ui.allocate_exact_size(vec2(15.0, 15.0), Sense::click());
     ui.painter().rect_filled(r, 0.0, Color32::from_rgb(c.0, c.1, c.2));
     let t = Tokens::get(ui.ctx());
@@ -425,7 +425,12 @@ pub fn combo(
     combo_impl(ui, id, width, current, items, preview, false)
 }
 
+/// What [`font_combo`] returns when its list's last entry, Add Font…, is chosen (#582): the
+/// caller runs `font.add`, which shows a file picker. Not a family name anyone can type.
+pub const ADD_FONT: &str = "\u{1}font.add";
+
 /// The font box: a [`combo`] where typing lists the matching families under the field (#359).
+/// Its list ends with Add Font… ([`ADD_FONT`]).
 /// Up/Down move the highlight, Enter or a click applies the highlighted family ("arial" applies
 /// "Arial"), Escape restores the current font. Text matching no family is applied as typed, as
 /// Word allows fonts that are not installed.
@@ -559,11 +564,19 @@ fn combo_impl(
         }
         let (ar, aresp) = ui.allocate_exact_size(vec2(16.0, resp.rect.height()), Sense::click());
         ui.painter().rect(ar, 0.0, if aresp.hovered() { t.hover } else { t.input }, Stroke::new(1.0, t.input_border), egui::StrokeKind::Inside);
-        icons::paint(ui.painter(), Rect::from_center_size(ar.center(), vec2(9.0, 9.0)), "dropdown", t.icon, t.accent);
-        egui::Popup::menu(&aresp).show(|ui| {
+        icons::paint(ui.painter(), Rect::from_center_size(ar.center(), vec2(10.0, 10.0)), "dropdown", t.icon, t.accent);
+        // The list drops from the box's left edge, as in Word, not from the arrow (#535).
+        egui::Popup::menu(&aresp).anchor(resp.rect.union(ar)).show(|ui| {
             if let Some(v) = combo_list(ui, width, current, items, preview) {
                 out = Some(v);
                 ui.close();
+            }
+            if search {
+                ui.separator();
+                if ui.button(tl!("Add Font…")).clicked() {
+                    out = Some(ADD_FONT.to_string());
+                    ui.close();
+                }
             }
         });
         if s.open && !s.matches.is_empty() {
@@ -672,7 +685,8 @@ fn list_rows<'a>(
 /// How a drawn button looks this frame. Hover fades in over egui's animation time and the
 /// pressed state blends in while the pointer is down, as on egui's own buttons. Framed buttons
 /// take egui's widget visuals (fill, stroke, text colour, expansion) so they match `ui.button`;
-/// frameless ones take the ribbon's hover/pressed tokens, like [`small`] and [`big`].
+/// frameless ones take the ribbon's hover/pressed tokens, like [`small`] and [`big`]. With
+/// animation effects off (egui's animation time is zero) both states show at once.
 pub struct DrawnState {
     pub fill: Color32,
     pub stroke: Stroke,
@@ -683,7 +697,7 @@ pub struct DrawnState {
 pub fn drawn_state(ui: &Ui, resp: &Response, framed: bool) -> DrawnState {
     let pressed = resp.is_pointer_button_down_on();
     let h = ui.ctx().animate_bool_responsive(resp.id.with("hover"), resp.hovered() || pressed);
-    let p = ui.ctx().animate_bool_with_time(resp.id.with("press"), pressed, 0.06);
+    let p = ui.ctx().animate_bool_with_time(resp.id.with("press"), pressed, ui.style().animation_time.min(0.06));
     if framed {
         let w = &ui.visuals().widgets;
         let mix = |a: Color32, b: Color32, c: Color32| a.lerp_to_gamma(b, h).lerp_to_gamma(c, p);

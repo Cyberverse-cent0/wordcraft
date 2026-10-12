@@ -1,6 +1,6 @@
 # Typing parity with Word
 
-> **Last reviewed:** 2026-10-11 · **Last updated:** 2026-10-11 · **Change:** minor (Move Paragraph Up/Down, Promote/Demote, Go Back and Alt+X keys, #343) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-11 · **Last updated:** 2026-10-11 · **Change:** trivial (complex-script caret and Backspace, #604; Move Paragraph Up/Down, Promote/Demote, Go Back and Alt+X keys, #343; previously trivial: outline keys in Outline view, #493) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 What Word does when you type, observed black-box (same keystrokes typed into Word and
 WordCraft, results read back paragraph by paragraph) and pinned by tests in
@@ -20,15 +20,25 @@ overall picture is in [`target-app-parity.md`](target-app-parity.md).
 | Backspace at the start of an item | 1st: number removed, indent kept; 2nd: Normal paragraph — **not** joined to the one above | `backspace_at_the_start_of_an_item_removes_the_number_then_the_indent` |
 | Enter mid-item / at item start | splits the item / inserts an empty item above | `enter_in_the_middle_or_at_the_start_of_an_item` |
 | Shift+Enter in an item | line break inside the same item | `shift_enter_stays_inside_the_list_item` |
+| Paste: Keep Text Only `A`, empty line, `B` into an empty item | three paragraphs `A`, empty, `B`: pasted paragraph breaks are text, not Enter (they never end the list) | `plain_text_paste_keeps_an_empty_paragraph_in_a_list` |
 | `* ` `- ` `1. ` `1) ` `a. ` `a) ` `A. ` `i. ` `I. ` + text | bullet, dash bullet, 1. 1) a. a) A. i. I. lists | `list_autoformat_triggers` |
+| `> ` `-> ` `=> ` + text | bulleted list with an arrow bullet (➢ ➔ ⇨; Word takes them from a symbol font, we use the Unicode arrows) ¹ | `arrow_bullets` |
 | `1. ` after other text | a new list restarting at 1 (never continues an earlier list) | `typing_1_dot_starts_numbering_again` |
 | ⌘Z right after an AutoFormat | undoes only the AutoFormat (`* ` comes back as text) | `undo_right_after_autoformat_undoes_only_the_autoformat` |
+
+## Undo
+
+| Keys | Word's result | Test |
+|---|---|---|
+| type, select some of it, type over it | two undo steps: the first ⌘Z brings the selected text back (still selected), the second removes the typing. Uninterrupted typing stays one step | `typing_then_selecting_then_typing_are_two_undo_steps` |
+| ⌘B with nothing selected, ⌘Z, type | the text isn't bold (Undo takes the waiting caret formatting back too); ⌘Y brings it back | `undoing_bold_at_the_caret_turns_bold_typing_off_again` |
 
 ## Track Changes
 
 | Keys | Word's result | Test |
 |---|---|---|
 | Enter (tracking on) | the new paragraph mark is a tracked insertion; Reject All joins the paragraphs again, Accept All keeps them | `tracked_enter_and_backspace_track_the_paragraph_mark`, `tests::reject_all_removes_a_tracked_paragraph_break` |
+| Paste of several paragraphs (tracking on) | every paragraph mark the paste adds is a tracked insertion; Reject All restores the one paragraph, Accept All keeps the pasted ones | `reject_all_takes_out_the_paragraph_breaks_a_tracked_paste_inserted` |
 | Backspace at a paragraph start / Delete at a paragraph end (tracking on) | the paragraph mark is marked deleted (still shown); the caret moves before it (Backspace) or past it (Delete). Accept joins the paragraphs, Reject keeps them. A mark you inserted yourself is just removed | `tracked_enter_and_backspace_track_the_paragraph_mark`, `tests::tracked_backspace_and_delete_mark_a_paragraph_break_deleted` |
 
 ## Editing keys
@@ -40,6 +50,8 @@ Windows/Linux keys are given first, macOS second.
 |---|---|---|
 | Alt+Shift+Up / Down (⌃⇧↑ / ⌃⇧↓) | the paragraphs the selection touches swap with the paragraph above / below, keeping style and list membership; the selection moves with them; one undo step. A selection ending at the start of a paragraph doesn't take it along. Refused at the top or bottom of the story or cell, next to a table and across a section break | `alt_shift_down_then_up_moves_a_paragraph_and_back_and_undoes` |
 | Alt+Shift+Left / Right (⌃⇧← / ⌃⇧→) | Promote / Demote: a heading goes up or down one level (Heading 1 and Heading 9 are the ends); promoted body text becomes a heading at the level of the heading before it; a list item changes level like Shift+Tab / Tab | `alt_shift_left_and_right_promote_and_demote_headings_and_list_items` |
+| Outline view: Alt+Shift+Up / Down, Left / Right | as above, but a collapsed heading takes what is hidden under it along: moving passes whole shown paragraphs with their hidden content; promote/demote shifts the hidden subheadings too | `outline_collapse_hides_descendants_and_expand_restores` |
+| Outline view: Alt+Shift+Plus / Minus, Alt+Shift+1–9, Alt+Shift+A | Expand / Collapse the heading (one level at a time); Show Level 1–9; show all levels. The caret never stays in hidden text: it moves on to the next shown paragraph | `outline_show_level_filters_paragraphs` |
 | Shift+F5 | Go Back: the caret cycles through the last four places edited, most recent first | `shift_f5_goes_back_through_the_last_edits` |
 | Alt+X (no macOS default) | the hex code before the caret (up to six digits, `U+` optional) or the selected code becomes its character; otherwise the character before the caret becomes its code (`é` ↔ `00E9`); one undo step | `alt_x_toggles_between_a_character_and_its_code` |
 
@@ -59,23 +71,55 @@ Applied when a word is finished by a space, punctuation **or Enter** (`enter_fin
   paragraphs Enter makes from it aren't links (#413; `a_link_covers_only_its_own_text`,
   `typing_at_either_end_of_a_link_is_not_linked`).
 - Enter after `---` `===` `***` `___` `~~~` `###` → a bottom border on the paragraph above
-  (single, double, dotted, thick, wave, triple) (`border_line_autoformat`).
+  (single, double, dotted, thick, wave, triple) (`border_line_autoformat`). ⌘Z right after brings the
+  characters back and removes the border; the Enter stays (one undo step) ¹
+  (`undo_right_after_a_border_line_brings_the_characters_back`).
+- `+---+------+` Enter (plus signs around runs of hyphens, the whole paragraph) → a one-row
+  table across the text width, each column as wide as its share of the hyphens; the caret goes
+  into the first cell. ⌘Z right after brings the characters back. More than 63 columns stay
+  text ¹ (`plus_and_hyphen_line_becomes_a_table`).
+- Smileys `:)` `:-)` `:(` `:-(` `:|` → ☺ ☹ 😐, also straight after a word (`ok:)` → `ok☺`) ¹
+  (`smileys_are_replaced_inside_words_too`).
+
+- Names of days are capitalised (`monday` → `Monday`). AutoCorrect Options (#412,
+  `tools.autocorrect`, saved per user) switch each of these off: replacements, sentence and
+  table-cell capitals, days, smart quotes, fractions, ordinals, dashes, links, bulleted and
+  numbered lists, border lines; user entries are added, replaced or deleted (built-in ones too),
+  and "don't capitalize after" exceptions extend the abbreviation list. A replacement of several
+  words takes a sentence capital on its first (`autocorrect_options_change_what_typing_does`).
+
+¹ From Word's documented AutoFormat and AutoCorrect options; not yet keystroke-compared with
+Word.
+## Editing options (File › Options › Advanced)
+
+| Keys / setting | Result | Test |
+|---|---|---|
+| Typing over a selection | replaces it (Word's default); with "Typing replaces selected text" off, the text goes in front of the selection, which stays | `typing_over_a_selection_follows_the_replace_selection_option` |
+| Overtype on, typing | each character replaces the one after the caret, never the paragraph mark or an object; Insert switches overtype only with the Insert-key option on (off by default, as in Word) | `overtype_replaces_the_characters_after_the_caret` |
 
 ## Layout
 
 - No line break right after a slash (`and/or`, URLs) unless the word can't fit a line
   (`layout::tests::no_line_break_right_after_a_slash`).
 
+## Complex scripts
+
+- Myanmar, Khmer and the Indic scripts are typed in memory order (consonant, medials, then
+  vowel signs such as ေ, which is drawn before its consonant); the caret steps over whole
+  syllables (Myanmar vowel signs and stacked consonants never split off), Backspace removes one
+  character (vowel sign, medial, stacked consonant), Delete the whole syllable — the platforms'
+  standard behaviour, not yet compared against Word (#604,
+  `myanmar_typing_steps_by_syllable_and_backspaces_by_sign`,
+  `indic_and_khmer_backspace_removes_one_character`).
+
 ## Known gaps
 
 - Word's body font Aptos isn't installed outside Office; our substitute (Carlito, else Helvetica
   Neue) is wider, so lines wrap earlier than in Word. Needs a metric-matched open substitute.
-- `:)` inside a word (`ok:)`) isn't replaced (Word replaces it).
 - Moving paragraphs with Track Changes on isn't recorded as a tracked move; whole table rows
   don't move yet (a selection across cells is refused). Go Back's places aren't mapped through
   later edits (they are clamped to the document).
-- Not yet compared: `+---+---+` Enter (table AutoFormat), `> ` arrow bullets, undo after a
-  border line, Correct TWo INitial CApitals.
+- Not yet compared: Correct TWo INitial CApitals; the rows marked ¹ above.
 
 ## How to compare
 
@@ -91,6 +135,13 @@ Applied when a word is finished by a space, punctuation **or Enter** (`enter_fin
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-11 | minor | AutoFormat tables from `+---+`, arrow bullets, smileys inside words, undo after a border line (#546) |
+| 2026-10-11 | trivial | Outline view keys: expand/collapse, Show Level, moving and promoting with collapsed content (#493) |
+| 2026-10-11 | minor | Editing options: typing replaces selection, overtype and the Insert key (#485) |
+| 2026-10-11 | minor | Pasted paragraph breaks: tracked under Track Changes (#417), kept in a list by Keep Text Only (#422) |
+| 2026-10-11 | minor | Complex scripts: caret by syllable, Backspace by character (#604) |
+| 2026-10-11 | minor | Undo rows: a selection ends the typing group (#419); Undo of Bold at the caret restores unbolded typing (#424) |
+| 2026-10-11 | minor | Names of days capitalised; AutoCorrect Options (user entries, deleted built-ins, exceptions, every AutoCorrect/AutoFormat switch) change typing (#412) |
 | 2026-10-11 | minor | Editing keys: Move Paragraph Up/Down, Promote/Demote, Go Back (Shift+F5), Alt+X (#343) |
 | 2026-10-11 | minor | Hyperlinks: text typed at either end of a link or after Enter stays outside it (#413) |
 | 2026-10-10 | trivial | Status line, revision history and cross-links added (progress-docs standard) |

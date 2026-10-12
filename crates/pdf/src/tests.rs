@@ -300,11 +300,44 @@ fn hidden_heading_text_stays_out_of_bookmarks_and_tags() {
     }
 }
 
+/// The CPU time `f` takes on this thread, in seconds. On Linux it is the scheduler's count of the
+/// time the thread actually ran, so the time it waits while other work on a busy machine has the
+/// CPU is left out; elsewhere, wall-clock time.
+fn cpu_cost(f: &mut impl FnMut()) -> f64 {
+    let ran = || {
+        let s = std::fs::read_to_string("/proc/thread-self/schedstat").ok()?;
+        s.split_whitespace().next()?.parse::<u64>().ok()
+    };
+    let (t, before) = (std::time::Instant::now(), ran());
+    f();
+    match (before, ran()) {
+        (Some(a), Some(b)) => b.saturating_sub(a) as f64 * 1e-9,
+        _ => t.elapsed().as_secs_f64(),
+    }
+}
+
+/// How much more `big` costs than `small`, for `big` an input `scale` times the size of `small`'s:
+/// (small, big, big / small), ~`scale` when linear and ~`scale`² when quadratic. Each is the
+/// cheapest of several runs after a warm-up, the runs alternating so a busy spell slows both sizes
+/// alike; `small` is timed `scale` times over per run, so both timings are long against the clock's
+/// resolution.
+fn cost_ratio(scale: usize, mut small: impl FnMut(), mut big: impl FnMut()) -> (f64, f64, f64) {
+    small();
+    big();
+    let mut small_scaled = || (0..scale).for_each(|_| small());
+    let (mut t1, mut tk) = (f64::INFINITY, f64::INFINITY);
+    for _ in 0..5 {
+        t1 = t1.min(cpu_cost(&mut small_scaled) / scale as f64);
+        tk = tk.min(cpu_cost(&mut big));
+    }
+    (t1, tk, tk / t1.max(1e-9))
+}
+
 #[test]
 fn long_fragmented_hidden_headings_export_in_linear_time() {
     // Headings of n chars in one-char runs: all hidden with bold alternating, and hidden and visible
     // alternating. Layout and the bookmark/tag titles once scanned every left-out range for every
-    // char, quadratic in n. Machine-independent: the time for 4n against n, linear ~4, quadratic ~16.
+    // char, quadratic in n. Machine-independent: the cost for 8n against n, linear ~8, quadratic ~64.
     let doc = |n: usize| {
         let heading = |visible_every_other: bool| {
             let mut h = Paragraph::with_text(&"abcdefg ".repeat(n / 8), CharProps::default()).styled("Heading1");
@@ -321,23 +354,19 @@ fn long_fragmented_hidden_headings_export_in_linear_time() {
         d
     };
     let opts = PdfOptions { compress: false, ..Default::default() };
-    // The fastest of a few runs, after a warm-up, so one slow run on a busy machine counts less.
-    let fastest = |d: &Document| {
-        (0..3)
-            .map(|_| {
-                let t = std::time::Instant::now();
-                export(d, &opts).unwrap();
-                t.elapsed().as_secs_f64()
-            })
-            .fold(f64::INFINITY, f64::min)
-    };
-    let n = 25_000;
-    let (small, big) = (doc(n), doc(4 * n));
-    export(&small, &opts).unwrap();
-    let (t1, t4) = (fastest(&small), fastest(&big));
-    let ratio = t4 / t1.max(1e-9);
-    eprintln!("t(n) {t1:.3} s, t(4n) {t4:.3} s, ratio {ratio:.1}");
-    assert!(ratio < 8.0, "4x the text took {ratio:.1}x the time ({t1:.3} s → {t4:.3} s): not linear");
+    let n = 12_500;
+    let (small, big) = (doc(n), doc(8 * n));
+    let (t1, t8, ratio) = cost_ratio(
+        8,
+        || {
+            export(&small, &opts).unwrap();
+        },
+        || {
+            export(&big, &opts).unwrap();
+        },
+    );
+    eprintln!("t(n) {t1:.3} s, t(8n) {t8:.3} s, ratio {ratio:.1}");
+    assert!(ratio < 24.0, "8x the text took {ratio:.1}x the time ({t1:.3} s → {t8:.3} s): not linear");
     let pdf = String::from_utf8_lossy(&export(&big, &opts).unwrap()).into_owned();
     // The all-hidden heading has no bookmark; the other is titled with its visible chars only.
     assert!(!pdf.contains("abcd"), "hidden heading text in a title");
@@ -763,4 +792,75 @@ fn cosmetic_metafile_pens_are_thin_but_visible() {
     let bytes = export(&d, &PdfOptions { compress: false, tagged: false, ..Default::default() }).unwrap();
     let raw = String::from_utf8_lossy(&bytes);
     assert!(raw.contains("0.25 w"), "the hairline is a quarter point wide");
+}
+
+/// #455: a link to a bookmark after a page break inside its paragraph goes to the page the
+/// bookmark is on, not the paragraph's first page.
+#[test]
+fn bookmark_destination_is_the_page_of_its_start() {
+    let mut d = Document::new();
+    let mut p = Paragraph::with_text("Paragraph start\u{c}Bookmark target", CharProps::default());
+    let at = "Paragraph start\u{c}".len();
+    p.insert_object(at, InlineObject::BookmarkStart { name: "target".into() }, &CharProps::default()).unwrap();
+    p.insert_object(0, InlineObject::BookmarkStart { name: "first".into() }, &CharProps::default()).unwrap();
+    d.body = vec![para_block(p)];
+    let lay = layout(&d, &mut LayoutCache::new(), &LayoutOptions::default());
+    assert_eq!(lay.pages.len(), 2);
+    let pages: Vec<usize> = (0..lay.pages.len()).collect();
+    let outlined = HashSet::new();
+    let ex = Exporter {
+        doc: &d,
+        lay: &lay,
+        opts: &PdfOptions::default(),
+        out_index: pages.iter().enumerate().map(|(o, p)| (*p, o)).collect(),
+        fonts: HashMap::new(),
+        outlined: &outlined,
+        cmaps: HashMap::new(),
+        images: HashMap::new(),
+        vectors: HashMap::new(),
+        tags: Vec::new(),
+        tag_index: HashMap::new(),
+        links: Vec::new(),
+    };
+    let (page, x, y) = ex.bookmark("target").unwrap();
+    assert_eq!(page, 1, "the bookmark is on the second page");
+    assert!((x - 72.0).abs() < 1.0 && y < 150.0, "{x} {y}");
+    assert_eq!(ex.bookmark("first").map(|b| b.0), Some(0));
+}
+
+/// Print Markup (#589): the comments and their replies print beside each page, which is scaled
+/// down to keep its paper size; without it they stay out of the PDF.
+#[test]
+fn comments_print_in_balloons_beside_scaled_pages() {
+    let mut d = Document::from_text("Intro line.\nThe quarterly figures look strong.\nClosing line.");
+    let part = d.add_part(wordcraft_doc::PartKind::Comment, vec![para_block(Paragraph::with_text("Check the totals", CharProps::default()))]);
+    d.comments.insert(0, wordcraft_doc::Comment { author: "Ada Reviewer".into(), part, ..Default::default() });
+    let part = d.add_part(wordcraft_doc::PartKind::Comment, vec![para_block(Paragraph::with_text("Totals checked", CharProps::default()))]);
+    d.comments.insert(1, wordcraft_doc::Comment { author: "Ben Editor".into(), part, parent: Some(0), ..Default::default() });
+    d.insert_object(&wordcraft_doc::Pos::body(1, 13), InlineObject::CommentEnd { id: 0 }, &CharProps::default()).unwrap();
+    d.insert_object(&wordcraft_doc::Pos::body(1, 4), InlineObject::CommentStart { id: 0 }, &CharProps::default()).unwrap();
+    let size = |bytes: &[u8]| {
+        let pdf = hayro_syntax::Pdf::new(bytes.to_vec()).expect("parse");
+        pdf.pages().iter().map(|p| p.media_box()).map(|r| (r.width().round(), r.height().round())).collect::<Vec<_>>()
+    };
+    let plain = export(&d, &PdfOptions::default()).unwrap();
+    let text = squash(&extract_text(&plain).concat());
+    assert!(text.contains("quarterly figures") && !text.contains("Check the totals") && !text.contains("Ada Reviewer"), "{text}");
+    let marked = export(&d, &PdfOptions { include_markup: true, comments: true, ..Default::default() }).unwrap();
+    let text = squash(&extract_text(&marked).concat());
+    for want in ["quarterly figures", "Ada Reviewer", "Check the totals", "Ben Editor", "Totals checked"] {
+        assert!(text.contains(want), "{want} missing: {text}");
+    }
+    // Same paper: the page and its markup area are scaled to fit it.
+    assert_eq!(size(&plain), size(&marked));
+    assert_eq!(size(&marked), vec![(612.0, 792.0)]);
+    // Tagged or not, with links and an outline, it still writes.
+    let mut d2 = sample();
+    let part = d2.add_part(wordcraft_doc::PartKind::Comment, vec![para_block(Paragraph::with_text("On the heading", CharProps::default()))]);
+    d2.comments.insert(0, wordcraft_doc::Comment { author: "Ada".into(), part, ..Default::default() });
+    d2.insert_object(&wordcraft_doc::Pos::body(1, 3), InlineObject::CommentStart { id: 0 }, &CharProps::default()).unwrap();
+    for tagged in [false, true] {
+        let bytes = export(&d2, &PdfOptions { tagged, comments: true, ..Default::default() }).unwrap();
+        assert!(squash(&extract_text(&bytes).concat()).contains("On the heading"));
+    }
 }

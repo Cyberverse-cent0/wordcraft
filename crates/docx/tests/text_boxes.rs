@@ -46,6 +46,7 @@ fn text_box(d: &mut Document, text: &str, body: TextBody) -> InlineObject {
         story: Some(id),
         effects: Default::default(),
         freeform: None,
+        extra: Default::default(),
     }
 }
 

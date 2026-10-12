@@ -47,6 +47,7 @@ use wordcraft_doc::{Document, Path as DocPath, Rgb, StoryRef};
 use wordcraft_fonts::FaceRef;
 use wordcraft_geom::Rect;
 use wordcraft_layout::display::{DisplayOptions, Draw, Stroke as LineStyle, page_display};
+use wordcraft_layout::wordart::ArtPaint;
 use wordcraft_layout::{DocLayout, LayoutCache, LayoutOptions, Page, Placed, layout};
 use wordcraft_metafile::{Picture, PlacedItem};
 
@@ -77,20 +78,25 @@ pub struct PdfOptions {
     pub tagged: bool,
     /// Show tracked changes as markup (coloured, underlined / struck through).
     pub include_markup: bool,
+    /// Print Markup's comments: each page is scaled down to make room on its right for the
+    /// comments in balloons joined to their anchors (Word's "Document showing markup").
+    pub comments: bool,
     /// Compress content streams.
     pub compress: bool,
 }
 
 impl Default for PdfOptions {
     fn default() -> Self {
-        PdfOptions { pages: None, title: None, author: None, tagged: true, include_markup: false, compress: true }
+        PdfOptions { pages: None, title: None, author: None, tagged: true, include_markup: false, comments: false, compress: true }
     }
 }
 
 /// Lay out `doc` and write it as PDF. Without markup the layout is the final text: tracked
-/// deletions are left out, as in Word's "No Markup" view.
+/// deletions are left out, as in Word's "No Markup" view. With `comments` each page carries the
+/// markup area with the comment balloons.
 pub fn export(doc: &Document, opts: &PdfOptions) -> Result<Vec<u8>, PdfError> {
-    let lay = layout(doc, &mut LayoutCache::new(), &LayoutOptions { hide_deleted: !opts.include_markup, ..Default::default() });
+    let lo = LayoutOptions { hide_deleted: !opts.include_markup, comment_balloons: opts.comments, ..Default::default() };
+    let lay = layout(doc, &mut LayoutCache::new(), &lo);
     export_layout(doc, &lay, opts)
 }
 
@@ -154,16 +160,26 @@ fn write(doc: &Document, lay: &DocLayout, opts: &PdfOptions, pages: &[usize], ou
     if let Some(o) = ex.outline(pages) {
         pdf.set_outline(o);
     }
-    for (out, &pi) in pages.iter().enumerate() {
+    for &pi in pages {
         let Some(page) = lay.pages.get(pi) else { return Err(PdfError::BadPage(pi + 1)) };
-        let (w, h) = (clamp_side(page.w), clamp_side(page.h));
+        let fit = Fit::of(page);
+        let (w, h) = (clamp_side(fit.paper_w), clamp_side(page.h));
         let size = Size::from_wh(w, h).ok_or(PdfError::NoPages)?;
         let mut kp = pdf.start_page_with(PageSettings::new(size));
         let mut s = kp.surface();
         ex.links.clear();
+        // A page with a markup area is scaled down to fit its paper with the area beside it.
+        let scaled = fit.k < 1.0;
+        if scaled {
+            s.push_transform(&Transform::from_row(fit.k, 0.0, 0.0, fit.k, 0.0, fit.dy));
+        }
+        // `w` is the document page's width: the page colour and watermark stay off the markup area.
         ex.page(&mut s, page, w, h);
+        if scaled {
+            s.pop();
+        }
         s.finish();
-        for a in ex.annotations(out) {
+        for a in ex.annotations(fit) {
             kp.add_annotation(a);
         }
         kp.finish();
@@ -181,6 +197,32 @@ fn write(doc: &Document, lay: &DocLayout, opts: &PdfOptions, pages: &[usize], ou
             }
         }
         Err(e) => Err(PdfError::Write(format!("{e:?}"))),
+    }
+}
+
+/// How a layout page maps onto its PDF page: a page with a markup area (Print Markup) is scaled
+/// by `k` to its paper width and centred vertically (`dy`); any other page is drawn as it is.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Fit {
+    paper_w: f32,
+    k: f32,
+    dy: f32,
+}
+
+impl Fit {
+    fn of(page: &Page) -> Fit {
+        let paper_w = page.w - page.markup;
+        if page.markup > 0.0 && ok(page.markup) && ok(page.w) && paper_w > 1.0 {
+            let k = paper_w / page.w;
+            Fit { paper_w, k, dy: page.h * (1.0 - k) / 2.0 }
+        } else {
+            Fit { paper_w: page.w, k: 1.0, dy: 0.0 }
+        }
+    }
+
+    /// A layout point on the PDF page.
+    fn point(self, x: f32, y: f32) -> (f32, f32) {
+        (x * self.k, y * self.k + self.dy)
     }
 }
 
@@ -408,9 +450,15 @@ fn shape_path(kind: ShapeKind, r: &Rect) -> Option<Path> {
         ShapeKind::Ellipse => ellipse(&mut pb, cx, cy, r.w / 2.0, r.h / 2.0),
         ShapeKind::Triangle => poly(&mut pb, &[(cx, y0), (x1, y1), (x0, y1)]),
         ShapeKind::Diamond => poly(&mut pb, &[(cx, y0), (x1, cy), (cx, y1), (x0, cy)]),
+        // DrawingML's `line`: top-left to bottom-right (flips give the other directions).
         ShapeKind::Line => {
-            pb.move_to(x0, y1);
-            pb.line_to(x1, y0);
+            pb.move_to(x0, y0);
+            pb.line_to(x1, y1);
+        }
+        // Connectors are drawn as paths (`Draw::Path`); this is their frame's diagonal.
+        ShapeKind::StraightConnector | ShapeKind::ElbowConnector | ShapeKind::CurvedConnector => {
+            pb.move_to(x0, y0);
+            pb.line_to(x1, y1);
         }
         ShapeKind::Arrow => {
             let h = r.h;
@@ -818,6 +866,56 @@ impl Exporter<'_> {
                 s.set_fill(None);
                 s.set_stroke(None);
             }
+            Draw::Art { path, fx, color, alpha } => {
+                for l in wordcraft_layout::wordart::art_layers(path, fx, *color, *alpha) {
+                    let mut pb = PathBuilder::new();
+                    append_path(&mut pb, &l.path);
+                    let Some(p) = pb.finish() else { continue };
+                    let (paint, opacity): (krilla::paint::Paint, f32) = match &l.paint {
+                        ArtPaint::Solid(c, a) => (rgb::Color::new(c.0, c.1, c.2).into(), *a),
+                        ArtPaint::Linear { p0, p1, stops } => {
+                            let stops = stops
+                                .iter()
+                                .map(|(o, c, a)| krilla::paint::Stop {
+                                    offset: norm(*o),
+                                    color: rgb::Color::new(c.0, c.1, c.2).into(),
+                                    opacity: norm(*a),
+                                })
+                                .collect();
+                            let g = krilla::paint::LinearGradient {
+                                x1: p0.0,
+                                y1: p0.1,
+                                x2: p1.0,
+                                y2: p1.1,
+                                transform: Transform::default(),
+                                spread_method: krilla::paint::SpreadMethod::Pad,
+                                stops,
+                                anti_alias: true,
+                            };
+                            (g.into(), 1.0)
+                        }
+                    };
+                    match l.stroke {
+                        Some(w) => {
+                            s.set_fill(None);
+                            s.set_stroke(Some(Stroke {
+                                paint,
+                                width: w.clamp(0.1, 400.0),
+                                opacity: norm(opacity),
+                                line_join: LineJoin::Round,
+                                ..Default::default()
+                            }));
+                        }
+                        None => {
+                            s.set_stroke(None);
+                            s.set_fill(Some(Fill { paint, opacity: norm(opacity), rule: FillRule::NonZero }));
+                        }
+                    }
+                    s.draw_path(&p);
+                }
+                s.set_fill(None);
+                s.set_stroke(None);
+            }
             Draw::Mark { .. } | Draw::MarkText { .. } => {}
             Draw::Clip { rect, items } => {
                 let Some(clip) = rect_path(rect) else { return };
@@ -1109,9 +1207,28 @@ impl Exporter<'_> {
         }
     }
 
-    /// Where a bookmark is: (output page, x, y).
+    /// Where a bookmark is: (output page, x, y) — the page and line its start lands on, which
+    /// in a paragraph split across pages need not be the paragraph's first page.
     fn bookmark(&self, name: &str) -> Option<(usize, f32, f32)> {
         let (_, pos) = self.doc.bookmarks().into_iter().find(|(n, _)| n == name)?;
+        if let Some(c) = self.lay.caret(&pos)
+            && let Some(out) = self.out_index.get(&c.page)
+        {
+            // The left edge of the paragraph's piece on that page, at the top of the line.
+            let x = self
+                .lay
+                .index
+                .get(&(pos.story, pos.path.clone()))
+                .into_iter()
+                .flatten()
+                .filter(|(pi, _)| *pi == c.page)
+                .find_map(|(pi, ii)| match self.lay.pages.get(*pi).and_then(|p| p.items.get(*ii)) {
+                    Some(Placed::Lines { x, .. }) => Some(*x),
+                    _ => None,
+                })
+                .unwrap_or(c.x);
+            return Some((*out, x, c.top));
+        }
         self.locate(pos.story, &pos.path)
     }
 
@@ -1120,8 +1237,9 @@ impl Exporter<'_> {
         let places = self.lay.index.get(&(story, path.clone()))?;
         for (pi, ii) in places {
             let Some(out) = self.out_index.get(pi) else { continue };
-            let (x, y) = match self.lay.pages.get(*pi).and_then(|p| p.items.get(*ii)) {
-                Some(Placed::Lines { x, y, .. }) => (*x, *y),
+            let Some(page) = self.lay.pages.get(*pi) else { continue };
+            let (x, y) = match page.items.get(*ii) {
+                Some(Placed::Lines { x, y, .. }) => Fit::of(page).point(*x, *y),
                 _ => (0.0, 0.0),
             };
             return Some((*out, x, y));
@@ -1129,10 +1247,11 @@ impl Exporter<'_> {
         None
     }
 
-    fn annotations(&self, _out: usize) -> Vec<Annotation> {
+    fn annotations(&self, fit: Fit) -> Vec<Annotation> {
         let mut v = Vec::new();
         for (x0, y0, x1, y1, target) in &self.links {
-            let Some(rect) = krilla::geom::Rect::from_ltrb(*x0, *y0, *x1, *y1) else { continue };
+            let ((x0, y0), (x1, y1)) = (fit.point(*x0, *y0), fit.point(*x1, *y1));
+            let Some(rect) = krilla::geom::Rect::from_ltrb(x0, y0, x1, y1) else { continue };
             let t = if let Some(name) = target.strip_prefix('#') {
                 match self.bookmark(name) {
                     Some((page, x, y)) => Target::Destination(XyzDestination::new(page, Point::from_xy(x, y)).into()),
@@ -1163,7 +1282,8 @@ impl Exporter<'_> {
                 if title.is_empty() {
                     continue;
                 }
-                flat.push((level.min(8), title, out, *x, *y));
+                let (x, y) = Fit::of(page).point(*x, *y);
+                flat.push((level.min(8), title, out, x, y));
             }
         }
         if flat.is_empty() {

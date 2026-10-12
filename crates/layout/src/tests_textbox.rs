@@ -26,6 +26,7 @@ fn text_box(d: &mut Document, para: usize, text: &str, w: f32, h: f32, body: Tex
         story: Some(id),
         effects: Default::default(),
         freeform: None,
+        extra: Default::default(),
     };
     let off = d.para(StoryRef::Body, &Path::top(para)).map_or(0, |p| p.len());
     d.insert_object(&Pos::body(para, off), shape, &Default::default()).unwrap();

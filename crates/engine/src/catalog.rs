@@ -13,12 +13,14 @@ File|Backstage|Open|file.open
 File|Backstage|Save|file.save
 File|Backstage|Save As|file.saveAs
 File|Backstage|Print|file.print
+File|Backstage|Print Markup|file.printMarkup
 File|Backstage|Close|file.close
 File|Backstage|Info|file.info
 File|Backstage|Properties|file.properties
 File|Backstage|Export PDF|file.exportPdf
 File|Backstage|Export Image|file.exportPng
 File|Backstage|Options|file.options
+File|Options|Numerals|view.numeral
 File|Backstage|Share|file.share
 File|Backstage|Protect Document|file.protect
 File|Backstage|Inspect Document|file.inspect
@@ -57,6 +59,7 @@ Home|Font|Subscript|format.subscript
 Home|Font|Superscript|format.superscript
 Home|Font|Text Effects Outline|format.outline
 Home|Font|Text Effects Shadow|format.shadow
+Home|Font|Text Effects and Typography|format.textEffects
 Home|Font|Text Highlight Color|format.highlight
 Home|Font|Font Color|format.color
 Home|Font|Character Shading|format.shading
@@ -217,7 +220,9 @@ Layout|Page Setup|Line Numbers|layout.lineNumbers
 Layout|Page Setup|Hyphenation|layout.hyphenation
 Layout|Page Setup|Page Setup Dialog|layout.pageSetup
 Layout|Page Setup|Vertical Alignment|layout.verticalAlign
+Layout|Page Setup|Document Grid|layout.documentGrid
 Layout|Page Setup|Section Direction|layout.sectionRtl
+Layout|Page Setup|Text Direction|layout.textDirection
 Layout|Paragraph|Indent|para.indents
 Layout|Paragraph|Spacing|para.spacing
 Layout|Arrange|Position|arrange.position
@@ -251,6 +256,7 @@ References|Index|Insert Index|references.index
 References|Index|Update Index|references.updateIndex
 References|Table of Authorities|Mark Citation|references.markCitation
 References|Table of Authorities|Insert Table of Authorities|references.tableOfAuthorities
+References|Table of Authorities|Update Table|references.updateAuthorities
 References|Fields|Update Fields|references.updateFields
 Mailings|Create|Envelopes|mailings.envelopes
 Mailings|Create|Labels|mailings.labels
@@ -274,6 +280,7 @@ Review|Proofing|Thesaurus|review.thesaurus
 Review|Proofing|Word Count|review.wordCount
 Review|Speech|Read Aloud|review.readAloud
 Review|Accessibility|Check Accessibility|file.accessibility
+Review|Accessibility|Alt Text|view.altTextPane
 Review|Language|Translate|review.translate
 Review|Language|Language|review.language
 Review|Comments|New Comment|review.newComment
@@ -328,6 +335,17 @@ View|Window|Switch Windows|view.switchWindows
 View|Macros|Macros|tools.macros
 View|Macros|Record Macro|tools.recordMacro
 View|SharePoint|Properties|file.properties
+Developer|Controls|Rich Text Content Control|developer.richText
+Developer|Controls|Plain Text Content Control|developer.plainText
+Developer|Controls|Picture Content Control|developer.picture
+Developer|Controls|Building Block Gallery Content Control|developer.buildingBlock
+Developer|Controls|Check Box Content Control|developer.checkBox
+Developer|Controls|Combo Box Content Control|developer.comboBox
+Developer|Controls|Drop-Down List Content Control|developer.dropDown
+Developer|Controls|Date Picker Content Control|developer.datePicker
+Developer|Controls|Repeating Section Content Control|developer.repeatingSection
+Developer|Controls|Design Mode|developer.designMode
+Developer|Controls|Properties|developer.properties
 Table Design|Table Style Options|Table Style Options|table.look
 Table Design|Table Styles|Table Styles|table.style
 Table Design|Table Styles|New Table Style|table.newStyle
@@ -341,6 +359,7 @@ Table Layout|Table|Select Row|table.selectRow
 Table Layout|Table|Select Cell|table.selectCell
 Table Layout|Table|View Gridlines|table.viewGridlines
 Table Layout|Table|Properties|table.properties
+Table Layout|Table|Alt Text|table.altText
 Table Layout|Table|Table Direction|table.rtl
 Table Layout|Draw|Draw Table|table.draw
 Table Layout|Draw|Eraser|table.eraser
@@ -389,6 +408,19 @@ Equation|Equation Options|Change to Inline / Display|equation.display
 Equation|Equation Options|Justification|equation.justify
 Equation|Equation Options|Equation Number (#)|equation.number
 Equation|Equation Options|Structure Commands|equation.structure
+Outlining|Outline Tools|Promote to Heading 1|outline.promoteToHeading1
+Outlining|Outline Tools|Promote|outline.promote
+Outlining|Outline Tools|Outline Level|outline.level
+Outlining|Outline Tools|Demote|outline.demote
+Outlining|Outline Tools|Demote to Body Text|outline.demoteToBody
+Outlining|Outline Tools|Move Up|outline.moveUp
+Outlining|Outline Tools|Move Down|outline.moveDown
+Outlining|Outline Tools|Expand|outline.expand
+Outlining|Outline Tools|Collapse|outline.collapse
+Outlining|Outline Tools|Show Level|outline.showLevel
+Outlining|Outline Tools|Show Text Formatting|outline.showFormatting
+Outlining|Outline Tools|Show First Line Only|outline.firstLineOnly
+Outlining|Close|Close Outline View|outline.close
 Picture Format|Adjust|Remove Background|picture.removeBackground
 Picture Format|Adjust|Corrections|picture.corrections
 Picture Format|Adjust|Color|picture.color
@@ -400,12 +432,29 @@ Picture Format|Adjust|Reset Picture|picture.reset
 Picture Format|Picture Styles|Picture Styles|picture.style
 Picture Format|Picture Styles|Picture Border|picture.border
 Picture Format|Accessibility|Alt Text|picture.altText
+Shape Format|Accessibility|Alt Text|object.altText
 Picture Format|Size|Crop|picture.crop
 Picture Format|Size|Size|picture.size
 Picture Format|Size|Rotation|arrange.rotation
+SmartArt Design|Create Graphic|Add Shape|smartArt.addShape
+SmartArt Design|Create Graphic|Promote|smartArt.promote
+SmartArt Design|Create Graphic|Demote|smartArt.demote
+SmartArt Design|Create Graphic|Text Pane|smartArt.textPane
+SmartArt Design|Layouts|Layouts|smartArt.layout
+SmartArt Design|SmartArt Styles|Change Colors|smartArt.colors
+SmartArt Design|Reset|Reset Graphic|smartArt.reset
+Chart Design|Type|Change Chart Type|chart.type
+Chart Design|Data|Edit Data|chart.editData
+Chart Design|Chart Layouts|Chart Title|chart.title
+Chart Design|Chart Layouts|Legend|chart.legend
+Chart Design|Chart Layouts|Data Labels|chart.dataLabels
 Shape Format|Shape Styles|Shape Fill|shape.fill
 Shape Format|Shape Styles|Shape Outline|shape.outline
 Shape Format|Shape Styles|Shape Effects|shape.effects
+Shape Format|WordArt Styles|WordArt Quick Styles|wordArt.style
+Shape Format|WordArt Styles|Text Fill|wordArt.textFill
+Shape Format|WordArt Styles|Text Outline|wordArt.textOutline
+Shape Format|WordArt Styles|Text Effects Transform|wordArt.transform
 Shape Format|Text|Text Direction|shape.textDirection
 Shape Format|Text|Align Text|shape.alignText
 Shape Format|Text|Create Link|shape.link

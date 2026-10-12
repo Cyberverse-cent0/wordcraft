@@ -2,6 +2,9 @@
 
 use wordcraft_doc::Document;
 
+#[cfg(not(target_arch = "wasm32"))]
+mod safe_save;
+
 /// Formats WordCraft opens.
 pub const OPEN_EXTS: &[&str] = &[
     "docx",
@@ -20,20 +23,34 @@ pub const OPEN_EXTS: &[&str] = &[
     "tex",
     "latex",
     "ltx",
+    "xml",
     "wcraft.json",
     "json",
 ];
 /// Formats WordCraft saves (Save As).
-pub const SAVE_EXTS: &[&str] = &["docx", "docm", "dotx", "dotm", "pdf", "txt", "md", "html", "rtf", "odt", "tex", "png", "json"];
+pub const SAVE_EXTS: &[&str] = &["docx", "docm", "dotx", "dotm", "pdf", "txt", "md", "html", "rtf", "odt", "tex", "png", "json", "xml"];
 
+/// The extension of a file name or path, lower-case; empty when the file name has none (a dot
+/// in a folder name doesn't count).
 fn ext_of(name: &str) -> String {
-    let lower = name.to_ascii_lowercase();
-    lower.rsplit('.').next().unwrap_or("").to_string()
+    let file = name.rsplit(['/', '\\']).next().unwrap_or(name);
+    file.rsplit_once('.').map(|(_, ext)| ext.to_ascii_lowercase()).unwrap_or_default()
 }
 
 /// Is `ext` one of Word's package formats (.docx/.docm/.dotx/.dotm), which save without loss?
 pub fn is_word_package(ext: &str) -> bool {
     wordcraft_docx::Flavor::from_ext(ext).is_some()
+}
+
+/// How a copy in another format is written.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ExportOptions {
+    /// Print Markup: PDFs show tracked changes marked up and, with `comments`, each page scaled
+    /// down beside a markup area with the comments in balloons (page images get the area too);
+    /// HTML, Markdown and text copies end with the comments.
+    pub markup: bool,
+    /// With `markup`, show the comments (Track Changes Options › Comments).
+    pub comments: bool,
 }
 
 /// A document password: wiped from memory when dropped, never printed (`Debug` shows `***`).
@@ -93,27 +110,64 @@ pub fn open_bytes_with(name: &str, bytes: &[u8], password: Option<&str>) -> Resu
         doc.ensure_nonempty();
         return Ok((doc, true));
     }
+    if ext.is_empty() {
+        return open_by_content(name, &ext, bytes, password);
+    }
     let mut doc = match ext.as_str() {
         // Plain text goes through the formats importer: BOMs, unmarked UTF-16, Windows-1252.
         "txt" | "text" | "" => wordcraft_formats::txt::import(bytes),
         "json" => serde_json::from_slice::<Document>(bytes).map_err(|e| format!("{name}: {e}"))?,
         other => match crate::io_ext::open(other, bytes) {
             Some(r) => r?,
-            None => return Err(format!("{name}: unsupported format `.{other}`")),
+            None => return open_by_content(name, other, bytes, password),
         },
     };
     doc.ensure_nonempty();
     Ok((doc, false))
 }
 
+/// A file whose extension names no format WordCraft knows (`.m3u`, `.log`, `.ini`, none…),
+/// opened by what it holds, as Word does: a Word document or RTF file by its signature, any
+/// other text through the plain-text import with encoding detection (#569). Anything else is
+/// refused with a clear error rather than shown as garbage.
+fn open_by_content(name: &str, ext: &str, bytes: &[u8], password: Option<&str>) -> Result<(Document, bool), String> {
+    const ZIP: &[u8] = b"PK\x03\x04";
+    const OLE: &[u8] = &[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1];
+    let (mut doc, encrypted) = if bytes.starts_with(OLE) && wordcraft_docx::is_encrypted(bytes) {
+        (wordcraft_docx::read_with_password(bytes, password).map_err(|e| e.to_string())?, true)
+    } else if bytes.starts_with(ZIP) {
+        (wordcraft_docx::read(bytes).map_err(|e| format!("{name}: not a document WordCraft can open ({e})"))?, false)
+    } else if bytes.starts_with(OLE) {
+        (wordcraft_docbin::read(bytes).map_err(|e| format!("{name}: not a document WordCraft can open ({e})"))?, false)
+    } else if bytes.starts_with(b"{\\rtf") {
+        (wordcraft_formats::rtf::import(bytes)?, false)
+    } else if wordcraft_formats::txt::is_text(bytes) {
+        (wordcraft_formats::txt::import(bytes), false)
+    } else if ext.is_empty() {
+        return Err(format!("{name}: not a document or text file WordCraft can open"));
+    } else {
+        return Err(format!("{name}: unsupported format `.{ext}` (not a document or text file)"));
+    };
+    doc.ensure_nonempty();
+    Ok((doc, encrypted))
+}
+
 /// Serialise a document; `name` gives the format by extension.
 pub fn save_bytes(name: &str, doc: &Document) -> Result<Vec<u8>, String> {
+    save_bytes_opts(name, doc, &ExportOptions::default())
+}
+
+/// [`save_bytes`] with export options (Print Markup).
+pub fn save_bytes_opts(name: &str, doc: &Document, opts: &ExportOptions) -> Result<Vec<u8>, String> {
     let ext = ext_of(name);
     match ext.as_str() {
         // List paragraphs get their label and a tab, as in Word's plain-text save.
-        "txt" | "text" => Ok(wordcraft_formats::txt::export(doc)),
+        "txt" | "text" => {
+            let bytes = wordcraft_formats::txt::export(doc);
+            Ok(if opts.markup && opts.comments { wordcraft_formats::comments::append("txt", doc, bytes) } else { bytes })
+        }
         "json" => serde_json::to_vec_pretty(doc).map_err(|e| e.to_string()),
-        other => match crate::io_ext::save(other, doc) {
+        other => match crate::io_ext::save(other, doc, opts) {
             Some(r) => r,
             None => Err(format!("{name}: can't save as `.{other}`")),
         },
@@ -122,8 +176,8 @@ pub fn save_bytes(name: &str, doc: &Document) -> Result<Vec<u8>, String> {
 
 /// [`save_bytes`], encrypted with `password` when there is one and the format is a Word package
 /// (other formats are copies and are written as they are).
-pub fn save_bytes_with(name: &str, doc: &Document, password: Option<&str>) -> Result<Vec<u8>, String> {
-    let bytes = save_bytes(name, doc)?;
+pub fn save_bytes_with(name: &str, doc: &Document, password: Option<&str>, opts: &ExportOptions) -> Result<Vec<u8>, String> {
+    let bytes = save_bytes_opts(name, doc, opts)?;
     match password {
         Some(pw) if can_encrypt(name) => wordcraft_docx::encrypt(&bytes, pw).map_err(|e| e.to_string()),
         _ => Ok(bytes),
@@ -262,21 +316,18 @@ pub fn open_path_with(path: &std::path::Path, _password: Option<&str>) -> Result
 }
 
 pub fn save_path(path: &std::path::Path, doc: &Document) -> Result<(), String> {
-    save_path_with(path, doc, None)
+    save_path_with(path, doc, None, &ExportOptions::default())
 }
 
 /// [`save_path`], encrypted with `password` as [`save_bytes_with`] does.
 #[cfg(not(target_arch = "wasm32"))]
-pub fn save_path_with(path: &std::path::Path, doc: &Document, password: Option<&str>) -> Result<(), String> {
-    let bytes = save_bytes_with(&path.to_string_lossy(), doc, password)?;
-    // Write atomically: temp file next to the target, then rename.
-    let tmp = path.with_extension(format!("{}.tmp", ext_of(&path.to_string_lossy())));
-    std::fs::write(&tmp, &bytes).map_err(|e| format!("{}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display()))
+pub fn save_path_with(path: &std::path::Path, doc: &Document, password: Option<&str>, opts: &ExportOptions) -> Result<(), String> {
+    let bytes = save_bytes_with(&path.to_string_lossy(), doc, password, opts)?;
+    safe_save::write(path, &bytes).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 #[cfg(target_arch = "wasm32")]
-pub fn save_path_with(path: &std::path::Path, _doc: &Document, _password: Option<&str>) -> Result<(), String> {
+pub fn save_path_with(path: &std::path::Path, _doc: &Document, _password: Option<&str>, _opts: &ExportOptions) -> Result<(), String> {
     Err(format!("{}: files are saved through the browser on the web", path.display()))
 }
 
